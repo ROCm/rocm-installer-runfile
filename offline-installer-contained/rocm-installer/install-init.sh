@@ -75,7 +75,9 @@ os_release() {
         echo "Unsupported OS"
         exit 1
     fi
-    
+}
+
+validate_version() {
     # For non-local builds, verify package version matches for the running host distribution
     if [[ $BUILD_INSTALLER_NAME != *"local"* ]]; then
     
@@ -85,8 +87,10 @@ os_release() {
         if [ $version_build != $version_install ]; then
             echo -e "\e[31m++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\e[0m"
             echo -e "\e[31mError: ROCm Runfile Installer Package mismatch:\e[0m"
-            echo -e "\e[31m       ${DISTRO_NAME} ${version_install} != ${DISTRO_NAME} ${version_build} (Package)\e[0m"
+            echo -e "\e[31mInstall Build: ${DISTRO_NAME} ${version_build}\e[0m"
+            echo -e "\e[31mInstall OS   : ${DISTRO_NAME} ${version_install}\e[0m"
             echo -e "\e[31m++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\e[0m"
+            echo Exiting installation.
             exit 1
         fi
     fi
@@ -114,6 +118,8 @@ do
 done
 
 if [ -z "$ARGS" ]; then
+    validate_version
+
     echo Using ROCm Installer UI.
     ./rocm_ui
 else

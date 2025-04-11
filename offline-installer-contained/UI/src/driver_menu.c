@@ -277,17 +277,7 @@ void driver_status_draw()
 
 void driver_menu_draw()
 {
-    WINDOW *pMenuWindow = menuDriver.pMenuWindow;
     DRIVER_MENU_CONFIG *pDriverConfig = &(menuDriver.pConfig)->driver_config;
-    
-    if (!gDriverStatusCheck)
-    {
-        mvwprintw(pMenuWindow, DRIVER_MENU_DRIVER_STATUS_ROW, DRIVER_MENU_DRIVER_STATUS_COL, "%s", "<Select to Search>");
-    }
-    else
-    {
-        mvwprintw(pMenuWindow, DRIVER_MENU_DRIVER_STATUS_ROW, DRIVER_MENU_DRIVER_STATUS_COL, "%s", "                  ");
-    }
 
     menu_info_draw_bool(&menuDriver, DRIVER_MENU_ITEM_INSTALL_DRIVER_ROW, DRIVER_MENU_FORM_COL, pDriverConfig->install_driver);
     menu_info_draw_bool(&menuDriver, DRIVER_MENU_ITEM_START_DRIVER_ROW, DRIVER_MENU_FORM_COL, pDriverConfig->start_driver);

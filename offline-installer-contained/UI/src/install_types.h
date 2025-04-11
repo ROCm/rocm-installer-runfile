@@ -43,7 +43,8 @@
 #define LARGE_CHAR_SIZE        1024
 #define SMALL_CHAR_SIZE        32
 
-#define MAX_PATHS 25
+// max rocm paths
+#define MAX_PATHS 50
 
 
 // Distro/OS type
