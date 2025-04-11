@@ -319,6 +319,14 @@ int find_rocm_installed(char *target, char fpaths[MAX_PATHS][LARGE_CHAR_SIZE], i
     // Check if the command was successful
     if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) 
     {
+        // the command maybe success, check for output
+        if (*pCount == 0)
+        {
+            return -1;
+        }
+    } 
+    else 
+    {
         return -1;
     }
 
