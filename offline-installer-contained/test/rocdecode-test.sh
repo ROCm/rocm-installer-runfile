@@ -1,0 +1,274 @@
+#!/bin/bash
+
+# #############################################################################
+# Copyright (C) 2024-2025 Advanced Micro Devices, Inc. All rights reserved.
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
+# #############################################################################
+
+
+###### Functions ###############################################################
+
+os_release() {
+    if [[ -r  /etc/os-release ]]; then
+        . /etc/os-release
+
+        DISTRO_NAME=$ID
+        DISTRO_VER=$(awk -F= '/^VERSION_ID=/{print $2}' /etc/os-release | tr -d '"')
+
+        case "$ID" in
+        ubuntu)
+	    echo "Running test on Ubuntu $DISTRO_VER."
+	    DISTRO_PACKAGE_MGR="apt"
+	    PACKAGE_TYPE="deb"
+	    ;;
+	rhel)
+	    echo "Running test on RHEL $DISTRO_VER."
+	    DISTRO_PACKAGE_MGR="dnf"
+	    PACKAGE_TYPE="rpm"
+            ;;
+        sles)
+	    echo "Running test on SUSE $DISTRO_VER."
+	    DISTRO_PACKAGE_MGR="zypper"
+	    PACKAGE_TYPE="rpm"
+            ;;
+        *)
+            echo "$ID is not a Unsupported OS"
+            exit 1
+            ;;
+        esac
+    else
+        echo "Unsupported OS"
+        exit 1
+    fi
+}
+
+install_deps() {
+    echo ++++++++++++++++++++++++++++++++
+    echo Installing deps...
+    
+    # install any dependencies for rocdecode
+    if [ $DISTRO_PACKAGE_MGR == "apt" ]; then
+        $SUDO apt-get install -y cmake pkg-config
+        $SUDO apt-get install -y vainfo
+        
+        if [[ $DISTRO_VER == 22.04 ]]; then
+            python3 -m pip install pandas tabulate
+        else
+            $SUDO apt-get install -y python3-pandas python3-tabulate
+        fi
+        
+    elif [ $DISTRO_PACKAGE_MGR == "dnf" ]; then
+        $SUDO dnf install pkg-config
+        
+        if [[ $DISTRO_VER == 8* ]]; then
+            echo Installing deps for RHEL8...
+            
+            $SUDO dnf install -y https://download1.rpmfusion.org/free/el/rpmfusion-free-release-8.noarch.rpm
+            $SUDO dnf install -y https://download1.rpmfusion.org/nonfree/el/rpmfusion-nonfree-release-8.noarch.rpm
+            $SUDO dnf install -y cmake gcc-c++ ffmpeg ffmpeg-devel
+            $SUDO dnf install -y mpg123-libs
+            
+            $SUDO dnf install -y gcc-toolset-11
+            
+            source ../package-puller/config/el/8/rocm-6.3.1-el8.config
+            
+	elif [[ $DISTRO_VER == 9* ]]; then
+	    echo Installing deps for RHEL9...
+	    
+	    $SUDO dnf install -y https://download1.rpmfusion.org/free/el/rpmfusion-free-release-9.noarch.rpm
+            $SUDO dnf install -y https://download1.rpmfusion.org/nonfree/el/rpmfusion-nonfree-release-9.noarch.rpm
+            $SUDO dnf install -y cmake ffmpeg ffmpeg-devel
+            $SUDO dnf install -y mpg123-libs
+
+	    source ../package-puller/config/el/9/rocm-6.3.1-el9.config
+	    
+	else
+            echo "Unsupported version for EL."
+            exit 1
+        fi
+        
+        python3 -m pip install pandas tabulate
+	
+   	echo "$AMDGPU_REPO" | $SUDO tee -a /etc/yum.repos.d/amdgpu-build.repo
+
+    	$SUDO dnf clean all
+    	$SUDO rm -rf /var/cache/dnf/*
+    
+    	$SUDO dnf install -y libva-amdgpu-devel mesa-amdgpu-va-drivers
+    	$SUDO dnf install -y libva-utils
+    	
+    elif [ $DISTRO_PACKAGE_MGR == "zypper" ]; then
+       $SUDO zypper install cmake ffmpeg-4-libavcodec-devel ffmpeg-4-libavformat-devel ffmpeg-4-libavutil-devel
+       
+       python3 -m pip install pandas tabulate
+       
+       if [[ $DISTRO_VER == 15.5 ]]; then
+           source ../package-puller/config/sle/15.5/rocm-6.3.1-sle-15.5.config
+       elif [[ $DISTRO_VER == 15.6 ]]; then
+           source ../package-puller/config/sle/15.6/rocm-6.3.1-sle-15.6.config
+       else
+           echo SLES $DISTRO_VER is not supported.
+           exit 1
+       fi
+       
+       echo "$AMDGPU_REPO" | $SUDO tee -a /etc/zypp/repos.d/amdgpu-build.repo
+       
+       $SUDO zypper clean
+       $SUDO zypper --gpg-auto-import-keys refresh
+       
+       $SUDO zypper install -y libva-amdgpu-devel mesa-amdgpu-va-drivers
+       
+    else
+        echo Unsupported Distro.
+        exit 1
+    fi
+    
+    echo Installing deps...Complete.
+}
+
+cleanup() {
+    echo ++++++++++++++++++++++++++++++++
+    echo Cleaning up...
+    
+    if [ $DISTRO_PACKAGE_MGR == "dnf" ]; then
+        $SUDO rm /etc/yum.repos.d/amdgpu-build.repo
+        
+        # cleanup dnf cache
+        $SUDO dnf clean all
+        $SUDO rm -r /var/cache/dnf/*
+        
+    elif [ $DISTRO_PACKAGE_MGR == "zypper" ]; then
+        $SUDO rm /etc/zypp/repos.d/amdgpu-build.repo
+        $SUDO zypper clean
+    fi
+
+    echo Cleaning up...Complete.
+}
+
+setup_rocm() {
+    echo ------------------------------------------------------
+    echo Setting up ROCm paths...
+    
+    # Look for the rocm directory
+    ROCM_VER_DIR=$(find / -type f -path '*/opt/rocm-*/.info/version' ! -path '*/rocm-installer/component-rocm/*' -print -quit 2>/dev/null)
+
+    if [ -n "$ROCM_VER_DIR" ]; then
+        echo "ROCm Install Directory found at: $ROCM_VER_DIR"
+    
+        ROCM_DIR=${ROCM_VER_DIR%%.info*}
+        echo ROCM_DIR = $ROCM_DIR
+    else
+        echo "ROCm Install Directory not found"
+        exit 1
+    fi
+
+    # Set the ROCm paths
+    export ROCM_PATH="$ROCM_DIR"
+    
+    # Set compiler paths
+    if [[ $DISTRO_PACKAGE_MGR != "zypper" ]]; then
+        export CXX=$ROCM_PATH/llvm/bin/amdclang++
+        export CC=$ROCM_PATH/llvm/bin/amdclang
+    fi
+    
+    echo Setting up ROCm paths...Complete.
+}
+
+test_samples() {
+    echo ------------------------------------------------------
+    echo TESTING rocDecodeSamples...
+    echo ------------------------------------------------------
+    
+    mkdir -p rocdecode-test/samples/videoDecode/build
+    cd rocdecode-test/samples/videoDecode/build
+    cmake $ROCM_PATH/share/rocdecode/samples/videoDecode
+    cmake --build . -- -j$(nproc)
+
+    cp $ROCM_PATH/share/rocdecode/test/testScripts/run_rocDecodeSamples.py .
+    
+    echo ">>>>> running test >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
+    python3 ./run_rocDecodeSamples.py --rocDecode_directory "../../.." --files_directory "$ROCM_PATH/share/rocdecode/video"
+    
+    echo TESTING rocDecodeSamples...Complete
+}
+
+test_perf() {
+    echo ------------------------------------------------------
+    echo TESTING videodecodeperf...
+    echo ------------------------------------------------------
+    
+    mkdir -p rocdecode-test/samples/videoDecodePerf/build
+    cd rocdecode-test/samples/videoDecodePerf/build
+    cmake $ROCM_PATH/share/rocdecode/samples/videoDecodePerf
+    cmake --build . -- -j$(nproc)
+
+    echo ">>>>> running test >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
+    ./videodecodeperf -i /$ROCM_PATH/share/rocdecode/video/AMD_driving_virtual_20-H265.mp4 -t 4
+    
+    echo TESTING videodecodeperf...Complete
+}
+
+test_simple() {
+    echo ------------------------------------------------------
+    echo TESTING simple [ctests]...
+    echo ------------------------------------------------------
+    
+    mkdir -p rocdecode-test/simple/build
+    cd rocdecode-test/simple/build
+    cmake $ROCM_PATH/share/rocdecode/test
+
+    echo ">>>>> running test >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
+    ctest --output-on-failure --stop-on-failure
+    
+    echo TESTING simple [ctests]...Complete
+}
+
+####### Main script ###############################################################
+
+echo ===============================
+echo ROCDECODE TESTER
+echo ===============================
+
+SUDO=$([[ $(id -u) -ne 0 ]] && echo "sudo" ||:)
+echo SUDO: $SUDO
+
+os_release
+
+if [ -d rocdecode-test ]; then
+    echo Removing old rocdecode-test
+    rm -r rocdecode-test
+fi
+
+install_deps
+
+setup_rocm
+
+# libva info
+vainfo
+
+# Run the tests
+test_samples
+
+test_perf
+ 
+test_simple
+
+cleanup
+
