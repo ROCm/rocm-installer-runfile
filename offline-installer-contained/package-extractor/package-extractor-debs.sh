@@ -62,6 +62,7 @@ AMDGPU_EXTRACT=0
 ROCM_CI_TAG=none
 ROCM_VER_TAG=none
 AMDGPU_VER_TAG=none
+ROCM_VER=
 
 CORE_PACKAGE=
 ROCM_CI_BUILD_TAGS="crdnnh crdcb"
@@ -212,7 +213,7 @@ get_buildversion_info() {
             fi
         done
         
-        # extract the version
+        # extract the version string
     	VERSION_INFO=$(dpkg -I $CORE_PACKAGE | grep -E ' Version:' | awk -F ': ' '{print $2}')
     	echo VERSION_INFO = $VERSION_INFO
     	
@@ -233,10 +234,39 @@ get_buildversion_info() {
             AMDGPU_VER_TAG=$VER_MAJ"0"$VER_MIN"0"$VER_MIN_MIN
         elif echo "$pkg" | grep -q 'rocm-core'; then
             ROCM_VER_TAG=$VER_MAJ"0"$VER_MIN"0"$VER_MIN_MIN
+            
+            # get the rocm version from the rocm-core
+            VERSION_INFO=$(dpkg -I $CORE_PACKAGE | grep -E ' Version:' | awk -F ': ' '{print $2}')
+            ROCM_VER=$(echo "$VERSION_INFO" | cut -d '.' -f 1-3)
         else
             print_err "Unknown core package: $pkg"
             exit 1
         fi
+    fi
+}
+
+write_version() {
+    echo -------------------------------------------------------------
+    echo Writing version...
+    
+    i=0
+    VERSION_FILE="../VERSION"
+    
+    while IFS= read -r line; do
+        case $i in
+            0) INSTALLER_VERSION="$line" ;;
+        esac
+        
+        i=$((i+1))
+    done < "$VERSION_FILE"
+     
+    if [[ -n $ROCM_VER ]]; then
+        echo "INSTALLER_VERSION = $INSTALLER_VERSION"
+        echo "ROCM_VER          = $ROCM_VER"
+    
+        # Update the version file
+        echo "$INSTALLER_VERSION" > "$VERSION_FILE"
+        echo "$ROCM_VER" >> "$VERSION_FILE"
     fi
 }
 
@@ -262,6 +292,10 @@ get_package_list() {
     echo "AMDGPU_VER_TAG = $AMDGPU_VER_TAG"
     echo "ROCM_VER_TAG   = $ROCM_VER_TAG"
     echo "ROCM_CI_TAG    = $ROCM_CI_TAG"
+    echo "ROCM_VER       = $ROCM_VER"
+    
+    # write out the ROCm version to the version file
+    write_version
     
     echo Getting package list...Complete.
 }

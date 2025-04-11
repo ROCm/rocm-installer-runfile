@@ -46,7 +46,10 @@ int clear_str(char *str);
 bool is_dir_exist(char *path);
 
 int is_rocm_pkg_installed(DISTRO_TYPE distroType);
-int find_rocm_installed(char fpaths[MAX_PATHS][LARGE_CHAR_SIZE], int *pCount);
+int find_rocm_installed(char *target, char fpaths[MAX_PATHS][LARGE_CHAR_SIZE], int *pCount);
+int get_rocm_version_str_from_path(char *rocm_loc, char *rocm_core_ver);
+int get_rocm_core_pkg(DISTRO_TYPE distroType, char *rocm_core_out, size_t out_size);
+int is_loc_opt_rocm(char *rocm_loc);
 
 int is_dkms_pkg_installed(DISTRO_TYPE distroType);
 int is_amdgpu_dkms_pkg_installed(DISTRO_TYPE distroType);

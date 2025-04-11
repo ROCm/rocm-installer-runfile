@@ -261,6 +261,25 @@ get_version() {
     fi
 }
 
+validate_version() {
+    # For non-local builds, verify package version matches for the running host distribution
+    if [[ $BUILD_INSTALLER_NAME != *"local"* ]]; then
+    
+        local version_build=${DISTRO_BUILD_VERSION%%.*}
+        local version_install=${DISTRO_VER%%.*}
+    
+        if [ $version_build != $version_install ]; then
+            echo -e "\e[31m++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\e[0m"
+            echo -e "\e[31mError: ROCm Runfile Installer Package mismatch:\e[0m"
+            echo -e "\e[31mInstall Build: ${DISTRO_NAME} ${version_build}\e[0m"
+            echo -e "\e[31mInstall OS   : ${DISTRO_NAME} ${version_install}\e[0m"
+            echo -e "\e[31m++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\e[0m"
+            echo Exiting installation.
+            exit 1
+        fi
+    fi
+}
+
 print_no_err() {
     local msg=$1
     echo -e "\e[32m++++++++++++++++++++++++++++++++++++\e[0m"
@@ -271,14 +290,14 @@ print_no_err() {
 print_err() {
     local msg=$1
     echo -e "\e[31m++++++++++++++++++++++++++++++++++++\e[0m"
-    echo -e "\e[31m$msg\e[0m"
+    echo -e "\e[31mError: $msg\e[0m"
     echo -e "\e[31m++++++++++++++++++++++++++++++++++++\e[0m"
 }
 
 print_warning() {
     local msg=$1
     echo -e "\e[93m++++++++++++++++++++++++++++++++++++\e[0m"
-    echo -e "\e[93m$msg\e[0m"
+    echo -e "\e[93mWarning: $msg\e[0m"
     echo -e "\e[93m++++++++++++++++++++++++++++++++++++\e[0m"
 }
 
@@ -411,7 +430,7 @@ dump_stats() {
 
 install_deps() {
     echo =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    echo -e "\e[96mINSTALL Dependencies\e[0m"
+    echo -e "\e[96mINSTALL Dependencies : $DISTRO_NAME $DISTRO_BUILD_VERSION\e[0m"
     echo =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     
     echo Installing Dependencies...
@@ -454,6 +473,9 @@ install_deps() {
         exit 0
         
     elif [[ $DEPS_ARG == "validate" ]]; then
+    
+        # validate the version of the installer
+        validate_version
         
         echo Validating required dependencies
         
@@ -468,6 +490,9 @@ install_deps() {
         exit 0
         
     elif [[ $DEPS_ARG == "install" ]] || [[ $DEPS_ARG == "install-only" ]]; then
+    
+        # validate the version of the installer
+        validate_version
         
         ./deps-installer.sh $deps_rocm $deps_amdgpu $depOp install
         status=$?
@@ -665,15 +690,35 @@ install_rocm_component() {
     local script_dir="$EXTRACT_DIR/$component/scriptlets"
     
     echo Copying content component: $component...
-
-    # Copy the component content/data to the target location
-    $SUDO rsync $RSYNC_OPTS "$content_dir"/* "$TARGET_DIR"
-    if [ $? -ne 0 ]; then
-        print_err "rsync error."
-        exit 1
+    
+    if [[ -n $INSTALLED_PKGS ]]; then
+        local matches=$(echo "$INSTALLED_PKGS" | grep -E "^($component)/")
+        if [[ -n $matches ]]; then
+            print_warning "Package installation of ROCm package: $component"
+            echo $matches
+            read -p "Overwrite package install of $compo (y/n): " option
+            if [[ $option == "Y" || $option == "y" ]]; then
+                echo "Proceeding with install..."
+                # Copy the component content/data to the target location
+                $SUDO rsync $RSYNC_OPTS "$content_dir"/* "$TARGET_DIR"
+                if [ $? -ne 0 ]; then
+                    print_err "rsync error."
+                    exit 1
+                fi
+                COMPONENT_COUNT=$((COMPONENT_COUNT+1))
+            else
+                echo "Skipping $component install."
+            fi
+        fi
+    else
+        # Copy the component content/data to the target location
+        $SUDO rsync $RSYNC_OPTS "$content_dir"/* "$TARGET_DIR"
+        if [ $? -ne 0 ]; then
+            print_err "rsync error."
+            exit 1
+        fi
+        COMPONENT_COUNT=$((COMPONENT_COUNT+1))
     fi
-            
-    COMPONENT_COUNT=$((COMPONENT_COUNT+1))
         
     echo Copying content component: $component...Complete.
 }
@@ -696,33 +741,61 @@ draw_progress_bar() {
     fi
 }
 
+check_rocm_package_install() {
+    #echo Checking for package installation: $1...
+    
+    local rocm_loc=$1
+    local ret=0
+    
+    # Package install only for /opt installs
+    if [[ "$TARGET_ROCM_DIR" == "/" || "$rocm_loc" == "/opt/rocm"* ]]; then
+        # check for a rocm-core package and if it matches the version of rocm being installed
+        local rocm_core_pkg=$($PKG_INSTALLED_CMD 2>&1 | grep "rocm-core")
+        
+        local rocm_ver_name=$(basename "$rocm_loc")
+        local rocm_ver=${rocm_ver_name#rocm-}
+    
+        IFS='.' read -r x y z <<< "${rocm_ver_name#rocm-}"
+        local rocm_core_ver=$(printf "%d%02d%02d" "$x" "$y" "$z")
+        
+        if [[ -n $rocm_core_pkg ]] && [[ "$rocm_core_pkg" == *"$rocm_core_ver"* ]]; then
+            echo rocm-core package detected : $rocm_core_ver
+        
+            # cached the installed packages
+            INSTALLED_PKGS=$($PKG_INSTALLED_CMD 2>&1)
+            ret=1
+        fi
+    
+        if [[ $FORCE_INSTALL == 1 ]]; then
+            echo Force install for package-based install.
+            INSTALLED_PKGS=
+        fi
+    fi
+    
+    return $ret
+}
+
 find_rocm_with_progress() {
     ROCM_DIR=
     ROCM_TARGET_ROOT=0
     
     local rocm_find_base=
     local rocm_version_dir=""
+    local rocm_depth=
     
     local find_opt=$1
     local found=1
     local progress=0
     local temp_file=$(mktemp)
     
-    # Check for a package install of rocm
-    if $PKG_INSTALLED_CMD 2>&1 | grep "rocm"; then
-        print_err "Package installation of ROCm"
-        echo "Please uninstall previous version of ROCm using the package manager."
-        exit 1
-    else
-        echo No package-based ROCm install found.
-    fi
-
     # optimize the search based on if the target arg is set or "all" option
-    if [[ "$find_opt" == "all" || -z "$INSTALL_TARGET" ]]; then
+    if [[ "$find_opt" == "all" ]]; then
         echo Using no target.
         rocm_find_base="/"
     else
         echo Using target argument.
+        
+        rocm_depth="-maxdepth 4"
         
         # Check for a /opt/rocm install
         if [ "$TARGET_ROCM_DIR" == "/" ]; then
@@ -738,7 +811,7 @@ find_rocm_with_progress() {
     echo "Looking for ROCm at: $rocm_find_base"
 
     # Start the find command in the background
-    find "$rocm_find_base" -type f -path '*/opt/rocm-*/.info/version' ! -path '*/rocm-installer/component-rocm/*' -print 2>/dev/null > "$temp_file" &
+    find "$rocm_find_base" $rocm_depth -type f -path '*/opt/rocm-*/.info/version' ! -path '*/rocm-installer/component-rocm/*' -print 2>/dev/null > "$temp_file" &
     local find_pid=$!
     
     # Update the progress bar while the find command is running
@@ -763,7 +836,7 @@ find_rocm_with_progress() {
     
     # Check if the version directory was found and set the rocm directory path
     if [ -n "$rocm_version_dir" ]; then
-        echo "ROCm detected."
+        echo "ROCm detected in target $rocm_find_base"
         
         ROCM_DIR=${rocm_version_dir%%.info*}
         echo "ROCm Install Directory found."
@@ -780,7 +853,7 @@ find_rocm_with_progress() {
         while IFS= read -r rocm_inst; do
             echo "    ${rocm_inst%%.info*}"
             ROCM_INSTALLS+="${rocm_inst%%.info*},"
-        done < "$temp_file"
+        done < <(sort -V "$temp_file")
         
         found=0
     fi
@@ -812,32 +885,62 @@ prereq_installer_check() {
     fi
 }
 
+query_prev_rocm() {
+    local inst=$1
+    local pkg_install=0
+
+    # Check for a package manager install of the install version
+    check_rocm_package_install "$inst"
+    pkg_install=$?
+    
+    if [[ $pkg_install -eq 0 ]]; then
+        print_warning "Runfile Installation of ROCm detected : $inst"
+    else
+        print_warning "Package manager Installation of ROCm detected : $inst"
+    fi
+
+    echo -e "Overwriting an existing installation may result in a loss of functionality.\n"
+    read -p "Do you wish to continue with a new Runfile ROCm installation (y/n): " option
+    if [[ $option == "Y" || $option == "y" ]]; then
+        echo "Proceeding with install..."
+    else
+        echo -e "Exiting Installer.\n"
+        
+        if [[ $pkg_install -eq 0 ]]; then
+            echo -e "Please uninstall previous version/s of ROCm using the Runfile installer.\n"
+            echo "Usage:"
+            echo "------"
+            echo "bash $PROG target=${inst%/} uninstall-rocm"
+        else
+            print_err "Package installation of ROCm: $inst"
+            echo "Please uninstall previous version of ROCm using the package manager."
+        fi
+        exit 1
+    fi
+}
+
 process_prev_rocm() {
+    local prev_install=0
+    
     # Check if rocm install is being forced, if not, prompt the user
     if [[ $FORCE_INSTALL == 1 ]]; then
         print_warning "Forcing ROCm install."
     else
-        echo -e "Multiple Runfile installations may cause existing installs to stop functioning.\n"
-        read -p "Do you wish to continue with a new Runfile ROCm installation (y/n): " option
-        if [[ $option == "Y" || $option == "y" ]]; then
-            echo "Proceeding with install..."
-        else
-            echo -e "Exiting Installer.\n"
-            echo -e "Please uninstall previous version/s of ROCm using the Runfile installer.\n"
-            echo "Usage:"
-            echo "------"
-            IFS=',' read -ra rocm_install <<< "$ROCM_INSTALLS"
-            for inst in "${rocm_install[@]}"; do
-                if [[ "$inst" == /opt/rocm* ]]; then
-                   echo "bash $PROG target=/ uninstall-rocm"
-                else
-                    echo "bash $PROG target=${inst%%/\opt*} uninstall-rocm"
-                fi
-            done
-            echo
-            
-            exit 1
-        fi
+        # Check the list of rocm installs for the current target
+        IFS=',' read -ra rocm_install <<< "$ROCM_INSTALLS"
+        for inst in "${rocm_install[@]}"; do
+            # Check if the same version is being installed
+            if [[ "$inst" == *"$INSTALLER_ROCM_VERSION"* ]]; then
+                echo Version match: $INSTALLER_ROCM_VERSION
+                prev_install=1
+                break
+            fi
+        done
+        
+        # Query the user for processing of the previous install of rocm
+        if [[ $prev_install -eq 1 ]]; then
+            query_prev_rocm "$inst"
+        fi  
     fi
 }
 
@@ -848,11 +951,10 @@ preinstall_rocm() {
     # Check for installer prerequisites
     prereq_installer_check
     
-    # Check for any previous installs of ROCm
-    find_rocm_with_progress "all"
+    # Check for any previous installs of ROCm for the current target
+    find_rocm_with_progress "$TARGET_ROCM_DIR"
 
     if [[ $? -eq 0 ]]; then
-        print_warning "Warning: Runfile installation of ROCm detected"
         process_prev_rocm
     else
         print_no_err "ROCm Install not found."
@@ -867,25 +969,30 @@ install_rocm() {
     echo -e "\e[96mINSTALL ROCm\e[0m"
     echo =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     
-    # If using a target, check that the target directory for install exists
-    if [[ -n "$INSTALL_TARGET" && ! -d "$TARGET_ROCM_DIR" ]]; then
-        print_err "Target directory $TARGET_ROCM_DIR for install does not exist."
-        exit 1
-    fi
-    
-    # Check if rocm is installable
-    preinstall_rocm
-    
     echo "EXTRACT_ROCM_DIR = $EXTRACT_ROCM_DIR"
     echo "TARGET_ROCM_DIR  = $TARGET_ROCM_DIR"
     
     EXTRACT_DIR="$EXTRACT_ROCM_DIR"
     TARGET_DIR="$TARGET_ROCM_DIR"
     
+    # If using a target, check that the target directory for install exists
+    if [[ -n "$INSTALL_TARGET" && ! -d "$TARGET_ROCM_DIR" ]]; then
+        print_err "Target directory $TARGET_ROCM_DIR for install does not exist."
+        exit 1
+    fi
+    
     # Find the ROCm version for install
     ROCM_CORE_VER_DIR=$(find "$EXTRACT_DIR/rocm-core/content/opt" -type d -name "*rocm*" -print -quit)
-    ROCM_CORE_VER_NAME=$(basename "$ROCM_CORE_VER_DIR")
-    echo "Installing: $ROCM_CORE_VER_NAME"
+    INSTALLER_ROCM_VERSION_NAME=$(basename "$ROCM_CORE_VER_DIR")
+    INSTALLER_ROCM_VERSION=${INSTALLER_ROCM_VERSION_NAME#rocm-}
+    
+    IFS='.' read -r x y z <<< "$INSTALLER_ROCM_VERSION"
+    ROCM_CORE_VER_STR=$(printf "%d%02d%02d" "$x" "$y" "$z")
+    
+    echo "Install: $INSTALLER_ROCM_VERSION_NAME : $ROCM_CORE_VER_STR"
+    
+    # Check if rocm is installable
+    preinstall_rocm
     
     prompt_user "Install ROCm (y/n): "
     if [[ $option == "N" || $option == "n" ]]; then
@@ -924,44 +1031,25 @@ install_rocm() {
     dump_stats "$TARGET_ROCM_DIR/opt"
 }
 
-uninstall_rocm() {
-    echo =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    echo -e "\e[95mUNINSTALL ROCm\e[0m"
-    echo =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    
-    echo "EXTRACT_ROCM_DIR = $EXTRACT_ROCM_DIR"
-    echo "INSTALL_TARGET   = $INSTALL_TARGET"
-    
-    EXTRACT_DIR="$EXTRACT_ROCM_DIR"
-    
-    local rocm_ver_dir=
+uninstall_rocm_target() {
+    local inst=$1
+
+    # set the version directory
+    local rocm_ver_dir="${inst%/}"
     local rocm_rm_dir=
-    
-    # Check for any previous installs of ROCm
-    find_rocm_with_progress
-    
-    if [[ $? -eq 0 ]]; then
-        print_no_err "ROCm Install found."
         
-        # set the version directory
-        rocm_ver_dir="${ROCM_DIR%/}"
-        
-        # check for the root/default target /opt/rocm
-        if [[ $ROCM_TARGET_ROOT == 1 ]]; then
-            TARGET_DIR="/"
-            rocm_rm_dir="$ROCM_DIR"
-        else
-            TARGET_DIR="${ROCM_DIR%%/\opt*}"
-            rocm_rm_dir="${ROCM_DIR%/\rocm*}"
-        fi
-        
-        echo "TARGET_DIR             : $TARGET_DIR"
-        echo "ROCM Version Directory : $rocm_ver_dir/"
-        echo "ROCm Removal Directory : $rocm_rm_dir"
+    # check for the root/default target /opt/rocm
+    if [[ $ROCM_TARGET_ROOT == 1 ]]; then
+        TARGET_DIR="/"
+        rocm_rm_dir="$inst"
     else
-        print_err "ROCm Install Directory not found"
-        exit 1
+        TARGET_DIR="${inst%%/\opt*}"
+        rocm_rm_dir="${inst%/\rocm*}"
     fi
+    
+    echo "TARGET_DIR             : $TARGET_DIR"
+    echo "ROCM Version Directory : $rocm_ver_dir/"
+    echo "ROCm Removal Directory : $rocm_rm_dir"
     
     # Start the uninstall
     prompt_user "Uninstall ROCm (y/n): "
@@ -969,7 +1057,9 @@ uninstall_rocm() {
         echo "Exiting Installer."
         exit 1
     fi
-
+    
+    echo -e "\e[95mUninstalling ROCm target: $rocm_ver_dir\e[0m"
+    
     # if the directory for removal exists, then remove the components and delete it
     if [[ -d "$rocm_rm_dir" && "rocm_rm_dir" != "/" ]]; then
         echo Uninstalling components from config.
@@ -996,13 +1086,22 @@ uninstall_rocm() {
         done
         echo "postrm executing....Complete."
         
-        echo -e "\e[93mRemoving install directory: $rocm_rm_dir\e[0m"
-        $SUDO rm -r "$rocm_rm_dir"
+        if [ -d "$rocm_ver_dir" ]; then
+            echo -e "\e[93mRemoving ROCm version directory: $rocm_ver_dir\e[0m"
+            $SUDO rm -r "$rocm_ver_dir"
+        fi
+        
+        if [ -d "$rocm_rm_dir" ] && [ -z "$(ls -A "$rocm_rm_dir")" ]; then
+            echo -e "\e[93mRemoving install directory: $rocm_rm_dir\e[0m"
+            $SUDO rm -r "$rocm_rm_dir"
+        fi
         
         # if target is the default install path and the directory exist remove it
         if [[ "$TARGET_DIR" == *"$TARGET_ROCM_DEFAULT_DIR"* && -d "$TARGET_ROCM_DEFAULT_DIR" ]]; then
-            echo -e "\e[93mRemoving default directory: $TARGET_ROCM_DEFAULT_DIR\e[0m"
-            $SUDO rm -r "$TARGET_ROCM_DEFAULT_DIR"
+            if [ -z "$(ls -A "$TARGET_ROCM_DEFAULT_DIR")" ]; then
+                echo -e "\e[93mRemoving default directory: $TARGET_ROCM_DEFAULT_DIR\e[0m"
+                $SUDO rm -r "$TARGET_ROCM_DEFAULT_DIR"
+            fi
         fi
     else
         print_err "ROCm remove target: $rocm_rm_dir does not exist."
@@ -1019,6 +1118,58 @@ uninstall_rocm() {
     echo "PRERM_COUNT  = $PRERM_COUNT"
     echo "POSTRM_COUNT = $POSTRM_COUNT"
     echo -e "\e[95mUNINSTALL ROCm Components. Complete.\e[0m"   
+}
+
+uninstall_rocm() {
+    echo =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    echo -e "\e[95mUNINSTALL ROCm\e[0m"
+    echo =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    
+    echo "EXTRACT_ROCM_DIR = $EXTRACT_ROCM_DIR"
+    echo "INSTALL_TARGET   = $INSTALL_TARGET"
+    
+    EXTRACT_DIR="$EXTRACT_ROCM_DIR"
+    
+    # Check for any previous installs of ROCm
+    find_rocm_with_progress "$TARGET_ROCM_DIR"
+    
+    if [[ $? -eq 0 ]]; then
+
+        # Check the list of rocm installs for the current target
+        IFS=',' read -ra rocm_install <<< "$ROCM_INSTALLS"
+        
+        print_no_err "ROCm Installs found: ${#rocm_install[@]}"
+        
+        # Check if multiple rocm installs at current target
+        if [[ ${#rocm_install[@]} > 1 ]]; then
+            echo "Multiple ROCm installs for target=$INSTALL_TARGET"
+            read -p "Do you wish to uninstall all ROCm installations at target (y/n): " option
+            if [[ $option == "Y" || $option == "y" ]]; then
+                echo "Proceeding with uninstall..."
+            else
+                echo "Exiting uninstall."
+                exit 1
+            fi
+        fi
+        
+        # Uninstall each rocm install at target
+        for inst in "${rocm_install[@]}"; do
+        
+            # Check for a package manager install of the install version
+            check_rocm_package_install "$inst"
+            if [[ $? -eq 1 ]]; then
+                print_err "Package installation of ROCm: $inst"
+                echo "Please uninstall previous version of ROCm using the package manager."
+                exit 1
+            fi
+            
+            uninstall_rocm_target "$inst"
+            
+        done
+    else
+        print_err "ROCm Install Directory not found."
+        exit 1
+    fi  
 }
 
 install_amdgpu_component() {
@@ -1107,6 +1258,9 @@ install_amdgpu() {
     echo =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     echo -e "\e[96mINSTALL AMDGPU\e[0m"
     echo =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    
+    # validate the version of the installer
+    validate_version
     
     # Check if amdgpu is installable
     preinstall_amdgpu
@@ -1236,14 +1390,17 @@ install_post_rocm() {
     echo -e "\e[96mINSTALL ROCm post-install config\e[0m"
     echo =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     
+    # validate the version of the installer
+    validate_version
+    
     echo "TARGET_DIR = $TARGET_DIR"
     
     local rocm_ver_dir=
     
     if [[ $TARGET_DIR == "/" ]]; then
-        rocm_ver_dir="/opt/$ROCM_CORE_VER_NAME"
+        rocm_ver_dir="/opt/$INSTALLER_ROCM_VERSION_NAME"
     else
-        rocm_ver_dir="$TARGET_DIR/opt/$ROCM_CORE_VER_NAME"
+        rocm_ver_dir="$TARGET_DIR/opt/$INSTALLER_ROCM_VERSION_NAME"
     fi
     
     # Set the PREFIX variable for rpm-based extracted scriptlets if required
@@ -1397,15 +1554,37 @@ do
     findrocm)
         echo "Finding ROCm install."
         
-        find_rocm_with_progress
+        find_rocm_with_progress "all"
 
-        if [[ $? -eq 0 ]]; then
-            echo "Runfile installation of ROCm: $ROCM_DIR"
-            exit 0
-        else
+        if [[ $? -eq 1 ]]; then
             echo "ROCm Install not found."
             exit 1
         fi
+        
+        IFS=',' read -ra rocm_install <<< "$ROCM_INSTALLS"
+        echo
+        print_no_err "ROCm Installs found: ${#rocm_install[@]}"
+        
+        echo -e "\nChecking rocm installation type...\n"
+        for inst in "${rocm_install[@]}"; do
+            
+            # Check for a package manager install of the install version
+            if [[ "$inst" == "/opt/rocm"* ]]; then
+                TARGET_ROCM_DIR="/"
+            else
+                TARGET_ROCM_DIR="$inst"
+            fi
+            
+            check_rocm_package_install "$inst"
+            if [[ $? -eq 0 ]]; then
+                echo "Runfile        : $inst"
+            else
+                echo "Package manager: $inst"
+            fi
+            
+        done
+        
+        exit 0
         ;;
     complist)
         echo Component List

@@ -176,6 +176,8 @@ int get_os_info(OFFLINE_INSTALL_CONFIG *pConfig)
 
 void main_menu_draw(MENU_DATA *pMenuData, OFFLINE_INSTALL_CONFIG *pConfig)
 {
+    ROCM_MENU_CONFIG *pRocmConfig = &pConfig->rocm_config;
+
     WINDOW *pMenuWindow = pMenuData->pMenuWindow;
     wclear(pMenuWindow);
 
@@ -194,11 +196,20 @@ void main_menu_draw(MENU_DATA *pMenuData, OFFLINE_INSTALL_CONFIG *pConfig)
     print_version(pMenuData);
 
     // Display a warning if ROCm is installed on the system
-    if (pConfig->rocm_config.is_rocm_installed)
+    if (pRocmConfig->install_rocm && pRocmConfig->is_rocm_installed && pRocmConfig->is_rocm_path_valid)
     {
-        wattron(pMenuWindow, COLOR_PAIR(10) | A_BOLD);
-        mvwprintw(pMenuWindow, DEBUG_ERR_START_Y, 1, "%s", "WARNING: ROCm installed");
-        wattroff(pMenuWindow, COLOR_PAIR(10) | A_BOLD);
+        if (pRocmConfig->rocm_install_type == eINSTALL_PACKAGE)
+        {
+            print_menu_err_msg(pMenuData, "ROCm %s package manager installed for target.", ROCM_VERSION);
+        }
+        else
+        {
+            print_menu_warning_msg(pMenuData, "ROCm %s installed for target", ROCM_VERSION);
+        }
+    }
+    else
+    {
+        clear_menu_msg(pMenuData);
     }
 
     box(pMenuData->pMenuWindow, 0, 0);
@@ -256,6 +267,7 @@ void config_install(OFFLINE_INSTALL_CONFIG *pConfig, char *cmdArgs)
 
 void set_install_state(MENU_DATA *pMenuData, OFFLINE_INSTALL_CONFIG *pConfig)
 {
+    ROCM_MENU_CONFIG *pRocmConfig = &pConfig->rocm_config;
     bool installable = false;
 
     if (pConfig->driver_config.install_driver)
@@ -263,9 +275,9 @@ void set_install_state(MENU_DATA *pMenuData, OFFLINE_INSTALL_CONFIG *pConfig)
         installable = true;
     }
 
-    if (pConfig->rocm_config.install_rocm)
+    if (pRocmConfig->install_rocm)
     {
-        if (pConfig->rocm_config.is_rocm_path_valid)
+        if (pRocmConfig->is_rocm_path_valid && (pRocmConfig->rocm_pkg_path_index < 0) )
         {
             installable = true;
         }
@@ -328,6 +340,7 @@ int main()
     init_pair(10, COLOR_YELLOW, COLOR_BLACK);
     init_pair(11, COLOR_BLACK, COLOR_MAGENTA);
     init_pair(12, COLOR_WHITE, COLOR_BLUE);
+    init_pair(13, COLOR_WHITE, COLOR_YELLOW);
 
     // Create the window to be associated with the menu 
     menuWindow = newwin(WIN_NUM_LINES, WIN_WIDTH_COLS, WIN_START_Y, WIN_START_X);
@@ -401,7 +414,6 @@ int main()
                 {
                     do_rocm_menu();
                     set_install_state(&menuMain, &offlineConfig);
-
                 }
                 else if ( item_index(pCurrentItem) == MAIN_MENU_ITEM_DRIVER_INDEX )
                 {

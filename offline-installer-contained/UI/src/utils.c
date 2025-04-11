@@ -27,6 +27,8 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <dirent.h>
+#include <libgen.h>
+#include <ctype.h>
 
 int calculate_text_height(char *desc, int width)
 {
@@ -178,11 +180,11 @@ int is_rocm_pkg_installed(DISTRO_TYPE distroType)
     
     if (distroType == eDISTRO_TYPE_DEB)
     {
-        status = system("dpkg -l rocm > /dev/null 2>&1");
+        status = system("dpkg -l rocm-core > /dev/null 2>&1");
     }
     else
     {
-        status = system("rpm -q rocm > /dev/null 2>&1");
+        status = system("rpm -q rocm-core > /dev/null 2>&1");
     }
 
     if (status == -1) 
@@ -195,10 +197,44 @@ int is_rocm_pkg_installed(DISTRO_TYPE distroType)
     return WIFEXITED(status) && WEXITSTATUS(status) == 0;
 }
 
-int find_rocm_installed(char fpaths[MAX_PATHS][LARGE_CHAR_SIZE], int *pCount) 
+// Helper function to extract the version number from a path
+int extract_version(const char *path, char *version) 
+{
+    const char *start = strstr(path, "rocm-");
+    if (start) 
+    {
+        start += strlen("rocm-"); // Move past "rocm-"
+        const char *end = start;
+
+        while (*end && (isdigit(*end) || *end == '.')) 
+        {
+            end++;
+        }
+        strncpy(version, start, end - start);
+        version[end - start] = '\0';
+        return 0;
+    }
+
+    return -1;
+}
+
+// Helper function to compare paths by version
+int compare_versions(const void *a, const void *b) 
+{
+    char version_a[SMALL_CHAR_SIZE], version_b[SMALL_CHAR_SIZE];
+
+    extract_version(*(const char **)a, version_a);
+    extract_version(*(const char **)b, version_b);
+
+    return strcmp(version_a, version_b);
+}
+
+int find_rocm_installed(char *target, char fpaths[MAX_PATHS][LARGE_CHAR_SIZE], int *pCount)
 {
     FILE *fp;
     char path[LARGE_CHAR_SIZE];
+    char search_path[DEFAULT_CHAR_SIZE];
+    char rocm_depth[SMALL_CHAR_SIZE];
     int status;
 
     if (pCount == NULL)
@@ -208,11 +244,33 @@ int find_rocm_installed(char fpaths[MAX_PATHS][LARGE_CHAR_SIZE], int *pCount)
 
     // Command to find the "version" file in directories containing "opt/rocm/.info"
     // and skip any directory paths containing "rocm-installer"
-    const char *command = "find / -type f -path '*/opt/rocm-*/.info/version' ! -path '*/rocm-installer/component-rocm/*' -print 2>/dev/null";
+    char command[LARGE_CHAR_SIZE];
+
+    // Search only from the target path if provided
+    if (target)
+    {
+        if (strcmp(target, "/") == 0)
+        {
+            sprintf(search_path, "/opt");
+        }
+        else
+        {
+            sprintf(search_path, "%s", target);
+        }
+
+        sprintf(rocm_depth, "-maxdepth 4");
+    }
+    else
+    {
+        sprintf(search_path, "/");
+        rocm_depth[0] = '\0';
+    }
+
+    sprintf(command, "find %s %s -type f -path '*/opt/rocm-*/.info/version' ! -path '*/rocm-installer/component-rocm/*' -print 2>/dev/null", search_path, rocm_depth);
 
     // Open a pipe to the command
     fp = popen(command, "r");
-    if (fp == NULL) 
+    if (fp == NULL)
     {
         perror("popen failed");
         exit(1);
@@ -221,31 +279,118 @@ int find_rocm_installed(char fpaths[MAX_PATHS][LARGE_CHAR_SIZE], int *pCount)
     // Initialize found_count
     *pCount = 0;
 
+    // Temporary array to store pointers to paths
+    char *temp_paths[MAX_PATHS];
+
     // Read the output of the command
-    while (fgets(path, sizeof(path), fp) != NULL) 
+    while (fgets(path, sizeof(path), fp) != NULL)
     {
         // Remove the newline character from the path
         path[strcspn(path, "\n")] = '\0';
 
         // Remove the substring ".info/version" from the path
         char *pos = strstr(path, ".info/version");
-        if (pos != NULL) 
+        if (pos != NULL)
         {
             *pos = '\0'; // Terminate the string at the start of ".info/version"
         }
 
-        // Save the path to the array
-        if (*pCount < MAX_PATHS) 
+        // Save the path to the temporary array
+        if (*pCount < MAX_PATHS)
         {
-            strncpy(fpaths[*pCount], path, LARGE_CHAR_SIZE - 1);
-            fpaths[*pCount][LARGE_CHAR_SIZE - 1] = '\0';
+            temp_paths[*pCount] = strdup(path); // Allocate memory for the path
             (*pCount)++;
-        } 
-        else 
+        }
+        else
         {
             fprintf(stderr, "Warning: Maximum number of paths reached. Some paths may not be stored.\n");
             break;
         }
+    }
+
+    // Close the command and get the exit status
+    status = pclose(fp);
+    if (status == -1)
+    {
+        perror("pclose");
+        return -1;
+    }
+
+    // Check if the command was successful
+    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) 
+    {
+        return -1;
+    }
+
+    // Sort the paths by version
+    qsort(temp_paths, *pCount, sizeof(char *), compare_versions);
+
+    // Copy the sorted paths to the fpaths array
+    for (int i = 0; i < *pCount; i++)
+    {
+        strncpy(fpaths[i], temp_paths[i], LARGE_CHAR_SIZE - 1);
+        fpaths[i][LARGE_CHAR_SIZE - 1] = '\0';
+        free(temp_paths[i]); // Free the allocated memory
+    }
+
+    return 0;
+}
+
+int get_rocm_version_str_from_path(char *rocm_loc, char *rocm_core_ver)
+{
+    char rocm_ver[SMALL_CHAR_SIZE];
+    int ret = -1;
+
+    // get the base directory name from the current location
+    char *rocm_dir = basename(rocm_loc);
+    
+    // extract "rocm-"
+    char *rocm_str = strstr(rocm_dir, "rocm-");
+    if (NULL != rocm_str)
+    {
+        // extract the version
+        strcpy(rocm_ver, rocm_str + strlen("rocm-"));
+
+        // convert to a core version number
+        int x, y, z;
+        if (sscanf(rocm_ver, "%d.%d.%d", &x, &y, &z) == 3)
+        {
+            sprintf(rocm_core_ver, "%d%02d%02d", x, y, z);
+
+            ret = 0;
+        }
+    }
+
+    return ret;
+}
+
+int get_rocm_core_pkg(DISTRO_TYPE distroType, char *rocm_core_out, size_t out_size)
+{
+    FILE *fp;
+    char path[LARGE_CHAR_SIZE];
+    int status;
+
+    // Open the command for reading
+    if (distroType == eDISTRO_TYPE_DEB)
+    {
+        fp = popen("dpkg -l | grep rocm-core", "r");
+    }
+    else
+    {
+        fp = popen("rpm -q rocm-core", "r");
+    }
+
+    if (fp == NULL) 
+    {
+        perror("popen failed");
+        return -1;
+    }
+
+    // Read the output a line at a time and store it in rocm_core_out
+    rocm_core_out[0] = '\0'; // Initialize rocm_core_out to an empty string
+    while (fgets(path, sizeof(path), fp) != NULL) 
+    {
+        strncat(rocm_core_out, path, out_size - strlen(rocm_core_out) - 1);
     }
 
     // Close the command and get the exit status
@@ -257,22 +402,37 @@ int find_rocm_installed(char fpaths[MAX_PATHS][LARGE_CHAR_SIZE], int *pCount)
     }
 
     // Check if the command was successful
-    if (WIFEXITED(status) || WEXITSTATUS(status) == 0) 
+    if (WIFEXITED(status) && WEXITSTATUS(status) == 0) 
     {
-        // the command maybe success, check for output
-        if (*pCount > 0)
+        // the command maybe success, check that dkms provide output
+        if (strlen(rocm_core_out) > 0)
         {
             return 0;
         }
-        else
-        {
-            return -1;
-        }
+        return -1;
     } 
     else 
     {
         return -1;
     }
+}
+
+int is_loc_opt_rocm(char *rocm_loc)
+{
+    char *rocm_base = "/opt/rocm";
+
+    // Check if the rocm loc is in /opt/rocm
+    if (strncmp(rocm_loc, rocm_base, strlen(rocm_base)) == 0)
+    {
+        char next_chr = rocm_loc[strlen(rocm_base)];
+        //if (next_chr == '\0' || next_chr == '-' || next_chr == '/')
+        if (next_chr == '-')
+        {
+            return 1;
+        }
+    }
+
+    return 0;
 }
 
 int is_dkms_pkg_installed(DISTRO_TYPE distroType)

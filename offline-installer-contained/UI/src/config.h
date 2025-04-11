@@ -44,6 +44,8 @@ typedef struct _ROCM_MENU_CONFIG
 
     bool is_rocm_path_valid;
     bool is_rocm_installed;
+    int rocm_pkg_path_index;
+    int rocm_runfile_path_index;
 
     INTSTALL_TYPE rocm_install_type;
     char rocm_paths[MAX_PATHS][LARGE_CHAR_SIZE];
