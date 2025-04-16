@@ -22,6 +22,7 @@
 # THE SOFTWARE.
 # #############################################################################
 
+BUILD_EXTRACT="yes"
 BUILD_INSTALLER="yes"
 BUILD_UI="yes"
 
@@ -55,7 +56,9 @@ Usage: $PROG [options]
 
 [options}:
     help      = Display this help information.
+    noextract = Disable package extraction.
     norunfile = Disable makeself build of installer runfile.
+    nogui     = Disable GUI building.
 END_USAGE
 }
 
@@ -253,16 +256,44 @@ install_tools() {
 extract_packages() {
     echo -------------------------------------------------------------
     echo Running Package Extractor...
-
-    pushd package-extractor
-        if [ $BUILD_DISTRO_TYPE == "deb" ]; then
-            ./package-extractor-debs.sh rocm ext-rocm="../rocm-installer"
-            ./package-extractor-debs.sh amdgpu ext-amdgpu="$EXTRACT_DIR"
-        else
-            ./package-extractor-rpms.sh rocm ext-rocm="../rocm-installer"
-            ./package-extractor-rpms.sh amdgpu ext-amdgpu="$EXTRACT_DIR"
-        fi
-    popd
+    
+    if [ $BUILD_EXTRACT == "yes" ]; then
+        echo Extracting packages...
+        
+        pushd package-extractor
+            if [ $BUILD_DISTRO_TYPE == "deb" ]; then
+                # extract the rocm packages - debian
+                ./package-extractor-debs.sh rocm ext-rocm="../rocm-installer"
+                if [[ $? -ne 0 ]]; then
+                    echo -e "\e[31mFailed extraction of ROCm packages.\e[0m"
+                    exit 1
+                fi
+                
+                # extract the amdgpu packages - debian
+                ./package-extractor-debs.sh amdgpu ext-amdgpu="$EXTRACT_DIR"
+                if [[ $? -ne 0 ]]; then
+                    echo -e "\e[31mFailed extraction of AMDGPU packages.\e[0m"
+                    exit 1
+                fi
+            else
+                # extract the rocm packages - rpm
+                ./package-extractor-rpms.sh rocm ext-rocm="../rocm-installer"
+                if [[ $? -ne 0 ]]; then
+                    echo -e "\e[31mFailed extraction of ROCm packages.\e[0m"
+                    exit 1
+                fi
+                
+                # extract the amdgpu packages - rpm
+                ./package-extractor-rpms.sh amdgpu ext-amdgpu="$EXTRACT_DIR"
+                if [[ $? -ne 0 ]]; then
+                    echo -e "\e[31mFailed extraction of AMDGPU packages.\e[0m"
+                    exit 1
+                fi
+            fi
+        popd
+    else
+        echo Extract Packages disabled.
+    fi
 
     echo Running Package Extractor...Complete
 }
@@ -283,6 +314,10 @@ build_UI() {
         pushd $BUILD_DIR_UI
             cmake -DINSTALLER_NAME="$BUILD_INSTALLER_NAME" -DAMDGPU_DKMS="$AMDGPU_DKMS_BUILD_NUM" ..
             make
+            if [[ $? -ne 0 ]]; then
+                echo -e "\e[31mFailed GUI build.\e[0m"
+                exit 1
+            fi
         popd
     else
         echo UI build disabled.
@@ -309,7 +344,11 @@ build_installer() {
         echo "MAKESELF_OPT_TAR     = $MAKESELF_OPT_TAR"
         
         makeself $MAKESELF_OPT_HEADER $MAKESELF_OPT $MAKESELF_OPT_CLEANUP $MAKESELF_OPT_TAR ./rocm-installer "./$BUILD_DIR/$BUILD_INSTALLER_NAME.run" "ROCm Runfile Installer" ./install-init.sh
-        
+        if [[ $? -ne 0 ]]; then
+            echo -e "\e[31mFailed makeself build.\e[0m"
+            exit 1
+        fi
+            
         echo Building installer runfile...Complete
     else
         echo Runfile build disabled.
@@ -338,6 +377,11 @@ do
         usage
         exit 0
         ;;
+    noextract)
+        echo "Disabling package extraction."
+        BUILD_EXTRACT="no"
+        shift
+        ;;    
     norunfile)
         echo "Disabling runfile build."
         BUILD_INSTALLER="no"

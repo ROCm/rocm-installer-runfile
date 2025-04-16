@@ -862,7 +862,7 @@ if [ ! -d $EXTRACT_LOGS_DIR ]; then
     mkdir -p $EXTRACT_LOGS_DIR
 fi
 
-{
+exec > >(tee -a "$EXTRACT_CURRENT_LOG") 2>&1
 
 echo ===============================
 echo PACKAGE EXTRACTOR - RPM
@@ -950,9 +950,6 @@ if [[ $AMDGPU_EXTRACT == 1 ]]; then
     
     filter_deps_version
 fi
-
-# Log the installer output if required
-} 2>&1 | $SUDO tee "$EXTRACT_CURRENT_LOG"
 
 if [[ -n $EXTRACT_CURRENT_LOG ]]; then
     echo -e "\e[32mExtract log stored in: $EXTRACT_CURRENT_LOG\e[0m"

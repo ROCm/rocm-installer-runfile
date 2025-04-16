@@ -110,6 +110,12 @@ pushd package-puller
         exit 1
     fi
     
+    # check if package pull was successful
+    if [[ $? -ne 0 ]]; then
+        echo -e "\e[31mFailed pull of ROCm packages.\e[0m"
+        exit 1
+    fi
+    
     if [ -d $PULLER_OUTPUT ]; then
         echo -e "\e[93mExtraction directory exists. Removing: $PULLER_OUTPUT\e[0m"
         $SUDO rm -rf $PULLER_OUTPUT
@@ -141,6 +147,12 @@ pushd package-puller
         
     else
         echo Invalid Distro Type: $PULL_DISTRO_TYPE
+        exit 1
+    fi
+    
+    # check if package pull was successful
+    if [[ $? -ne 0 ]]; then
+        echo -e "\e[31mFailed pull of AMDGPU packages.\e[0m"
         exit 1
     fi
 
