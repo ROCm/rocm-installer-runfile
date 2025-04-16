@@ -287,19 +287,24 @@ download_packages() {
                 
                 $SUDO zypper install -y --download-only $PACKAGES
             fi
+            
+            ret=$?
+            
         popd
+        
+        # check for any download errors
+        if [[ $ret -ne 0 ]]; then
+            print_err "Failed packages download."
+            cleanup
+            exit 1
+        else
+            print_no_err "Packages download successful."
+        fi
         
     else
         cleanup
         
         echo "Exiting."
-        exit 1
-    fi
-    
-    if [ $? -eq 0 ]; then
-    	print_no_err "Download successful."
-    else
-        print_err "Download failed."
         exit 1
     fi
     
@@ -436,7 +441,7 @@ if [ ! -d $PULL_LOGS_DIR ]; then
     mkdir -p $PULL_LOGS_DIR
 fi
 
-{
+exec > >(tee -a "$PULL_CURRENT_LOG") 2>&1
 
 echo ====================
 echo PACKAGE PULLER - SLE
@@ -543,9 +548,6 @@ prompt_user "Cleanup (y/n): "
 if [[ $option == "Y" || $option == "y" ]]; then
     cleanup
 fi
-
-# Log the installer output if required
-} 2>&1 | $SUDO tee "$PULL_CURRENT_LOG"
 
 if [[ -n $PULL_CURRENT_LOG ]]; then
     echo -e "\e[32mExtract log stored in: $PULL_CURRENT_LOG\e[0m"
