@@ -136,7 +136,7 @@ setup_rocm() {
     echo Setting up ROCm paths...
     
     # Look for the rocm directory
-    ROCM_VER_DIR=$(find / -type f -path '*/opt/rocm-*/.info/version' ! -path '*/rocm-installer/component-rocm/*' -print -quit 2>/dev/null)
+    ROCM_VER_DIR=$(find / -type f -path '*/rocm-*/.info/version' ! -path '*/rocm-installer/component-rocm/*' -print -quit 2>/dev/null)
 
     if [ -n "$ROCM_VER_DIR" ]; then
         echo "ROCm Install Directory found at: $ROCM_VER_DIR"
@@ -232,7 +232,7 @@ do
 done
 
 # Look for the rocm directory
-ROCM_VER_DIR=$(find / -type f -path '*/opt/rocm-*/.info/version' ! -path '*/rocm-installer/component-rocm/*' -print -quit 2>/dev/null)
+ROCM_VER_DIR=$(find / -type f -path '*/rocm-*/.info/version' ! -path '*/rocm-installer/component-rocm/*' -print -quit 2>/dev/null)
 
 if [ -n "$ROCM_VER_DIR" ]; then
     echo ------------------------------------------------------
@@ -245,9 +245,9 @@ else
     exit 1
 fi
 
-install_deps
-
 setup_rocm
+
+install_deps
 
 get_rocm_examples
 

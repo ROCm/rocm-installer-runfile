@@ -300,6 +300,32 @@ get_package_list() {
     echo Getting package list...Complete.
 }
 
+move_opt_contents_to_root() {
+    echo Moving opt contents...
+    
+    local content_dir="$1"
+    echo "Content root: $content_dir"
+
+    # Loop through the content directory
+    for dir in "$content_dir"/*; do
+        # Check if the current directory is the opt directory
+        if [[ -d "$dir" && $(basename "$dir") == "opt" ]]; then
+            echo "Found 'opt' directory: $dir"
+
+            # Move all contents of the 'opt' directory to the root content directory
+            mv "$dir/"* "$content_dir/"
+
+            # Remove the empty 'opt' directory
+            rmdir "$dir"
+            echo "Moved contents of '$dir' to '$content_dir'."
+        else
+            echo -e "\e[93m$dir not moved.\e[0m"
+        fi
+    done
+    
+    echo Moving opt contents...Complete.
+}
+
 extract_data() {
     echo --------------------------------
     echo Extracting all data/content
@@ -326,6 +352,9 @@ extract_data() {
     tar -xf "$data" -C $package_dir_content
     
     rm $data
+    
+    # Move content out of the opt directory to root content directory
+    move_opt_contents_to_root "$package_dir_content"
     
     echo Extracting Data...Complete.
     echo ---------------------------

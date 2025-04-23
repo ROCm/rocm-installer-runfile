@@ -335,6 +335,43 @@ get_package_list() {
     echo Getting package list...Complete.
 }
 
+move_opt_contents_to_root() {
+    echo Moving opt contents...
+    
+    local content_dir="$1"
+    echo "Content root: $content_dir"
+
+    # Loop through the content directory
+    for dir in "$content_dir"/*; do
+        local dirname=$(basename "$dir")
+        # Check if the current directory is the opt directory
+        if [[ -d "$dir" && $dirname == "opt" ]]; then
+            echo "Found 'opt' directory: $dir"
+
+            # Move all contents of the 'opt' directory to the root content directory
+            mv "$dir/"* "$content_dir/"
+
+            # Remove the empty 'opt' directory
+            rmdir "$dir"
+            echo "Moved contents of '$dir' to '$content_dir'."
+        else
+            echo -e "\e[93m$dir not moved.\e[0m"
+            
+            # workaround for extra /usr content for RHEL
+            if [[ $content_dir =~ "component-rocm" && $dirname == "usr"  ]]; then
+                if [[ -d "$dir/lib/.build-id" ]]; then
+                    echo -e "\e[31m$dir/lib/.build-id delete\e[0m"
+                    $SUDO rm -r "$dir/lib/.build-id"
+                    rmdir "$dir/lib"
+                    rmdir "$dir"
+                fi
+            fi
+        fi
+    done
+    
+    echo Moving opt contents...Complete.
+}
+
 extract_data() {
     echo --------------------------------
     echo Extracting all data/content
@@ -353,6 +390,9 @@ extract_data() {
         rpm2cpio "$PACKAGE" | cpio -idmv > /dev/null 2>&1
         
     popd
+    
+    # Move content out of the opt directory to root content directory
+    move_opt_contents_to_root "$package_dir_content"
     
     echo Extracting Data...Complete.
     echo ---------------------------

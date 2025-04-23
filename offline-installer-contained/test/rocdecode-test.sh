@@ -87,7 +87,7 @@ install_deps() {
             
             $SUDO dnf install -y gcc-toolset-11
             
-            source ../package-puller/config/el/8/rocm-6.3.1-el8.config
+            source ../package-puller/config/el/8/rocm-$ROCM_VER-el8.config
             
 	elif [[ $DISTRO_VER == 9* ]]; then
 	    echo Installing deps for RHEL9...
@@ -97,7 +97,7 @@ install_deps() {
             $SUDO dnf install -y cmake ffmpeg ffmpeg-devel
             $SUDO dnf install -y mpg123-libs
 
-	    source ../package-puller/config/el/9/rocm-6.3.1-el9.config
+	    source ../package-puller/config/el/9/rocm-$ROCM_VER-el9.config
 	    
 	else
             echo "Unsupported version for EL."
@@ -120,9 +120,9 @@ install_deps() {
        python3 -m pip install pandas tabulate
        
        if [[ $DISTRO_VER == 15.5 ]]; then
-           source ../package-puller/config/sle/15.5/rocm-6.3.1-sle-15.5.config
+           source ../package-puller/config/sle/15.5/rocm-$ROCM_VER-sle-15.5.config
        elif [[ $DISTRO_VER == 15.6 ]]; then
-           source ../package-puller/config/sle/15.6/rocm-6.3.1-sle-15.6.config
+           source ../package-puller/config/sle/15.6/rocm-$ROCM_VER-sle-15.6.config
        else
            echo SLES $DISTRO_VER is not supported.
            exit 1
@@ -167,7 +167,7 @@ setup_rocm() {
     echo Setting up ROCm paths...
     
     # Look for the rocm directory
-    ROCM_VER_DIR=$(find / -type f -path '*/opt/rocm-*/.info/version' ! -path '*/rocm-installer/component-rocm/*' -print -quit 2>/dev/null)
+    ROCM_VER_DIR=$(find / -type f -path '*/rocm-*/.info/version' ! -path '*/rocm-installer/component-rocm/*' -print -quit 2>/dev/null)
 
     if [ -n "$ROCM_VER_DIR" ]; then
         echo "ROCm Install Directory found at: $ROCM_VER_DIR"
@@ -178,6 +178,19 @@ setup_rocm() {
         echo "ROCm Install Directory not found"
         exit 1
     fi
+    
+    local rocm_ver_name=$(basename "$ROCM_DIR")
+    ROCM_VER=${rocm_ver_name#rocm-}
+    
+    local VER_MAJ=${ROCM_VER:0:1}
+    local VER_MIN=${ROCM_VER:2:1}
+    local VER_MIN_MIN=${ROCM_VER:4:1}
+
+    if [[ "$VER_MIN_MIN" == "0" || "$VER_MIN_MIN" == "00" ]]; then
+        ROCM_VER=$VER_MAJ.$VER_MIN
+    fi
+    
+    echo "ROCM_VER = $ROCM_VER"
 
     # Set the ROCm paths
     export ROCM_PATH="$ROCM_DIR"
@@ -189,6 +202,15 @@ setup_rocm() {
     fi
     
     echo Setting up ROCm paths...Complete.
+}
+
+test_va() {
+    echo ------------------------------------------------------
+    echo VAINFO..
+    echo ------------------------------------------------------
+    
+    # libva info
+    vainfo
 }
 
 test_samples() {
@@ -256,12 +278,11 @@ if [ -d rocdecode-test ]; then
     rm -r rocdecode-test
 fi
 
-install_deps
-
 setup_rocm
 
-# libva info
-vainfo
+install_deps
+
+test_va
 
 # Run the tests
 test_samples

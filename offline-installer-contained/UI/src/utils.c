@@ -266,7 +266,7 @@ int find_rocm_installed(char *target, char fpaths[MAX_PATHS][LARGE_CHAR_SIZE], i
         rocm_depth[0] = '\0';
     }
 
-    sprintf(command, "find %s %s -type f -path '*/opt/rocm-*/.info/version' ! -path '*/rocm-installer/component-rocm/*' -print 2>/dev/null", search_path, rocm_depth);
+    sprintf(command, "find %s %s -type f -path '*/rocm-*/.info/version' ! -path '*/rocm-installer/component-rocm/*' -print 2>/dev/null", search_path, rocm_depth);
 
     // Open a pipe to the command
     fp = popen(command, "r");
@@ -316,16 +316,7 @@ int find_rocm_installed(char *target, char fpaths[MAX_PATHS][LARGE_CHAR_SIZE], i
         return -1;
     }
 
-    // Check if the command was successful
-    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) 
-    {
-        // the command maybe success, check for output
-        if (*pCount == 0)
-        {
-            return -1;
-        }
-    } 
-    else 
+    if (*pCount == 0)
     {
         return -1;
     }
