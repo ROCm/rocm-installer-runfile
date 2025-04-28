@@ -267,6 +267,8 @@ validate_version() {
     
         local version_build=${DISTRO_BUILD_VERSION%%.*}
         local version_install=${DISTRO_VER%%.*}
+        
+        echo "Checking version: Build $version_build : Install Distro $version_install"
     
         if [ $version_build != $version_install ]; then
             echo -e "\e[31m++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\e[0m"
@@ -945,11 +947,7 @@ preinstall_rocm() {
     echo --------------------------------
 }
 
-install_rocm() {
-    echo =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    echo -e "\e[96mINSTALL ROCm\e[0m"
-    echo =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    
+set_rocm_target() {
     EXTRACT_DIR="$EXTRACT_ROCM_DIR"
     TARGET_DIR="$TARGET_ROCM_DIR"
     
@@ -959,6 +957,30 @@ install_rocm() {
     
     echo "EXTRACT_DIR: $EXTRACT_DIR"
     echo "TARGET_DIR : $TARGET_DIR"
+}
+
+configure_rocm_install() {
+    if [[ -n $INSTALL_COMPO ]]; then
+       echo Installing component: $INSTALL_COMPO
+       COMPONENTS=$INSTALL_COMPO
+    else
+        if [[ -n $INSTALL_COMPO_FILE ]]; then
+            COMPO_FILE="$INSTALL_COMPO_FILE"
+        else
+            COMPO_FILE="$COMPO_ROCM_FILE"
+        fi
+        
+        echo Installing components from config.
+        read_components
+    fi
+}
+
+install_rocm() {
+    echo =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    echo -e "\e[96mINSTALL ROCm\e[0m"
+    echo =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    
+    set_rocm_target
     
     # If using a target, check that the target directory for install exists
     if [[ -n "$INSTALL_TARGET" && ! -d "$TARGET_DIR" ]]; then
@@ -985,19 +1007,8 @@ install_rocm() {
         exit 1
     fi
     
-    if [[ -n $INSTALL_COMPO ]]; then
-       echo Installing component: $INSTALL_COMPO
-       COMPONENTS=$INSTALL_COMPO
-    else
-        if [[ -n $INSTALL_COMPO_FILE ]]; then
-            COMPO_FILE="$INSTALL_COMPO_FILE"
-        else
-            COMPO_FILE="$COMPO_ROCM_FILE"
-        fi
-        
-        echo Installing components from config.
-        read_components
-    fi
+    # configure the rocm components for install
+    configure_rocm_install
     
     # Install each component in the component list for ROCm
     for compo in ${COMPONENTS[@]}; do
@@ -1006,11 +1017,6 @@ install_rocm() {
         install_rocm_component $compo
         echo ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     done
-    
-    # Install/set any post install configuration
-    if [[ $POST_ROCM_INSTALL == 1 ]]; then
-        install_post_rocm
-    fi
     
     dump_rocm_state
     dump_stats "$TARGET_DIR"
@@ -1094,15 +1100,7 @@ uninstall_rocm() {
     echo -e "\e[95mUNINSTALL ROCm\e[0m"
     echo =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     
-    EXTRACT_DIR="$EXTRACT_ROCM_DIR"
-    TARGET_DIR="$TARGET_ROCM_DIR"
-    
-    if [[ $TARGET_DIR == "/" ]]; then
-        TARGET_DIR=/opt
-    fi
-    
-    echo "EXTRACT_DIR: $EXTRACT_DIR"
-    echo "TARGET_DIR : $TARGET_DIR"
+    set_rocm_target
     
     # Check for any previous installs of ROCm
     find_rocm_with_progress "$TARGET_DIR"
@@ -1370,17 +1368,56 @@ install_post_rocm() {
     echo -e "\e[96mINSTALL ROCm post-install config\e[0m"
     echo =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     
-    echo "TARGET_DIR: $TARGET_DIR"
+    local rocm_ver_dir=
     
     # validate the version of the installer
     validate_version
     
-    local rocm_ver_dir=
-    
-    if [[ $TARGET_DIR == "/" ]]; then
-        rocm_ver_dir="/opt/$INSTALLER_ROCM_VERSION_NAME"
+    if [[ $ROCM_INSTALL == 1 ]]; then
+        echo ROCm post-install...
+        if [[ $TARGET_DIR == "/" ]]; then
+            rocm_ver_dir="/opt/$INSTALLER_ROCM_VERSION_NAME"
+        else
+            rocm_ver_dir="$TARGET_DIR/$INSTALLER_ROCM_VERSION_NAME"
+        fi
+        
     else
-        rocm_ver_dir="$TARGET_DIR/$INSTALLER_ROCM_VERSION_NAME"
+        echo ROCm post-install for target...
+        set_rocm_target
+    	
+    	# check if target has a rocm install
+        find_rocm_with_progress "$TARGET_DIR"
+        if [[ $? -ne 0 ]]; then
+            print_err "ROCm runfile install at target $TARGET_DIR not found."
+            exit 1
+        fi
+        
+        IFS=',' read -ra rocm_install <<< "$ROCM_INSTALLS"
+        print_no_err "ROCm Installs found: ${#rocm_install[@]}"
+        
+        # Only allow for single post-rocm install
+        if [[ ${#rocm_install[@]} > 1 ]]; then
+            print_err "Multiple ROCm installation found.  Please select a single target for post install."
+            exit 1
+        fi
+        
+        # check if there found target rocm version matches the rocm version of the installer
+        local rocm_ver_name=$(basename "${rocm_install[0]}")
+        local rocm_ver=${rocm_ver_name#rocm-}
+        
+        echo "Install ROCm version: $ROCM_VERSION"
+        echo "Target ROCM version : $rocm_ver"
+            
+        if [[ "$rocm_ver" != "$ROCM_VERSION" ]]; then
+            print_err "ROCm version mismatch."
+            exit 1
+        fi
+        
+        rocm_ver_dir="$TARGET_DIR"
+        TARGET_DIR="${TARGET_DIR%/\rocm*}"
+        
+        # configure the rocm components for install
+        configure_rocm_install    
     fi
     
     # Set the PREFIX variable for rpm-based extracted scriptlets if required
@@ -1626,6 +1663,11 @@ fi
 if [[ $AMDGPU_INSTALL == 1 ]]; then
     install_amdgpu
 fi
+
+# Install/set any post install configuration
+    if [[ $POST_ROCM_INSTALL == 1 ]]; then
+        install_post_rocm
+    fi
 
 # Apply any GPU access requirements
 if [[ -n $GPU_ACCESS ]]; then
