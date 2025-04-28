@@ -669,8 +669,10 @@ void draw_rocm_uninstall_types()
                 mvwprintw(pWin, ROCM_MENU_ITEM_START_Y+draw_index, 3, "R");
                 wattroff(pWin, COLOR_PAIR(13) | A_BOLD);
 
-                char *shortpath = strstr(pRocmConfig->rocm_paths[i], "opt/");
-                print_menu_warning_msg(&menuROCmUninstall, "ROCm %s runfile conflict: ../%s", ROCM_VERSION, shortpath);
+                char drawName[DEFAULT_CHAR_SIZE];
+                field_trim(pRocmConfig->rocm_paths[i], drawName, 30);
+
+                print_menu_warning_msg(&menuROCmUninstall, "ROCm %s runfile conflict: %s", ROCM_VERSION, drawName);
             }
             else
             {
