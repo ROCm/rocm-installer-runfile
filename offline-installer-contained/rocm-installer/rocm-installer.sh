@@ -59,6 +59,9 @@ VERBOSE=0
 # Installer preqreqs
 INSTALLER_DEPS=(rsync)
 
+# Uninstall data
+INSTALLED_AMDGPU_DKMS_BUILD_NUM=0
+FORCED_UNINSTALL=1
 
 ###### Functions ###############################################################
 
@@ -268,7 +271,7 @@ validate_version() {
         local version_build=${DISTRO_BUILD_VERSION%%.*}
         local version_install=${DISTRO_VER%%.*}
     
-        if [ $version_build != $version_install ]; then
+        if [[ $version_build != $version_install ]]; then
             echo -e "\e[31m++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\e[0m"
             echo -e "\e[31mError: ROCm Runfile Installer Package mismatch:\e[0m"
             echo -e "\e[31mInstall Build: ${DISTRO_NAME} ${version_build}\e[0m"
@@ -618,6 +621,33 @@ install_postinst_scriptlet() {
     fi
 }
 
+patch_scriptlet_version() {
+    local scriptlet_file="$1"
+    local search_string="$2"
+    local replace_string="$3"
+
+    if [[ $VERBOSE == 1 ]]; then
+        echo "Replacing '$search_string' with '$replace_string'"
+        echo "Processing $scriptlet_file"
+    fi
+
+    # Create a backup of the original file
+    cp "$scriptlet_file" "$scriptlet_file.bak"
+
+    # Perform the replacement
+    sed -i "s/$search_string/$replace_string/g" "$scriptlet_file"
+
+    # Check if replacement was successful
+    if [ $? -eq 0 ]; then
+        echo "Successfully updated $scriptlet_file"
+    else
+        echo "Error processing $file"
+        # Restore backup if there was an error
+        mv "$scriptlet_file.bak" "$scriptlet_file"
+    fi
+
+}
+
 uninstall_prerm_scriptlet() {
     local component=$1
     local prerm_scriptlet="$EXTRACT_DIR/$component/scriptlets/prerm"
@@ -626,11 +656,16 @@ uninstall_prerm_scriptlet() {
     if [[ -s "$prerm_scriptlet" ]]; then
         echo --------------------------------
         echo -e "\e[92mExecuting prerm script for $component...\e[0m"
+
+        if [[ $FORCE_UNINSTALL == 1 ]]; then
+            echo "Patching prerm scriptlet $prerm_scriptlet"
+            patch_scriptlet_version $prerm_scriptlet $AMDGPU_DKMS_BUILD_NUM $INSTALLED_AMDGPU_DKMS_BUILD_NUM
+        fi
         
         if [[ $VERBOSE == 1 ]]; then
             cat "$prerm_scriptlet"
         fi
-        
+
         if [[ ! $TARGET_DIR == "/" ]]; then
             print_str "echo Running Reloc."
             configure_scriptlet "$prerm_scriptlet"
@@ -642,6 +677,11 @@ uninstall_prerm_scriptlet() {
         echo -e "\e[92mComplete: $?\e[0m"
         
         PRERM_COUNT=$((PRERM_COUNT+1))
+
+        if [[ $FORCE_UNINSTALL == 1 ]]; then
+            echo "Restoring prerm scriptlet $prerm_scriptlet"
+            mv "$prerm_scriptlet.bak" "$prerm_scriptlet"
+        fi
     fi
 }
 
@@ -1199,6 +1239,27 @@ install_amdgpu_component() {
     install_postinst_scriptlet $component
 }
 
+query_prev_driver_version() {
+    # Get DKMS status output
+    # SUSE require sudo for dkms
+    dkms_output=$($SUDO dkms status)
+
+    while read -r line; do
+        # Extract driver name and version (format is "module, version, kernel/arch/...")
+        if [[ $line =~ ^([^\/]+)\/([^,]+),\ ([^,]+),\ (.+)$ ]]; then
+            driver=${BASH_REMATCH[1]}
+            if [ $driver = "amdgpu" ]; then
+                INSTALLED_AMDGPU_DKMS_BUILD_NUM="${BASH_REMATCH[2]}"
+                kernel_version=${BASH_REMATCH[3]}
+                if [[ $VERBOSE == 1 ]]; then
+                    echo "Driver: $driver"
+                    echo "Version: $INSTALLED_AMDGPU_DKMS_BUILD_NUM"
+                    echo "Kernel Version: $kernel_version"
+                fi
+            fi
+        fi
+    done < <(echo $dkms_output)
+}
 preinstall_amdgpu() {
     echo --------------------------------
     echo Preinstall amdgpu...
@@ -1219,8 +1280,10 @@ preinstall_amdgpu() {
     if $PKG_INSTALLED_CMD 2>&1 | grep "dkms" > /dev/null 2>&1; then
         echo "dkms package installed."
         # Check if driver already present in dkms
-        if $SUDO dkms status | grep "amdgpu"; then
-            print_err "amdgpu driver installed."
+        query_prev_driver_version
+
+        if [ ! $INSTALLED_AMDGPU_DKMS_BUILD_NUM = 0 ] ; then
+            print_err "amdgpu driver installed, version $INSTALLED_AMDGPU_DKMS_BUILD_NUM"
             echo "Please uninstall previous version of amdgpu using the Runfile installer."
             echo "Usage: bash $PROG uninstall-amdgpu"
             exit 1
@@ -1277,9 +1340,32 @@ install_amdgpu() {
 find_and_delete() {
     local file_path=$1
     local type=$2
+    local force_remove_dir=0
 
     find $file_path -type $type -print0 | while IFS= read -r -d '' filename; do
         remove_filename=$(echo $filename|sed -e "s%$path_to_files%%g")
+
+        if [[ $FORCE_UNINSTALL == 1 ]]; then
+            if [[ "$remove_filename" == *"$AMDGPU_DKMS_BUILD_NUM"* ]]; then
+                force_remove_filename=${remove_filename//$AMDGPU_DKMS_BUILD_NUM/$INSTALLED_AMDGPU_DKMS_BUILD_NUM}
+                # Workaround to delete all folders in /usr/src/amdgpu because of diffrent versions numbers in directory name
+                # delete all files and subfolders
+                force_remove_dir=$(dirname "$force_remove_filename")
+                if [[ $VERBOSE == 1 ]]; then
+                    echo "remove: $force_remove_dir"
+                fi
+                $SUDO rm -rf "$force_remove_dir" 2>/dev/null
+            fi
+            if [[ "$remove_filename" == *"/lib/firmware/updates"* ]]; then
+                force_remove_dir=$(dirname "$remove_filename")
+                remove_filename="$force_remove_dir/*"
+                if [[ $VERBOSE == 1 ]]; then
+                    echo "remove: $remove_filename"
+                fi
+                # Here delete only files, folder deleted as in normal uninstall
+                $SUDO rm -f $remove_filename 2>/dev/null
+            fi
+        fi
 
         if [ -e "$remove_filename" ] || [ -L "$remove_filename" ]; then
             if [[ $VERBOSE == 1 ]]; then
@@ -1325,6 +1411,26 @@ uninstall_amdgpu() {
     EXTRACT_DIR="$EXTRACT_AMDGPU_DIR"
     TARGET_DIR="$TARGET_AMDGPU_DIR"
 
+    query_prev_driver_version
+
+    if [ $INSTALLED_AMDGPU_DKMS_BUILD_NUM == 0 ] ; then
+            print_err "amdgpu driver not installed."
+            echo "Please install amdgpu using the Runfile installer."
+            echo "Usage: bash $PROG amdgpu"
+            exit 1
+    fi
+
+    echo "Installed amdgpu version $INSTALLED_AMDGPU_DKMS_BUILD_NUM"
+    echo "Runfile amdgpu version $AMDGPU_DKMS_BUILD_NUM"
+
+    if [ ! $INSTALLED_AMDGPU_DKMS_BUILD_NUM == $AMDGPU_DKMS_BUILD_NUM ] ; then
+            print_err "amdgpu driver installed version does not match runfile version."
+            prompt_user "Force uninstall (y/n): "
+            if [[ $option == "Y" || $option == "y" ]]; then
+                FORCE_UNINSTALL=1;
+            fi
+    fi
+
     echo Uninstalling components from config.
 
     COMPO_FILE="$COMPO_AMDGPU_FILE"
@@ -1338,6 +1444,7 @@ uninstall_amdgpu() {
         compo=${remove_arr[i]}
 
         uninstall_prerm_scriptlet $compo
+
         # remove files
         path_to_files="$EXTRACT_AMDGPU_DIR/$compo/content"
 
