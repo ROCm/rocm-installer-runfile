@@ -61,7 +61,7 @@ INSTALLER_DEPS=(rsync)
 
 # Uninstall data
 INSTALLED_AMDGPU_DKMS_BUILD_NUM=0
-FORCED_UNINSTALL=1
+FORCE_UNINSTALL_AMDGPU=0
 
 ###### Functions ###############################################################
 
@@ -657,7 +657,34 @@ uninstall_prerm_scriptlet() {
         echo --------------------------------
         echo -e "\e[92mExecuting prerm script for $component...\e[0m"
 
-        if [[ $FORCE_UNINSTALL == 1 ]]; then
+        if [[ $VERBOSE == 1 ]]; then
+            cat "$prerm_scriptlet"
+        fi
+
+        if [[ ! $TARGET_DIR == "/" ]]; then
+            print_str "echo Running Reloc."
+            configure_scriptlet "$prerm_scriptlet"
+            $SUDO_OPTS "$prerm_scriptlet-reloc" "$UNINSTALL_SCRIPTLET_ARG"
+        else
+            $SUDO_OPTS "$prerm_scriptlet" "$UNINSTALL_SCRIPTLET_ARG"
+        fi
+
+        echo -e "\e[92mComplete: $?\e[0m"
+
+        PRERM_COUNT=$((PRERM_COUNT+1))
+    fi
+}
+
+uninstall_prerm_scriptlet_amdgpu() {
+    local component=$1
+    local prerm_scriptlet="$EXTRACT_DIR/$component/scriptlets/prerm"
+
+    # execute pre-install with arg "remove" or "0"
+    if [[ -s "$prerm_scriptlet" ]]; then
+        echo --------------------------------
+        echo -e "\e[92mExecuting prerm script for $component...\e[0m"
+
+        if [[ $FORCE_UNINSTALL_AMDGPU == 1 ]]; then
             echo "Patching prerm scriptlet $prerm_scriptlet"
             patch_scriptlet_version $prerm_scriptlet $AMDGPU_DKMS_BUILD_NUM $INSTALLED_AMDGPU_DKMS_BUILD_NUM
         fi
@@ -678,7 +705,7 @@ uninstall_prerm_scriptlet() {
         
         PRERM_COUNT=$((PRERM_COUNT+1))
 
-        if [[ $FORCE_UNINSTALL == 1 ]]; then
+        if [[ $FORCE_UNINSTALL_AMDGPU == 1 ]]; then
             echo "Restoring prerm scriptlet $prerm_scriptlet"
             mv "$prerm_scriptlet.bak" "$prerm_scriptlet"
         fi
@@ -1260,6 +1287,7 @@ query_prev_driver_version() {
         fi
     done < <(echo $dkms_output)
 }
+
 preinstall_amdgpu() {
     echo --------------------------------
     echo Preinstall amdgpu...
@@ -1345,7 +1373,7 @@ find_and_delete() {
     find $file_path -type $type -print0 | while IFS= read -r -d '' filename; do
         remove_filename=$(echo $filename|sed -e "s%$path_to_files%%g")
 
-        if [[ $FORCE_UNINSTALL == 1 ]]; then
+        if [[ $FORCE_UNINSTALL_AMDGPU == 1 ]]; then
             if [[ "$remove_filename" == *"$AMDGPU_DKMS_BUILD_NUM"* ]]; then
                 force_remove_filename=${remove_filename//$AMDGPU_DKMS_BUILD_NUM/$INSTALLED_AMDGPU_DKMS_BUILD_NUM}
                 # Workaround to delete all folders in /usr/src/amdgpu because of diffrent versions numbers in directory name
@@ -1414,21 +1442,24 @@ uninstall_amdgpu() {
     query_prev_driver_version
 
     if [ $INSTALLED_AMDGPU_DKMS_BUILD_NUM == 0 ] ; then
-            print_err "amdgpu driver not installed."
-            echo "Please install amdgpu using the Runfile installer."
-            echo "Usage: bash $PROG amdgpu"
-            exit 1
+        print_err "amdgpu driver not installed."
+        echo "Please install amdgpu using the Runfile installer."
+        echo "Usage: bash $PROG amdgpu"
+        exit 1
     fi
 
     echo "Installed amdgpu version $INSTALLED_AMDGPU_DKMS_BUILD_NUM"
     echo "Runfile amdgpu version $AMDGPU_DKMS_BUILD_NUM"
 
     if [ ! $INSTALLED_AMDGPU_DKMS_BUILD_NUM == $AMDGPU_DKMS_BUILD_NUM ] ; then
-            print_err "amdgpu driver installed version does not match runfile version."
-            prompt_user "Force uninstall (y/n): "
-            if [[ $option == "Y" || $option == "y" ]]; then
-                FORCE_UNINSTALL=1;
-            fi
+        print_err "amdgpu driver installed version does not match runfile version."
+        prompt_user "Force uninstall (y/n): "
+        if [[ $option == "Y" || $option == "y" ]]; then
+            FORCE_UNINSTALL_AMDGPU=1;
+        fi
+        if [[ $option == "N" || $option == "n" ]]; then
+            exit 1
+        fi
     fi
 
     echo Uninstalling components from config.
@@ -1443,11 +1474,12 @@ uninstall_amdgpu() {
     for(( i=0; i<${#remove_arr[@]}; i++ )) do
         compo=${remove_arr[i]}
 
-        uninstall_prerm_scriptlet $compo
+        uninstall_prerm_scriptlet_amdgpu $compo
 
         # remove files
         path_to_files="$EXTRACT_AMDGPU_DIR/$compo/content"
 
+        echo "Removing amdgpu files..."
         find_and_delete $path_to_files "l"
         find_and_delete $path_to_files "f"
 
