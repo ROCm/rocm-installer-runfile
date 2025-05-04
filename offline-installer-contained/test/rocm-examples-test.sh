@@ -102,13 +102,13 @@ install_deps() {
     
         if [[ $DISTRO_VER == 8* ]]; then
             echo Installing deps for RHEL8...
-            $SUDO dnf install -y git cmake glfw-devel vulkan-headers vulkan-loader vulkan-validation-layers mesa-libGL-devel
+            $SUDO dnf install -y gcc-c++ git cmake glfw-devel vulkan-headers vulkan-loader vulkan-validation-layers mesa-libGL-devel
             $SUDO dnf install -y gcc-toolset-11
             install_glslang
             
         elif [[ $DISTRO_VER == 9* ]]; then
 	    echo Installing deps for RHEL9...
-            $SUDO dnf install -y git cmake glfw-devel glslang-devel vulkan-loader-devel libshaderc-devel
+            $SUDO dnf install -y gcc-c++ git cmake glfw-devel glslang-devel vulkan-loader-devel libshaderc-devel
         else
             echo "Unsupported version for EL."
             exit 1
