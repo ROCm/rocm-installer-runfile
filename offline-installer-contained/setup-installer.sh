@@ -23,9 +23,9 @@
 # #############################################################################
 
 # Package Puller Input Config
-PULLER_CONFIG="${PULLER_CONFIG:-config/deb/22.04/rocm-6.4-22.04.config}"
-PULLER_CONFIG_EL="${PULLER_CONFIG_EL:-config/el/9/rocm-6.4-el9.config}"
-PULLER_CONFIG_SLE="${PULLER_CONFIG_SLE:-config/sle/15.6/rocm-6.4-sle-15.6.config}"
+PULLER_CONFIG="${PULLER_CONFIG:-config/deb/22.04/rocm-6.4.1-22.04.config}"
+PULLER_CONFIG_EL="${PULLER_CONFIG_EL:-config/el/9/rocm-6.4.1-el9.config}"
+PULLER_CONFIG_SLE="${PULLER_CONFIG_SLE:-config/sle/15.6/rocm-6.4.1-sle-15.6.config}"
 
 # Package Puller Output directory
 PULLER_OUTPUT="../package-extractor/packages-rocm"

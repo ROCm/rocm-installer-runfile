@@ -665,9 +665,9 @@ void draw_rocm_uninstall_types()
             else if (i == g_uninstall_rocm_runfile_index)
             {
                 // runfile install with conflict - matches installers rocm version
-                wattron(pWin, COLOR_PAIR(13) | A_BOLD);
-                mvwprintw(pWin, ROCM_MENU_ITEM_START_Y+draw_index, 3, "R");
-                wattroff(pWin, COLOR_PAIR(13) | A_BOLD);
+                wattron(pWin, COLOR_PAIR(10) | A_BOLD);
+                mvwprintw(pWin, ROCM_MENU_ITEM_START_Y+draw_index, 3, "C");
+                wattroff(pWin, COLOR_PAIR(10) | A_BOLD);
 
                 char drawName[DEFAULT_CHAR_SIZE];
                 field_trim(pRocmConfig->rocm_paths[i], drawName, 30);
@@ -707,9 +707,9 @@ void rocm_uninstall_menu_draw()
     wattroff(pWin, COLOR_PAIR(6) | A_BOLD);
     mvwprintw(pWin, 23, 66, " Package manager");
 
-    wattron(pWin, COLOR_PAIR(13) | A_BOLD);
-    mvwprintw(pWin, 24, 65, "R");
-    wattroff(pWin, COLOR_PAIR(13) | A_BOLD);
+    wattron(pWin, COLOR_PAIR(10) | A_BOLD);
+    mvwprintw(pWin, 24, 65, "C");
+    wattroff(pWin, COLOR_PAIR(10) | A_BOLD);
     mvwprintw(pWin, 24, 66, " Runfile Conflict");
 
     wattron(pWin, COLOR_PAIR(4) | A_BOLD);
