@@ -266,22 +266,19 @@ get_version() {
 
 validate_version() {
     # For non-local builds, verify package version matches for the running host distribution
-    if [[ $BUILD_INSTALLER_NAME != *"local"* ]]; then
-    
-        local version_build=${DISTRO_BUILD_VERSION%%.*}
-        local version_install=${DISTRO_VER%%.*}
+    local version_build=${DISTRO_BUILD_VERSION%%.*}
+    local version_install=${DISTRO_VER%%.*}
         
-        echo "Checking version: Build $version_build : Install Distro $version_install"
+    echo "Checking version: Build $version_build : Install Distro $version_install"
     
-        if [[ $version_build != $version_install ]]; then
-            echo -e "\e[31m++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\e[0m"
-            echo -e "\e[31mError: ROCm Runfile Installer Package mismatch:\e[0m"
-            echo -e "\e[31mInstall Build: ${DISTRO_NAME} ${version_build}\e[0m"
-            echo -e "\e[31mInstall OS   : ${DISTRO_NAME} ${version_install}\e[0m"
-            echo -e "\e[31m++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\e[0m"
-            echo Exiting installation.
-            exit 1
-        fi
+    if [[ $version_build != $version_install ]]; then
+        echo -e "\e[31m++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\e[0m"
+        echo -e "\e[31mError: ROCm Runfile Installer Package mismatch:\e[0m"
+        echo -e "\e[31mInstall Build: ${DISTRO_NAME} ${version_build}\e[0m"
+        echo -e "\e[31mInstall OS   : ${DISTRO_NAME} ${version_install}\e[0m"
+        echo -e "\e[31m++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\e[0m"
+        echo Exiting installation.
+        exit 1
     fi
 }
 
@@ -1172,13 +1169,13 @@ uninstall_rocm() {
     # Check for any previous installs of ROCm
     find_rocm_with_progress "$TARGET_DIR"
     
-    # Update the target for scriptlet hanndling
-    if [[ "$TARGET_DIR" == *"rocm"* ]]; then
-        TARGET_DIR="${TARGET_ROCM_DIR%/\rocm*}"
-        echo "TARGET_DIR : $TARGET_DIR"
-    fi
-    
     if [[ $? -eq 0 ]]; then
+    
+        # Update the target for scriptlet hanndling
+        if [[ "$TARGET_DIR" == *"rocm"* ]]; then
+            TARGET_DIR="${TARGET_ROCM_DIR%/\rocm*}"
+            echo "TARGET_DIR : $TARGET_DIR"
+        fi
 
         # Check the list of rocm installs for the current target
         IFS=',' read -ra rocm_install <<< "$ROCM_INSTALLS"
