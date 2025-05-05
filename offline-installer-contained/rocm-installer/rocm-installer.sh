@@ -1140,8 +1140,7 @@ uninstall_rocm_target() {
         if [[ -L "$rocm_rm_dir/rocm" ]]; then
             echo "Found symlink 'rocm': $rocm_rm_dir"
             
-            local item_count
-            item_count=$(find "$rocm_rm_dir" -mindepth 1 -maxdepth 1 | wc -l)
+            local item_count=$(find "$rocm_rm_dir" -mindepth 1 -maxdepth 1 | wc -l)
 
             # If the directory contains only the "rocm" symlink, delete it
             if [[ $item_count -eq 1 ]]; then
@@ -1509,6 +1508,7 @@ install_post_rocm() {
     # validate the version of the installer
     validate_version
     
+    # check if postrocm is part of a rocm install
     if [[ $ROCM_INSTALL == 1 ]]; then
         echo ROCm post-install...
         if [[ $TARGET_DIR == "/" ]]; then
@@ -1519,6 +1519,13 @@ install_post_rocm() {
         
     else
         echo ROCm post-install for target...
+        
+        # check if the target arg is used
+        if [[ -z "$INSTALL_TARGET" ]]; then
+            print_err "target= argument required."
+            exit 1
+        fi
+        
         set_rocm_target
     	
     	# check if target has a rocm install
@@ -1550,7 +1557,7 @@ install_post_rocm() {
         fi
         
         rocm_ver_dir="$TARGET_DIR"
-        TARGET_DIR="${TARGET_DIR%/\rocm*}"
+        TARGET_DIR="${TARGET_DIR%/\rocm-[0-9]*}"
         
         # configure the rocm components for install
         configure_rocm_install    
@@ -1617,6 +1624,8 @@ os_release
 if [ ! -d $RUN_INSTALLER_LOG_DIR ]; then
     mkdir -p $RUN_INSTALLER_LOG_DIR
 fi
+
+echo "Using args: $@"
 
 # parse args
 while (($#))
@@ -1695,7 +1704,7 @@ do
         shift
         ;;
     postrocm)
-        echo "Enabling post ROCm install."
+        echo "Enabling Post ROCm install."
         POST_ROCM_INSTALL=1
         shift
         ;;
@@ -1795,15 +1804,15 @@ if [[ $ROCM_INSTALL == 1 ]]; then
     install_rocm
 fi
 
+# Install/set any post install configuration
+if [[ $POST_ROCM_INSTALL == 1 ]]; then
+    install_post_rocm
+fi
+
 # Install AMDGPU components if required
 if [[ $AMDGPU_INSTALL == 1 ]]; then
     install_amdgpu
 fi
-
-# Install/set any post install configuration
-    if [[ $POST_ROCM_INSTALL == 1 ]]; then
-        install_post_rocm
-    fi
 
 # Apply any GPU access requirements
 if [[ -n $GPU_ACCESS ]]; then
