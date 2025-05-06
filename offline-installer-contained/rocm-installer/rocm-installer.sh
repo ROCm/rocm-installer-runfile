@@ -1610,6 +1610,13 @@ EOF
 
 ####### Main script ###############################################################
 
+# Create the installer log directory
+if [ ! -d $RUN_INSTALLER_LOG_DIR ]; then
+    mkdir -p $RUN_INSTALLER_LOG_DIR
+fi
+
+exec > >(tee -a "$RUN_INSTALLER_CURRENT_LOG") 2>&1
+
 echo =================================
 echo ROCm INSTALLER
 echo =================================
@@ -1620,12 +1627,8 @@ PROG=${0##*/}
 
 os_release
 
-# Create the installer log directory
-if [ ! -d $RUN_INSTALLER_LOG_DIR ]; then
-    mkdir -p $RUN_INSTALLER_LOG_DIR
-fi
-
-echo "Using args: $@"
+echo "args: $@"
+echo --------------------------------
 
 # parse args
 while (($#))
@@ -1783,8 +1786,6 @@ do
         ;;
     esac
 done
-
-exec > >(tee -a "$RUN_INSTALLER_CURRENT_LOG") 2>&1
 
 get_version
 
