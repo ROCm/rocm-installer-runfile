@@ -540,11 +540,12 @@ check_installed_dep_packages() {
     check_installed_kernel_packages
 }
 
-remove_duplicates() {
+remove_deps_duplicates() {
     echo Removing duplicate deps...
     
     if [[ -n $FILTER_PACKAGES ]]; then
         for dep in $FILTER_PACKAGES; do
+            # Remove any dependency in MISSING_DEPS that matches
             if [[ "$MISSING_DEPS" == *"$dep"* ]]; then
                 echo Removing: "$dep"
                 MISSING_DEPS=$(echo "$MISSING_DEPS" | sed -E "s/(^|, )$dep(, |$)/\1/g")
@@ -555,6 +556,24 @@ remove_duplicates() {
     fi
     
     echo Removing duplicate deps...Complete.
+}
+
+remove_deps() {
+    echo Removing deps...
+    
+    if [[ -n $REMOVE_PACKAGES ]]; then
+        for dep in $REMOVE_PACKAGES; do
+            # Remove any dependency in MISSING_DEPS that contains the match
+            if [[ "$MISSING_DEPS" == *"$dep"* ]]; then
+                echo Removing: "$dep"
+                MISSING_DEPS=$(echo "$MISSING_DEPS" | tr ',' '\n' | grep -v "$dep" | tr '\n' ',' | sed 's/,$//')
+                MISSING_DEPS_COUNT=$((MISSING_DEPS_COUNT-1))
+                DEPS_COUNT=$((DEPS_COUNT-1))
+            fi
+        done
+    fi
+
+    echo Removing deps...Complete.
 }
 
 get_kernel_packages() {
@@ -589,6 +608,7 @@ get_kernel_packages() {
         fi
         
         FILTER_PACKAGES="kernel-devel"
+        REMOVE_PACKAGES="kernel-headers"
         
     elif [ $DISTRO_PACKAGE_MGR == "zypper" ]; then
         if [[ $DEPS_LIST_ONLY == 0 ]]; then
@@ -709,11 +729,14 @@ build_dependencies_list() {
         # get the list of kernel packages required by amdgpu
         get_kernel_packages
         
+        # remove any kernel packages from the current deps list that are not required
+        remove_deps
+        
         COMPO_DIR="$PWD/component-amdgpu"
         build_dependencies_list_for_compo
         
         # filter out any duplicate packages
-        remove_duplicates
+        remove_deps_duplicates
     fi
     
     print_deps
