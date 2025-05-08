@@ -1556,12 +1556,15 @@ install_post_rocm() {
             exit 1
         fi
         
-        rocm_ver_dir="$TARGET_DIR"
+        rocm_ver_dir="$ROCM_DIR"
         TARGET_DIR="${TARGET_DIR%/\rocm-[0-9]*}"
         
         # configure the rocm components for install
         configure_rocm_install    
     fi
+    
+    echo "rocm_ver_dir: $rocm_ver_dir"
+    echo "TARGET_DIR  : $TARGET_DIR"
     
     # Set the PREFIX variable for rpm-based extracted scriptlets if required
     set_prefix_scriptlet "$rocm_ver_dir"
