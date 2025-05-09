@@ -77,34 +77,34 @@ os_release() {
         DISTRO_NAME=$ID
 
         case "$ID" in
-        ubuntu)
-	    DISTRO_PACKAGE_MGR="apt"
-	    DISTRO_CACHE_CHK="apt-cache show"
-	    DISTRO_VIRTUAL_CHK="apt-cache showpkg"
-	    PACKAGE_TYPE="deb"
-	    ;;
-	rhel)
-	    DISTRO_PACKAGE_MGR="dnf"
-	    DISTRO_CACHE_CHK="$SUDO dnf --cacheonly info"
-	    DISTRO_VIRTUAL_CHK="dnf provides"
-	    PACKAGE_TYPE="rpm"
+        ubuntu|debian)
+            DISTRO_PACKAGE_MGR="apt"
+            DISTRO_CACHE_CHK="apt-cache show"
+            DISTRO_VIRTUAL_CHK="apt-cache showpkg"
+            PACKAGE_TYPE="deb"
+            ;;
+        rhel|ol)
+            DISTRO_PACKAGE_MGR="dnf"
+            DISTRO_CACHE_CHK="$SUDO dnf --cacheonly info"
+            DISTRO_VIRTUAL_CHK="dnf provides"
+            PACKAGE_TYPE="rpm"
             ;;
         sles)
-	    DISTRO_PACKAGE_MGR="zypper"
-	    DISTRO_CACHE_CHK="zypper search --type package --match-exact"
-	    DISTRO_VIRTUAL_CHK="zypper search --provides --match-exact"
-	    PACKAGE_TYPE="rpm"
-	    
-	    # install awk if required
-	    if ! rpm -qa | grep -q "awk"; then
-	        echo "Package: awk missing. Installing..."
-	        $SUDO zypper install -y awk > /dev/null 2>&1
-	        echo "Package: awk installed."
-	    fi
-	    
+            DISTRO_PACKAGE_MGR="zypper"
+            DISTRO_CACHE_CHK="zypper search --type package --match-exact"
+            DISTRO_VIRTUAL_CHK="zypper search --provides --match-exact"
+            PACKAGE_TYPE="rpm"
+            	    
+            # install awk if required
+            if ! rpm -qa | grep -q "awk"; then
+                echo "Package: awk missing. Installing..."
+                $SUDO zypper install -y awk > /dev/null 2>&1
+                echo "Package: awk installed."
+            fi
+            	    
             ;;
         *)
-            echo "$ID is not a Unsupported OS"
+            echo "$ID is not a supported OS"
             exit 1
             ;;
         esac
@@ -112,7 +112,7 @@ os_release() {
         echo "Unsupported OS"
         exit 1
     fi
-    
+        
     DISTRO_VER=$(awk -F= '/^VERSION_ID=/{print $2}' /etc/os-release | tr -d '"')
     echo "Dependency install on $DISTRO_NAME $DISTRO_VER."
 }

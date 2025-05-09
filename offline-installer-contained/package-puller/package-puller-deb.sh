@@ -90,11 +90,11 @@ os_release() {
         DISTRO_VER=$(awk -F= '/^VERSION_ID=/{print $2}' /etc/os-release | tr -d '"')
 
         case "$ID" in
-        ubuntu)
-	    echo "Pulling packages for Ubuntu $DISTRO_VER."
-	    ;;
+        ubuntu|debian)
+            echo "Pulling packages for Ubuntu $DISTRO_VER."
+            ;;
         *)
-            echo "$ID is not a Unsupported OS"
+            echo "$ID is not a supported OS"
             exit 1
             ;;
         esac

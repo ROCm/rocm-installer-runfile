@@ -82,13 +82,13 @@ os_release() {
 
         DISTRO_NAME=$ID
         DISTRO_VER=$(awk -F= '/^VERSION_ID=/{print $2}' /etc/os-release | tr -d '"')
-
+        
         case "$ID" in
-	rhel)
-	    echo "Pulling packages for RHEL $DISTRO_VER."
-	    ;;
+        rhel|ol)
+            echo "Pulling packages for EL $DISTRO_VER."
+            ;;
         *)
-            echo "$ID is not a Unsupported OS"
+            echo "$ID is not a supported OS"
             exit 1
             ;;
         esac

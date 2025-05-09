@@ -111,16 +111,16 @@ os_release() {
         DISTRO_VER=$(awk -F= '/^VERSION_ID=/{print $2}' /etc/os-release | tr -d '"')
 
         case "$ID" in
-	rhel)
-	    echo "Extracting for RHEL $DISTRO_VER."
-	    EXTRACT_DISTRO_TYPE=el
+        rhel|ol)
+            echo "Extracting for RHEL $DISTRO_VER."
+            EXTRACT_DISTRO_TYPE=el
             ;;
         sles)
             echo "Extracting for SUSE $DISTRO_VER."
-	    EXTRACT_DISTRO_TYPE=sle
+            EXTRACT_DISTRO_TYPE=sle
             ;;
         *)
-            echo "$ID is not a Unsupported OS"
+            echo "$ID is not a supported OS"
             exit 1
             ;;
         esac

@@ -143,8 +143,8 @@ int get_os_info(OFFLINE_INSTALL_CONFIG *pConfig)
     get_os_release_value("ID", pConfig->distroID);
     get_os_release_value("VERSION_ID", pConfig->distroVersion);
 
-    char *debList[] = {"ubuntu"};
-    char *elList[]  = {"rhel"};
+    char *debList[] = {"ubuntu", "debian"};
+    char *elList[]  = {"rhel", "ol"};
     char *sleList[] = {"sles"};
 
     for (i = 0; i < ARRAY_SIZE(debList); i++) 
@@ -182,7 +182,7 @@ void main_menu_draw(MENU_DATA *pMenuData, OFFLINE_INSTALL_CONFIG *pConfig)
     wclear(pMenuWindow);
 
     char installer_build[DEFAULT_CHAR_SIZE];
-    sprintf(installer_build, "%s", DISTRO_BUILD);
+    sprintf(installer_build, "%s", pConfig->distroName);
 
     // resizes pMenuWindow and subwindow that displays menu items to its original
     // size in case user resized terminal window

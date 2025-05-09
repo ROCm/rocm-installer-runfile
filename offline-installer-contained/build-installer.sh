@@ -65,37 +65,33 @@ END_USAGE
 os_release() {
     if [[ -r  /etc/os-release ]]; then
         . /etc/os-release
-
+        
         DISTRO_NAME=$ID
         DISTRO_VER=$(awk -F= '/^VERSION_ID=/{print $2}' /etc/os-release | tr -d '"')
-
+        
         case "$ID" in
-        ubuntu)
-	    echo "Build running on Ubuntu $DISTRO_VER."
-	    BUILD_DISTRO_TYPE=deb
-	    BUILD_OS=$DISTRO_VER
-	    ;;
-	rhel)
-	    echo "Build running on RHEL $DISTRO_VER."
-	    BUILD_DISTRO_TYPE=el
-	    
-	    if [[ $DISTRO_VER == 8* ]]; then
-	        echo Disable makeself tar options for EL8.
-	        MAKESELF_OPT_HEADER="--header ./rocm-makeself-header-pre.sh --help-header ./rocm-installer/VERSION"
-	        MAKESELF_OPT_TAR=
-	        BUILD_OS=el8
-	    else
-	        BUILD_OS=el9
-	    fi
-	    
+        ubuntu|debian)
+            BUILD_DISTRO_TYPE=deb
+            BUILD_OS=$DISTRO_VER
+            ;;
+        rhel|ol)
+            BUILD_DISTRO_TYPE=el
+                        	    
+            if [[ $DISTRO_VER == 8* ]]; then
+                echo Disable makeself tar options for EL8.
+                MAKESELF_OPT_HEADER="--header ./rocm-makeself-header-pre.sh --help-header ./rocm-installer/VERSION"
+                MAKESELF_OPT_TAR=
+                BUILD_OS=el8
+            else
+                BUILD_OS=el9
+            fi	    
             ;;
         sles)
-	    echo "Build running on SUSE $DISTRO_VER."
-	    BUILD_DISTRO_TYPE=sle
-	    BUILD_OS=sles${DISTRO_VER//./}
+            BUILD_DISTRO_TYPE=sle
+            BUILD_OS=sles${DISTRO_VER//./}
             ;;
         *)
-            echo "$ID is not a Unsupported OS"
+            echo "$ID is not a supported OS"
             exit 1
             ;;
         esac
@@ -103,6 +99,8 @@ os_release() {
         echo "Unsupported OS"
         exit 1
     fi
+        
+    echo "Build running on $DISTRO_NAME $DISTRO_VER."
 }
 
 get_version() {

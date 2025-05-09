@@ -46,22 +46,19 @@ os_release() {
 
         DISTRO_NAME=$ID
         DISTRO_VER=$(awk -F= '/^VERSION_ID=/{print $2}' /etc/os-release | tr -d '"')
-
+        
         case "$ID" in
-        ubuntu)
-	    echo "Setup running on Ubuntu $DISTRO_VER."
-	    PULL_DISTRO_TYPE=deb
-	    ;;
-	rhel)
-	    echo "Setup running on RHEL $DISTRO_VER."
-	    PULL_DISTRO_TYPE=el
+        ubuntu|debian)
+            PULL_DISTRO_TYPE=deb
+            ;;
+        rhel|ol)
+            PULL_DISTRO_TYPE=el
             ;;
         sles)
-	    echo "Setup running on SLES $DISTRO_VER."
-	    PULL_DISTRO_TYPE=sle
+            PULL_DISTRO_TYPE=sle
             ;;
         *)
-            echo "$ID is not a Unsupported OS"
+            echo "$ID is not a supported OS"
             exit 1
             ;;
         esac
@@ -69,8 +66,9 @@ os_release() {
         echo "Unsupported OS"
         exit 1
     fi
+    
+    echo "Setup running on $DISTRO_NAME $DISTRO_VER."
 }
-
 
 ####### Main script ###############################################################
 
