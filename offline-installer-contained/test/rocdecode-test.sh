@@ -94,7 +94,7 @@ install_deps() {
 	    
 	    $SUDO dnf install -y https://download1.rpmfusion.org/free/el/rpmfusion-free-release-9.noarch.rpm
             $SUDO dnf install -y https://download1.rpmfusion.org/nonfree/el/rpmfusion-nonfree-release-9.noarch.rpm
-            $SUDO dnf install -y cmake ffmpeg ffmpeg-devel
+            $SUDO dnf install -y cmake gcc-c++ ffmpeg ffmpeg-devel
             $SUDO dnf install -y mpg123-libs
 
 	    source ../package-puller/config/el/9/rocm-$ROCM_VER-el9.config
