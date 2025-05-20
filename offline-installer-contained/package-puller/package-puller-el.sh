@@ -229,6 +229,12 @@ setup_rocm_repo() {
     echo ++++++++++++++++++++++++++++++++
     echo Setting up ROCm repo...
     
+    # Disable rocm repo for OL 8.10 for amdgpu-dkms package pull
+    if [[ "$PACKAGES" =~ "amdgpu-dkms" && "$DISTRO_NAME" == "ol" && "$DISTRO_VER" == "8.10" ]]; then
+        echo "amdgpu-dkms packaged pull for OL 8.10.  Disabling rocm repo setup." 
+        return
+    fi
+    
     echo "$ROCM_REPO" | $SUDO tee -a /etc/yum.repos.d/rocm-build.repo
     
      # cleanup the dnf cache

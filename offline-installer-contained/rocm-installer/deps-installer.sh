@@ -42,6 +42,8 @@ VERBOSE=0
 
 NO_CMD_OUTPUT="> /dev/null 2>&1"
 
+GCC_TOOLSET_PACKAGES_OL=(gcc-toolset-11-gcc gcc-toolset-11-gcc-c++ gcc-toolset-11-gcc-gfortran gcc-toolset-11-libquadmath-devel gcc-toolset-11-libstdc++-devel gcc-toolset-11-gcc-gdb-plugin)
+
 
 ###### Functions ###############################################################
 
@@ -635,7 +637,7 @@ get_kernel_packages_ol() {
 
             if [ ! -z "$gcc_package_ver" ]; then
                 echo "Install $gcc_package version $gcc_package_ver"
-                #KERNEL_PACKAGES+="$gcc_package_ver "
+                KERNEL_PACKAGES+="$gcc_package_ver "
             else
                 echo "Unable to gcc version $TARGET_GCC_VERSION for package $gcc_package_ver in repo ol${DISTRO_VER_MAJ}_appstream"
             fi
