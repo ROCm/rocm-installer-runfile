@@ -42,6 +42,8 @@ VERBOSE=0
 
 NO_CMD_OUTPUT="> /dev/null 2>&1"
 
+GCC_TOOLSET_PACKAGES_OL=(gcc-toolset-11-gcc gcc-toolset-11-gcc-c++ gcc-toolset-11-gcc-gfortran gcc-toolset-11-libquadmath-devel gcc-toolset-11-libstdc++-devel gcc-toolset-11-gcc-gdb-plugin)
+
 
 ###### Functions ###############################################################
 
@@ -77,34 +79,34 @@ os_release() {
         DISTRO_NAME=$ID
 
         case "$ID" in
-        ubuntu)
-	    DISTRO_PACKAGE_MGR="apt"
-	    DISTRO_CACHE_CHK="apt-cache show"
-	    DISTRO_VIRTUAL_CHK="apt-cache showpkg"
-	    PACKAGE_TYPE="deb"
-	    ;;
-	rhel)
-	    DISTRO_PACKAGE_MGR="dnf"
-	    DISTRO_CACHE_CHK="$SUDO dnf --cacheonly info"
-	    DISTRO_VIRTUAL_CHK="dnf provides"
-	    PACKAGE_TYPE="rpm"
+        ubuntu|debian)
+            DISTRO_PACKAGE_MGR="apt"
+            DISTRO_CACHE_CHK="apt-cache show"
+            DISTRO_VIRTUAL_CHK="apt-cache showpkg"
+            PACKAGE_TYPE="deb"
+            ;;
+        rhel|ol)
+            DISTRO_PACKAGE_MGR="dnf"
+            DISTRO_CACHE_CHK="$SUDO dnf --cacheonly info"
+            DISTRO_VIRTUAL_CHK="dnf provides"
+            PACKAGE_TYPE="rpm"
             ;;
         sles)
-	    DISTRO_PACKAGE_MGR="zypper"
-	    DISTRO_CACHE_CHK="zypper search --type package --match-exact"
-	    DISTRO_VIRTUAL_CHK="zypper search --provides --match-exact"
-	    PACKAGE_TYPE="rpm"
-	    
-	    # install awk if required
-	    if ! rpm -qa | grep -q "awk"; then
-	        echo "Package: awk missing. Installing..."
-	        $SUDO zypper install -y awk > /dev/null 2>&1
-	        echo "Package: awk installed."
-	    fi
-	    
+            DISTRO_PACKAGE_MGR="zypper"
+            DISTRO_CACHE_CHK="zypper search --type package --match-exact"
+            DISTRO_VIRTUAL_CHK="zypper search --provides --match-exact"
+            PACKAGE_TYPE="rpm"
+            	    
+            # install awk if required
+            if ! rpm -qa | grep -q "awk"; then
+                echo "Package: awk missing. Installing..."
+                $SUDO zypper install -y awk > /dev/null 2>&1
+                echo "Package: awk installed."
+            fi
+            	    
             ;;
         *)
-            echo "$ID is not a Unsupported OS"
+            echo "$ID is not a supported OS"
             exit 1
             ;;
         esac
@@ -112,7 +114,7 @@ os_release() {
         echo "Unsupported OS"
         exit 1
     fi
-    
+        
     DISTRO_VER=$(awk -F= '/^VERSION_ID=/{print $2}' /etc/os-release | tr -d '"')
     echo "Dependency install on $DISTRO_NAME $DISTRO_VER."
 }
@@ -576,6 +578,73 @@ remove_deps() {
     echo Removing deps...Complete.
 }
 
+get_kernel_packages_rhel() {
+    echo RHEL kernel packages...
+    
+    if [[ $DEPS_LIST_ONLY == 0 ]]; then
+        dnf list "kernel-headers-$KERNEL_VER" &> /dev/null
+        if [ $? -eq 0 ]; then
+            echo "Kernel Packages for $KERNEL_VER are available in the repositories."
+            KERNEL_PACKAGES_VER="-$KERNEL_VER"
+        else
+            echo "Kernel Packages not available in the repositories.  Using defaults."
+        fi
+    else
+        KERNEL_PACKAGES_VER="-$KERNEL_VER"
+    fi
+    
+    KERNEL_PACKAGES="kernel-headers$KERNEL_PACKAGES_VER kernel-devel$KERNEL_PACKAGES_VER kernel-modules$KERNEL_PACKAGES_VER "
+    
+    if [[ $DISTRO_VER == 9* ]]; then
+        echo Adding EL9 amdgpu packages
+        KERNEL_PACKAGES+="kernel-devel-matched$KERNEL_PACKAGES_VER "
+    fi
+    
+    FILTER_PACKAGES="kernel-devel"
+    REMOVE_PACKAGES="kernel-headers"
+}
+
+get_kernel_packages_ol() {
+    echo OL kernel packages...
+    
+    if [[ $DEPS_LIST_ONLY == 0 ]]; then
+        dnf list "kernel-uek-devel-$KERNEL_VER" #&> /dev/null
+        if [ $? -eq 0 ]; then
+            echo "Kernel Packages for $KERNEL_VER are available in the repositories."
+            KERNEL_PACKAGES_VER="-$KERNEL_VER"
+        else
+            echo "Kernel Packages not available in the repositories.  Using defaults."
+        fi
+    else
+        KERNEL_PACKAGES_VER="-$KERNEL_VER"
+    fi
+    
+    KERNEL_PACKAGES="kernel-uek-devel$KERNEL_PACKAGES_VER "
+    FILTER_PACKAGES="kernel-devel"
+    REMOVE_PACKAGES="kernel-headers"
+    
+    if [ -f "/boot/config-$(uname -r)" ]; then
+        echo "Find the value of TARGET_GCC_VERSION using CONFIG_CC_VERSION_TEXT from /boot/config-$(uname -r)"
+        TARGET_GCC_VERSION=$($SUDO cat /boot/config-$(uname -r) | grep CONFIG_CC_VERSION_TEXT | cut -d '=' -f2 | awk -F " " '{print $NF}' | tr -d ')' | tr -d '"')
+        for gcc_package in ${GCC_TOOLSET_PACKAGES_OL[@]}; do
+            # Expect full package name we want to install
+            # Example: gcc-toolset-11-gcc-11.4.1-3.0.1.el8_6
+            if [[ $DISTRO_VER == 8* ]]; then
+                gcc_package_ver=$(sudo dnf --disablerepo="*" --enablerepo="ol8_appstream" repoquery --all --nvr | grep "$gcc_package-$TARGET_GCC_VERSION" | awk '{print $NF}' | sort | uniq | tail -1)
+            elif [[ $DISTRO_VER == 9* ]]; then
+                gcc_package_ver=$(sudo dnf --disablerepo="*" --enablerepo="ol9_appstream" repoquery --all --nvr | grep "$gcc_package-$TARGET_GCC_VERSION" | awk '{print $NF}' | sort | uniq | tail -1)
+            fi
+
+            if [ ! -z "$gcc_package_ver" ]; then
+                echo "Install $gcc_package version $gcc_package_ver"
+                KERNEL_PACKAGES+="$gcc_package_ver "
+            else
+                echo "Unable to gcc version $TARGET_GCC_VERSION for package $gcc_package_ver in repo ol${DISTRO_VER_MAJ}_appstream"
+            fi
+        done
+    fi
+}
+
 get_kernel_packages() {
     echo "------------------------------------"
     
@@ -588,27 +657,12 @@ get_kernel_packages() {
         KERNEL_PACKAGES="linux-headers-$KERNEL_VER "
         
     elif [ $DISTRO_PACKAGE_MGR == "dnf" ]; then
-        if [[ $DEPS_LIST_ONLY == 0 ]]; then
-            dnf list "kernel-headers-$KERNEL_VER" &> /dev/null
-            if [ $? -eq 0 ]; then
-                echo "Kernel Packages for $KERNEL_VER are available in the repositories."
-                KERNEL_PACKAGES_VER="-$KERNEL_VER"
-            else
-                echo "Kernel Packages not available in the repositories.  Using defaults."
-            fi
+    
+        if [ "$DISTRO_NAME" = "rhel" ]; then
+            get_kernel_packages_rhel
         else
-            KERNEL_PACKAGES_VER="-$KERNEL_VER"
+            get_kernel_packages_ol
         fi
-        
-        KERNEL_PACKAGES="kernel-headers$KERNEL_PACKAGES_VER kernel-devel$KERNEL_PACKAGES_VER kernel-modules$KERNEL_PACKAGES_VER "
-        
-        if [[ $DISTRO_VER == 9* ]]; then
-            echo Adding EL9 amdgpu packages
-            KERNEL_PACKAGES+="kernel-devel-matched$KERNEL_PACKAGES_VER "
-        fi
-        
-        FILTER_PACKAGES="kernel-devel"
-        REMOVE_PACKAGES="kernel-headers"
         
     elif [ $DISTRO_PACKAGE_MGR == "zypper" ]; then
         if [[ $DEPS_LIST_ONLY == 0 ]]; then

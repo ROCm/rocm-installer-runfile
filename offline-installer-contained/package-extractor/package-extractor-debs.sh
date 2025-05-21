@@ -887,6 +887,31 @@ extract_amdgpu_debs() {
         echo AMDGPU_DKMS_BUILD_VER = $AMDGPU_DKMS_BUILD_VER
         echo "$AMDGPU_DKMS_BUILD_VER" >> "$EXTRACT_DIR/$EXTRACT_AMDGPU_DKMS_VER_FILE"
     fi
+    
+    # reorder the amdgpu package config to ensure the order
+    local config_file="$EXTRACT_DIR/$EXTRACT_AMDGPU_PKG_CONFIG_FILE"
+    
+    local packages=$(cat "$config_file")
+    local reordered_packages=""
+
+    # Ensure "amdgpu-dkms-firmware" is the first package
+    if echo "$packages" | grep -q "^amdgpu-dkms-firmware$"; then
+        reordered_packages+="amdgpu-dkms-firmware"$'\n'
+        packages=$(echo "$packages" | grep -v "^amdgpu-dkms-firmware$")
+    fi
+
+    # Ensure "amdgpu-dkms" is the second package
+    if echo "$packages" | grep -q "^amdgpu-dkms$"; then
+        reordered_packages+="amdgpu-dkms"$'\n'
+        packages=$(echo "$packages" | grep -v "^amdgpu-dkms$")
+    fi
+
+    # Append the remaining packages
+    reordered_packages+="$packages"
+
+    # Write the reordered packages back to the config file
+    echo "$reordered_packages" > "$config_file"
+    echo "Reordered packages written to '$config_file'."
 }
 
 write_extract_info() {

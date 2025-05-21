@@ -258,8 +258,11 @@ Usage:
                  
     Uninstall:
     ----------
-        uninstall-rocm (target=<directory>) = Uninstall ROCm. If no target is provided, the first instance of ROCm will be unintalled.
-        	        target=directory>   = Optional.  Set target=<directory> to the directory where ROCm is installed.
+        uninstall-rocm target=<directory/rocm-ver> = Uninstall ROCm version at target directory path.
+                              <directory/rocm-ver> = ROCm version target directory path for uninstall.  
+                                         rocm-ver  = ROCm version directory: rocm-x.y.z (x=major, y=minor, patch number)
+
+                             * If target=<directory/rocm-ver> is not provided, uninstall will be from $PWD/rocm-x.y.z
       
         uninstall-amdgpu = Uninstall amdgpu driver.
         	           
@@ -277,20 +280,20 @@ Usage examples:
     
 # ROCm installation (no Dependency install)
 
-    * ROCm install location (default) => $PWD/rocm
+    * ROCm install location (default) => $PWD/rocm-x.y.z
         bash \$installer_name.run rocm
     
 # ROCm + Dependency installation
     
-    * ROCm install location (default) => $PWD/rocm
+    * ROCm install location (default) => $PWD/rocm-x.y.z
         bash \$installer_name.run deps=install rocm
     
 # ROCm + Dependency installation + ROCm target location
     
-    * ROCm install location => /opt
+    * ROCm install location => /opt/rocm-x.y.z
         bash \$installer_name.run deps=install target="/" rocm
  
-    * ROCm install location => $HOME/myrocm
+    * ROCm install location => $HOME/myrocm/rocm-x.y.z
         bash \$installer_name.run deps=install target="$HOME/myrocm" rocm
     
 # ROCm + Dependency installation + ROCm target location + Post ROCm configuration
@@ -321,7 +324,8 @@ Usage examples:
 # Uninstall
 
     Uninstall ROCm               = bash \$installer_name.run uninstall-rocm
-    Uninstall ROCm from location = bash \$installer_name.run target="$HOME/myrocm" uninstall-rocm
+    Uninstall ROCm from location = bash \$installer_name.run target="$HOME/myrocm/rocm-x.y.z" uninstall-rocm
+
     Uninstall amdgpu driver      = bash \$installer_name.run uninstall-amdgpu
     Uninstall combined           = bash \$installer_name.run uninstall-amdgpu uninstall-rocm
 

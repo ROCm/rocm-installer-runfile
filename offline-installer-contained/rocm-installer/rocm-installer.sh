@@ -117,8 +117,11 @@ Usage: bash $PROG [options]
                  
     Uninstall:
     ----------
-        uninstall-rocm (target=<directory>) = Uninstall ROCm. If no target is provided, the first instance of ROCm will be unintalled.
-        	        target=directory>   = Optional.  Set target=<directory> to the directory where ROCm is installed.
+        uninstall-rocm target=<directory/rocm-ver> = Uninstall ROCm version at target directory path.
+                              <directory/rocm-ver> = ROCm version target directory path for uninstall.  
+                                         rocm-ver  = ROCm version directory: rocm-x.y.z (x=major, y=minor, patch number)
+
+                             * If target=<directory/rocm-ver> is not provided, uninstall will be from $PWD/rocm-x.y.z
       
         uninstall-amdgpu = Uninstall amdgpu driver.
         	           
@@ -136,20 +139,20 @@ Usage examples:
     
 # ROCm installation (no Dependency install)
 
-    * ROCm install location (default) => $PWD/rocm
+    * ROCm install location (default) => $PWD/rocm-x.y.z
         bash $PROG rocm
     
 # ROCm + Dependency installation
     
-    * ROCm install location (default) => $PWD/rocm
+    * ROCm install location (default) => $PWD/rocm-x.y.z
         bash $PROG deps=install rocm
     
 # ROCm + Dependency installation + ROCm target location
     
-    * ROCm install location => /opt
+    * ROCm install location => /opt/rocm-x.y.z
         bash $PROG deps=install target="/" rocm
  
-    * ROCm install location => $HOME/myrocm
+    * ROCm install location => $HOME/myrocm/rocm-x.y.z
         bash $PROG deps=install target="$HOME/myrocm" rocm
     
 # ROCm + Dependency installation + ROCm target location + Post ROCm configuration
@@ -180,7 +183,8 @@ Usage examples:
 # Uninstall
 
     Uninstall ROCm               = bash $PROG uninstall-rocm
-    Uninstall ROCm from location = bash $PROG target="$HOME/myrocm" uninstall-rocm
+    Uninstall ROCm from location = bash $PROG target="$HOME/myrocm/rocm-x.y.z" uninstall-rocm
+
     Uninstall amdgpu driver      = bash $PROG uninstall-amdgpu
     Uninstall combined           = bash $PROG uninstall-amdgpu uninstall-rocm
     
@@ -194,36 +198,36 @@ os_release() {
         DISTRO_NAME=$ID
 
         case "$ID" in
-        ubuntu)
+        ubuntu|debian)
             DISTRO_VER=$(awk -F= '/^VERSION_ID=/{print $2}' /etc/os-release | tr -d '"')
-            
-	    INSTALL_SCRIPTLET_ARG="configure"
-	    UNINSTALL_SCRIPTLET_ARG="remove"
-	    PKG_INSTALLED_CMD="apt list --installed"
-	    ;;
-	rhel)
-	    DISTRO_VER=$(awk -F= '/^VERSION_ID=/{print $2}' /etc/os-release | tr -d '"')
-	   
-	    INSTALL_SCRIPTLET_ARG="1"
-	    UNINSTALL_SCRIPTLET_ARG="0"
-	    PKG_INSTALLED_CMD="rpm -qa"
-	    
-	    if ! rpm -qa | grep -qE "ncurses-[0-9]"; then
-	        NCURSES_BAR=0
-	    fi
-	    
+                        
+            INSTALL_SCRIPTLET_ARG="configure"
+            UNINSTALL_SCRIPTLET_ARG="remove"
+            PKG_INSTALLED_CMD="apt list --installed"
+            ;;
+        rhel|ol)
+            DISTRO_VER=$(awk -F= '/^VERSION_ID=/{print $2}' /etc/os-release | tr -d '"')
+            	   
+            INSTALL_SCRIPTLET_ARG="1"
+            UNINSTALL_SCRIPTLET_ARG="0"
+            PKG_INSTALLED_CMD="rpm -qa"
+            	    
+            if ! rpm -qa | grep -qE "ncurses-[0-9]"; then
+                NCURSES_BAR=0
+            fi
+            	    
             ;;
         sles)
             if rpm -qa | grep -q "awk"; then
-	        DISTRO_VER=$(awk -F= '/^VERSION_ID=/{print $2}' /etc/os-release | tr -d '"')
-	    fi
+                DISTRO_VER=$(awk -F= '/^VERSION_ID=/{print $2}' /etc/os-release | tr -d '"')
+            fi
             
-	    INSTALL_SCRIPTLET_ARG="1"
-	    UNINSTALL_SCRIPTLET_ARG="0"
-	    PKG_INSTALLED_CMD="rpm -qa"
+            INSTALL_SCRIPTLET_ARG="1"
+            UNINSTALL_SCRIPTLET_ARG="0"
+            PKG_INSTALLED_CMD="rpm -qa"
             ;;
         *)
-            echo "$ID is not a Unsupported OS"
+            echo "$ID is not a supported OS"
             exit 1
             ;;
         esac
@@ -231,7 +235,7 @@ os_release() {
         echo "Unsupported OS"
         exit 1
     fi
-    
+        
     echo "Installing for $DISTRO_NAME $DISTRO_VER."
 }
 
@@ -1338,13 +1342,9 @@ install_amdgpu() {
     COMPO_FILE="$COMPO_AMDGPU_FILE"
     
     read_components
-
-    # Workaround for amdgpu packages order
-    #for compo in ${COMPONENTS[@]}; do
-    install_arr=($COMPONENTS)
-    for(( i=${#install_arr[@]}-1; i>=0; i-- )) do
-        compo=${install_arr[i]}
-
+    
+    # Install each component in the component list for amdgpu
+    for compo in ${COMPONENTS[@]}; do
         echo ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
         echo -e "\e[32mInstalling $compo\e[0m"
         install_amdgpu_component $compo

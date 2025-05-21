@@ -82,13 +82,13 @@ os_release() {
 
         DISTRO_NAME=$ID
         DISTRO_VER=$(awk -F= '/^VERSION_ID=/{print $2}' /etc/os-release | tr -d '"')
-
+        
         case "$ID" in
-	rhel)
-	    echo "Pulling packages for RHEL $DISTRO_VER."
-	    ;;
+        rhel|ol)
+            echo "Pulling packages for EL $DISTRO_VER."
+            ;;
         *)
-            echo "$ID is not a Unsupported OS"
+            echo "$ID is not a supported OS"
             exit 1
             ;;
         esac
@@ -228,6 +228,12 @@ install_tools() {
 setup_rocm_repo() {
     echo ++++++++++++++++++++++++++++++++
     echo Setting up ROCm repo...
+    
+    # Disable rocm repo for OL 8.10 for amdgpu-dkms package pull
+    if [[ "$PACKAGES" =~ "amdgpu-dkms" && "$DISTRO_NAME" == "ol" && "$DISTRO_VER" == "8.10" ]]; then
+        echo "amdgpu-dkms packaged pull for OL 8.10.  Disabling rocm repo setup." 
+        return
+    fi
     
     echo "$ROCM_REPO" | $SUDO tee -a /etc/yum.repos.d/rocm-build.repo
     

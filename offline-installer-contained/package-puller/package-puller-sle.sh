@@ -85,10 +85,10 @@ os_release() {
 
         case "$ID" in
         sles)
-	    echo "Pulling packages for SLES $DISTRO_VER."
-	    ;;
+            echo "Pulling packages for SLES $DISTRO_VER."
+            ;;
         *)
-            echo "$ID is not a Unsupported OS"
+            echo "$ID is not a supported OS"
             exit 1
             ;;
         esac

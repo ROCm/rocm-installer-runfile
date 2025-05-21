@@ -58,16 +58,22 @@ os_release() {
 
         case "$ID" in
         ubuntu)
-	    echo "Installer running on Ubuntu $DISTRO_VER."
-	    ;;
-	rhel)
-	    echo "Installer running on RHEL $DISTRO_VER."
+            echo "Installer running on Ubuntu $DISTRO_VER."
+            ;;
+        debian)
+            echo "Installer running on Debian $DISTRO_VER."
+            ;;
+        rhel)
+            echo "Installer running on RHEL $DISTRO_VER."
+            ;;
+        ol)
+            echo "Installer running on Oracle Linux $DISTRO_VER."
             ;;
         sles)
-	    echo "Installer running on SLES $DISTRO_VER."
+            echo "Installer running on SLES $DISTRO_VER."
             ;;
         *)
-            echo "$ID is not a Unsupported OS"
+            echo "$ID is not a supported OS"
             exit 1
             ;;
         esac
