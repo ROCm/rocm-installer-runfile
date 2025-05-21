@@ -1342,13 +1342,9 @@ install_amdgpu() {
     COMPO_FILE="$COMPO_AMDGPU_FILE"
     
     read_components
-
-    # Workaround for amdgpu packages order
-    #for compo in ${COMPONENTS[@]}; do
-    install_arr=($COMPONENTS)
-    for(( i=${#install_arr[@]}-1; i>=0; i-- )) do
-        compo=${install_arr[i]}
-
+    
+    # Install each component in the component list for amdgpu
+    for compo in ${COMPONENTS[@]}; do
         echo ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
         echo -e "\e[32mInstalling $compo\e[0m"
         install_amdgpu_component $compo

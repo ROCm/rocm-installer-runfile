@@ -83,85 +83,93 @@ os_release
 
 echo Running Package Puller...
 
-# Pull ROCm packages for the currently running OS (debian or rpm)
-pushd package-puller
-    echo -------------------------------------------------------------
-    echo "Setting up for ROCm components..."
+setup_rocm() {
+    # Pull ROCm packages for the currently running OS (debian or rpm)
+    pushd package-puller
+        echo -------------------------------------------------------------
+        echo "Setting up for ROCm components..."
 
-    if [ $PULL_DISTRO_TYPE == "deb" ]; then
+        if [ $PULL_DISTRO_TYPE == "deb" ]; then
+            
+            echo "Setting up for DEB."
+            ./package-puller-deb.sh amd config="$PULLER_CONFIG" pkg="$PULLER_PACKAGES"
+            
+        elif [ $PULL_DISTRO_TYPE == "el" ]; then
         
-        echo "Setting up for DEB."
-        ./package-puller-deb.sh amd config="$PULLER_CONFIG" pkg="$PULLER_PACKAGES"
+        	echo "Setting up for EL RPM."
+            ./package-puller-el.sh amd config="$PULLER_CONFIG_EL" pkg="$PULLER_PACKAGES_EL"
+            
+        elif [ $PULL_DISTRO_TYPE == "sle" ]; then
         
-    elif [ $PULL_DISTRO_TYPE == "el" ]; then
-    
-    	echo "Setting up for EL RPM."
-        ./package-puller-el.sh amd config="$PULLER_CONFIG_EL" pkg="$PULLER_PACKAGES_EL"
+            echo "Setting up for SLES RPM."
+            ./package-puller-sle.sh amd config="$PULLER_CONFIG_SLE" pkg="$PULLER_PACKAGES_SLE"
+            
+        else
+            echo Invalid Distro Type: $PULL_DISTRO_TYPE
+            exit 1
+        fi
         
-    elif [ $PULL_DISTRO_TYPE == "sle" ]; then
-    
-        echo "Setting up for SLES RPM."
-        ./package-puller-sle.sh amd config="$PULLER_CONFIG_SLE" pkg="$PULLER_PACKAGES_SLE"
+        # check if package pull was successful
+        if [[ $? -ne 0 ]]; then
+            echo -e "\e[31mFailed pull of ROCm packages.\e[0m"
+            exit 1
+        fi
         
-    else
-        echo Invalid Distro Type: $PULL_DISTRO_TYPE
-        exit 1
-    fi
-    
-    # check if package pull was successful
-    if [[ $? -ne 0 ]]; then
-        echo -e "\e[31mFailed pull of ROCm packages.\e[0m"
-        exit 1
-    fi
-    
-    if [ -d $PULLER_OUTPUT ]; then
-        echo -e "\e[93mExtraction directory exists. Removing: $PULLER_OUTPUT\e[0m"
-        $SUDO rm -rf $PULLER_OUTPUT
-    fi
-    mv packages/packages-amd $PULLER_OUTPUT
-    
-    echo "Setting up for ROCm components...Complete."
-popd
+        if [ -d $PULLER_OUTPUT ]; then
+            echo -e "\e[93mExtraction directory exists. Removing: $PULLER_OUTPUT\e[0m"
+            $SUDO rm -rf $PULLER_OUTPUT
+        fi
+        mv packages/packages-amd $PULLER_OUTPUT
+        
+        echo "Setting up for ROCm components...Complete."
+    popd
+}
 
-# Pull AMDGPU packages for the currently running OS (debian or rpm)
-pushd package-puller
-    echo -------------------------------------------------------------
-    echo "Setting up for AMDGPU components..."
+setup_amdgpu() {
+    # Pull AMDGPU packages for the currently running OS (debian or rpm)
+    pushd package-puller
+        echo -------------------------------------------------------------
+        echo "Setting up for AMDGPU components..."
 
-    if [ $PULL_DISTRO_TYPE == "deb" ]; then
-    
-        echo "Setting up for DEB."
-        ./package-puller-deb.sh amd config="$PULLER_CONFIG" pkg="$PULLER_PACKAGES_AMDGPU"
+        if [ $PULL_DISTRO_TYPE == "deb" ]; then
         
-    elif [ $PULL_DISTRO_TYPE == "el" ]; then
-    
-         echo "Setting up for RPM AMDGPU builds."
-        ./package-puller-el.sh amd config="$PULLER_CONFIG_EL" pkg="$PULLER_PACKAGES_AMDGPU"
+            echo "Setting up for DEB."
+            ./package-puller-deb.sh amd config="$PULLER_CONFIG" pkg="$PULLER_PACKAGES_AMDGPU"
+            
+        elif [ $PULL_DISTRO_TYPE == "el" ]; then
         
-    elif [ $PULL_DISTRO_TYPE == "sle" ]; then
-    
-         echo "Setting up for RPM AMDGPU builds."
-        ./package-puller-sle.sh amd config="$PULLER_CONFIG_SLE" pkg="$PULLER_PACKAGES_AMDGPU"
+             echo "Setting up for RPM AMDGPU builds."
+            ./package-puller-el.sh amd config="$PULLER_CONFIG_EL" pkg="$PULLER_PACKAGES_AMDGPU"
+            
+        elif [ $PULL_DISTRO_TYPE == "sle" ]; then
         
-    else
-        echo Invalid Distro Type: $PULL_DISTRO_TYPE
-        exit 1
-    fi
-    
-    # check if package pull was successful
-    if [[ $? -ne 0 ]]; then
-        echo -e "\e[31mFailed pull of AMDGPU packages.\e[0m"
-        exit 1
-    fi
+             echo "Setting up for RPM AMDGPU builds."
+            ./package-puller-sle.sh amd config="$PULLER_CONFIG_SLE" pkg="$PULLER_PACKAGES_AMDGPU"
+            
+        else
+            echo Invalid Distro Type: $PULL_DISTRO_TYPE
+            exit 1
+        fi
+        
+        # check if package pull was successful
+        if [[ $? -ne 0 ]]; then
+            echo -e "\e[31mFailed pull of AMDGPU packages.\e[0m"
+            exit 1
+        fi
 
-    if [ -d $PULLER_OUTPUT_AMDGPU ]; then
-        echo -e "\e[93mExtraction directory exists. Removing: $PULLER_OUTPUT_AMDGPU\e[0m"
-        $SUDO rm -rf $PULLER_OUTPUT_AMDGPU
-    fi
-    mv packages/packages-amd $PULLER_OUTPUT_AMDGPU
-    
-    echo "Setting up for AMDGPU components...Complete."
-popd
+        if [ -d $PULLER_OUTPUT_AMDGPU ]; then
+            echo -e "\e[93mExtraction directory exists. Removing: $PULLER_OUTPUT_AMDGPU\e[0m"
+            $SUDO rm -rf $PULLER_OUTPUT_AMDGPU
+        fi
+        mv packages/packages-amd $PULLER_OUTPUT_AMDGPU
+        
+        echo "Setting up for AMDGPU components...Complete."
+    popd
+}
+
+setup_rocm
+
+setup_amdgpu
 
 echo Running Package Puller...Complete
 
