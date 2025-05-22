@@ -33,23 +33,20 @@ os_release() {
         DISTRO_VER=$(awk -F= '/^VERSION_ID=/{print $2}' /etc/os-release | tr -d '"')
 
         case "$ID" in
-        ubuntu)
-	    echo "Running test on Ubuntu $DISTRO_VER."
+        ubuntu|debian)
 	    DISTRO_PACKAGE_MGR="apt"
 	    PACKAGE_TYPE="deb"
 	    ;;
-	rhel)
-	    echo "Running test on RHEL $DISTRO_VER."
+	rhel|ol)
 	    DISTRO_PACKAGE_MGR="dnf"
 	    PACKAGE_TYPE="rpm"
             ;;
         sles)
-	    echo "Running test on SUSE $DISTRO_VER."
 	    DISTRO_PACKAGE_MGR="zypper"
 	    PACKAGE_TYPE="rpm"
             ;;
         *)
-            echo "$ID is not a Unsupported OS"
+            echo "$ID is not a supported OS"
             exit 1
             ;;
         esac
@@ -57,6 +54,8 @@ os_release() {
         echo "Unsupported OS"
         exit 1
     fi
+    
+    echo "Running test on $DISTRO_NAME $DISTRO_VER."
 }
 
 
@@ -73,6 +72,7 @@ echo SUDO: $SUDO
 os_release
 
 amd-smi version
+amd-smi list
 amd-smi metric -tc
 amd-smi static --asic --board
 
