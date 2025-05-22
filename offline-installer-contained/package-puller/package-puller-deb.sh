@@ -91,7 +91,7 @@ os_release() {
 
         case "$ID" in
         ubuntu|debian)
-            echo "Pulling packages for Ubuntu $DISTRO_VER."
+            echo "Pulling packages for $DISTRO_NAME $DISTRO_VER."
             ;;
         *)
             echo "$ID is not a supported OS"
