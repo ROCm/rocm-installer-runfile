@@ -1505,9 +1505,6 @@ install_post_rocm() {
     
     local rocm_ver_dir=
     
-    # validate the version of the installer
-    validate_version
-    
     # check if postrocm is part of a rocm install
     if [[ $ROCM_INSTALL == 1 ]]; then
         echo ROCm post-install...
