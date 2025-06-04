@@ -606,20 +606,53 @@ get_kernel_packages_rhel() {
 
 get_kernel_packages_ol() {
     echo OL kernel packages...
+
+    # RHCK kernels
+    local rhck_kernels=$(rpm -q kernel | sed 's/kernel-//g')
+    
+    echo "uek kernel : $KERNEL_VER"
+    for kernel_version in $rhck_kernels; do
+        echo "rhck kernel: $kernel_version"
+    done
     
     if [[ $DEPS_LIST_ONLY == 0 ]]; then
-        dnf list "kernel-uek-devel-$KERNEL_VER" #&> /dev/null
+
+        # check for the uek kernel packages
+        dnf list "kernel-uek-devel-$KERNEL_VER" &> /dev/null
         if [ $? -eq 0 ]; then
-            echo "Kernel Packages for $KERNEL_VER are available in the repositories."
-            KERNEL_PACKAGES_VER="-$KERNEL_VER"
+            echo "Kernel Packages for UEK $KERNEL_VER are available in the repositories."
+            KERNEL_PACKAGES+="kernel-uek-devel-$KERNEL_VER "
         else
-            echo "Kernel Packages not available in the repositories.  Using defaults."
+            echo "Kernel Packages for UEK not available in the repositories.  Using defaults."
         fi
+
+        # check for the rhck kernel packages
+        for kernel_version in $rhck_kernels; do
+            dnf list "kernel-headers-$kernel_version" &> /dev/null
+            if [[ $? -eq 0 ]]; then
+                echo "Kernel Packages for RHCK $kernel_version are available in the repositories."
+                KERNEL_PACKAGES+="kernel-headers-$kernel_version kernel-devel-$kernel_version kernel-modules-$kernel_version "
+                if [[ $DISTRO_VER == 9* ]]; then
+                    echo Adding EL9 amdgpu packages
+                    KERNEL_PACKAGES+="kernel-devel-matched-$kernel_version "
+                fi
+            else
+                echo "Kernel Packages for RHCK not available in the repositories.  Using defaults."
+            fi
+        done
+
     else
-        KERNEL_PACKAGES_VER="-$KERNEL_VER"
+        KERNEL_PACKAGES+="kernel-uek-devel-$KERNEL_VER "
+
+        for kernel_version in $rhck_kernels; do
+            KERNEL_PACKAGES+="kernel-headers-$kernel_version kernel-devel-$kernel_version kernel-modules-$kernel_version "
+            if [[ $DISTRO_VER == 9* ]]; then
+                echo Adding EL9 amdgpu packages
+                KERNEL_PACKAGES+="kernel-devel-matched-$kernel_version "
+            fi
+        done
     fi
     
-    KERNEL_PACKAGES="kernel-uek-devel$KERNEL_PACKAGES_VER "
     FILTER_PACKAGES="kernel-devel"
     REMOVE_PACKAGES="kernel-headers"
     
