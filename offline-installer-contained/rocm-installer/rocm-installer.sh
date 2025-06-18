@@ -42,7 +42,7 @@ COMPO_AMDGPU_FILE="$EXTRACT_AMDGPU_DIR/amdgpu-packages.config"
 COMPONENTS=
 
 # Install Configuration
-RSYNC_OPTS="--keep-dirlinks -rlp"
+RSYNC_OPTS="-a --keep-dirlinks --no-perms --no-owner --no-group --omit-dir-times "
 ROCM_INSTALL=0
 AMDGPU_INSTALL=0
 AMDGPU_START=0
@@ -1756,7 +1756,7 @@ do
     verbose)
         echo "Enabling verbose logging."
         VERBOSE=1
-        RSYNC_OPTS+="v"
+        RSYNC_OPTS+="--itemize-changes -v "
         shift
         ;;
     uninstall-rocm)
