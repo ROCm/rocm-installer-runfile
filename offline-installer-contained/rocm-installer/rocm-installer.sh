@@ -42,7 +42,7 @@ COMPO_AMDGPU_FILE="$EXTRACT_AMDGPU_DIR/amdgpu-packages.config"
 COMPONENTS=
 
 # Install Configuration
-RSYNC_OPTS="--keep-dirlinks -rlp"
+RSYNC_OPTS="-a --keep-dirlinks --no-perms --no-owner --no-group --omit-dir-times "
 ROCM_INSTALL=0
 AMDGPU_INSTALL=0
 AMDGPU_START=0
@@ -257,6 +257,16 @@ get_version() {
         done < "./VERSION"
     fi
     
+    VERSION_BUILD=${DISTRO_BUILD_VERSION%%.*}
+    VERSION_INSTALL=${DISTRO_VER%%.*}
+    
+    if [[ $DISTRO_NAME == "debian" ]] && [[ $DISTRO_VER == 12 ]]; then
+        if [[ $VERSION_BUILD == 22 ]]; then
+            echo Using 22.04 build for debian.
+            VERSION_BUILD=12
+        fi
+    fi
+    
     echo "Installer Version: $INSTALLER_VERSION"
     echo "ROCm Version     : $ROCM_VERSION"
     echo "ROCm Build       : $ROCM_BUILD_NUM"
@@ -270,16 +280,14 @@ get_version() {
 
 validate_version() {
     # For non-local builds, verify package version matches for the running host distribution
-    local version_build=${DISTRO_BUILD_VERSION%%.*}
-    local version_install=${DISTRO_VER%%.*}
         
-    echo "Checking version: Build $version_build : Install Distro $version_install"
+    echo "Checking version: Build $VERSION_BUILD : Install Distro $VERSION_INSTALL"
     
-    if [[ $version_build != $version_install ]]; then
+    if [[ $VERSION_BUILD != $VERSION_INSTALL ]]; then
         echo -e "\e[31m++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\e[0m"
         echo -e "\e[31mError: ROCm Runfile Installer Package mismatch:\e[0m"
-        echo -e "\e[31mInstall Build: ${DISTRO_NAME} ${version_build}\e[0m"
-        echo -e "\e[31mInstall OS   : ${DISTRO_NAME} ${version_install}\e[0m"
+        echo -e "\e[31mInstall Build: ${DISTRO_NAME} ${VERSION_BUILD}\e[0m"
+        echo -e "\e[31mInstall OS   : ${DISTRO_NAME} ${VERSION_INSTALL}\e[0m"
         echo -e "\e[31m++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\e[0m"
         echo Exiting installation.
         exit 1
@@ -1756,7 +1764,7 @@ do
     verbose)
         echo "Enabling verbose logging."
         VERBOSE=1
-        RSYNC_OPTS+="v"
+        RSYNC_OPTS+="--itemize-changes -v "
         shift
         ;;
     uninstall-rocm)
