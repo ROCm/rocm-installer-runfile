@@ -42,7 +42,8 @@ COMPO_AMDGPU_FILE="$EXTRACT_AMDGPU_DIR/amdgpu-packages.config"
 COMPONENTS=
 
 # Install Configuration
-RSYNC_OPTS="-a --keep-dirlinks --no-perms --no-owner --no-group --omit-dir-times "
+RSYNC_OPTS_ROCM="-a --keep-dirlinks --no-owner --no-group --omit-dir-times "
+RSYNC_OPTS_AMDGPU="-a --keep-dirlinks --no-perms --no-owner --no-group --omit-dir-times "
 ROCM_INSTALL=0
 AMDGPU_INSTALL=0
 AMDGPU_START=0
@@ -768,7 +769,7 @@ install_rocm_component() {
             if [[ $option == "Y" || $option == "y" ]]; then
                 echo "Proceeding with install..."
                 # Copy the component content/data to the target location
-                $SUDO rsync $RSYNC_OPTS "$content_dir"/* "$TARGET_DIR"
+                $SUDO rsync $RSYNC_OPTS_ROCM "$content_dir"/* "$TARGET_DIR"
                 if [ $? -ne 0 ]; then
                     print_err "rsync error."
                     exit 1
@@ -780,7 +781,7 @@ install_rocm_component() {
         fi
     else
         # Copy the component content/data to the target location
-        $SUDO rsync $RSYNC_OPTS "$content_dir"/* "$TARGET_DIR"
+        $SUDO rsync $RSYNC_OPTS_ROCM "$content_dir"/* "$TARGET_DIR"
         if [ $? -ne 0 ]; then
             print_err "rsync error."
             exit 1
@@ -1238,7 +1239,7 @@ install_amdgpu_component() {
 
     if [[ $component == "amdgpu-dkms" ]]; then
 
-        $SUDO rsync $RSYNC_OPTS "$content_dir/"* "$TARGET_DIR"
+        $SUDO rsync $RSYNC_OPTS_AMDGPU "$content_dir/"* "$TARGET_DIR"
         if [ $? -ne 0 ]; then
             print_err "rsync error."
             exit 1
@@ -1249,7 +1250,7 @@ install_amdgpu_component() {
             $SUDO cp -p $script_dir/amdgpu_firmware $script_dir/amdgpu-dkms.amdgpu_firmware
         fi
     else
-        $SUDO rsync $RSYNC_OPTS "$content_dir/"* "$TARGET_DIR"
+        $SUDO rsync $RSYNC_OPTS_AMDGPU "$content_dir/"* "$TARGET_DIR"
 
         if [ $? -ne 0 ]; then
             print_err "rsync error."
@@ -1764,7 +1765,8 @@ do
     verbose)
         echo "Enabling verbose logging."
         VERBOSE=1
-        RSYNC_OPTS+="--itemize-changes -v "
+        RSYNC_OPTS_ROCM+="--itemize-changes -v "
+        RSYNC_OPTS_AMDGPU+="--itemize-changes -v "
         shift
         ;;
     uninstall-rocm)
