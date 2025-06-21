@@ -308,6 +308,7 @@ move_opt_contents_to_root() {
 
     # Loop through the content directory
     for dir in "$content_dir"/*; do
+        local dirname=$(basename "$dir")
         # Check if the current directory is the opt directory
         if [[ -d "$dir" && $(basename "$dir") == "opt" ]]; then
             echo "Found 'opt' directory: $dir"
@@ -320,6 +321,14 @@ move_opt_contents_to_root() {
             echo "Moved contents of '$dir' to '$content_dir'."
         else
             echo -e "\e[93m$dir not moved.\e[0m"
+            
+            # workaround for extra /usr content
+            if [[ $content_dir =~ "component-rocm" && $dirname == "usr"  ]]; then
+                if [[ -d "$dir/share/lintian/overrides" ]]; then
+                    echo -e "\e[31m$dir/share/lintian/overrides delete\e[0m"
+                    $SUDO rm -rf "$dir"
+                fi
+            fi
         fi
     done
     
