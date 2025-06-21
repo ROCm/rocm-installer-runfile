@@ -861,7 +861,9 @@ install_repos_el() {
 install_repos_sle() {
     echo "Education and science repo setup..."
     
-    if [[ $DISTRO_VER == 15.6 ]]; then
+    if [[ $DISTRO_VER == 15.7 ]]; then
+        SLES_SCI_REPO="https://download.opensuse.org/repositories/science/SLE_15_SP5/science.repo"
+    elif [[ $DISTRO_VER == 15.6 ]]; then
          SLES_EDU_REPO="https://download.opensuse.org/repositories/Education/15.6/Education.repo"
          SLES_SCI_REPO="https://download.opensuse.org/repositories/science/SLE_15_SP5/science.repo"
     elif [[ $DISTRO_VER == 15.5 ]]; then
@@ -871,15 +873,19 @@ install_repos_sle() {
          echo "Unsupported version for repos Education and science."
          exit 1
     fi
-        
-    zypper repos | grep -q Education
-    if [ $? -eq 1 ]; then
-        $SUDO zypper addrepo "$SLES_EDU_REPO"
+    
+    if [[ -n $SLES_EDU_REPO ]]; then 
+        zypper repos | grep -q Education
+        if [ $? -eq 1 ]; then
+            $SUDO zypper addrepo "$SLES_EDU_REPO"
+        fi
     fi
-        
-    zypper repos | grep -q science
-    if [ $? -eq 1 ]; then
-        $SUDO zypper addrepo "$SLES_SCI_REPO"
+    
+    if [[ -n $SLES_SCI_REPO ]]; then   
+        zypper repos | grep -q science
+        if [ $? -eq 1 ]; then
+            $SUDO zypper addrepo "$SLES_SCI_REPO"
+        fi
     fi
       
     $SUDO zypper --gpg-auto-import-keys refresh > /dev/null 2>&1
