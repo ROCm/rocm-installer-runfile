@@ -138,7 +138,9 @@ install_prereqs() {
     if [ $? -eq 1 ]; then
         echo -------------------------------
         echo "Adding Perl language repo."
-        if [[ $DISTRO_VER == 15.6 ]]; then
+        if [[ $DISTRO_VER == 15.7 ]]; then
+            echo "15.7 not setting perl repo"
+        elif [[ $DISTRO_VER == 15.6 ]]; then
             $SUDO zypper addrepo https://download.opensuse.org/repositories/devel:/languages:/perl/15.6/devel:languages:perl.repo
         elif [[ $DISTRO_VER == 15.5 ]]; then
             $SUDO zypper addrepo https://download.opensuse.org/repositories/devel:/languages:/perl/15.5/devel:languages:perl.repo
@@ -155,7 +157,9 @@ install_prereqs() {
     if [ $? -eq 1 ]; then
         echo -------------------------------
         echo "Adding Education repo."
-        if [[ $DISTRO_VER == 15.6 ]]; then
+        if [[ $DISTRO_VER == 15.7 ]]; then
+            echo "15.7 not setting Education repo"
+        elif [[ $DISTRO_VER == 15.6 ]]; then
             $SUDO zypper addrepo https://download.opensuse.org/repositories/Education/15.6/Education.repo
         elif [[ $DISTRO_VER == 15.5 ]]; then
             $SUDO zypper addrepo https://download.opensuse.org/repositories/Education/15.5/Education.repo
@@ -172,7 +176,9 @@ install_prereqs() {
     if [ $? -eq 1 ]; then
         echo -------------------------------
         echo "Adding science repo."
-        if [[ $DISTRO_VER == 15.6 ]]; then
+        if [[ $DISTRO_VER == 15.7 ]]; then
+            $SUDO zypper addrepo https://download.opensuse.org/repositories/science/SLE_15_SP5/science.repo
+        elif [[ $DISTRO_VER == 15.6 ]]; then
             $SUDO zypper addrepo https://download.opensuse.org/repositories/science/SLE_15_SP5/science.repo
         elif [[ $DISTRO_VER == 15.5 ]]; then
             $SUDO zypper addrepo https://download.opensuse.org/repositories/science/SLE_15_SP5/science.repo

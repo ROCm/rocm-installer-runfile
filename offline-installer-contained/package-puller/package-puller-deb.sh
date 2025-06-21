@@ -349,6 +349,13 @@ check_package_owner() {
             fi
         fi
         
+        # filter out any distro-versions of hip packages
+        if [[ $package =~ "hip" && -n $maintainer ]]; then
+            if [[ $maintainer =~ "Ubuntu Developers" ]]; then
+                AMDPKG=0
+            fi
+        fi
+        
     else
        if [[ -n $maintainer ]]; then
            if [[ $maintainer =~ "Advanced Micro Devices" || $maintainer =~ "ROCm" || $maintainer =~ "AMD" || $maintainer =~ "amd.com"  ]]; then
