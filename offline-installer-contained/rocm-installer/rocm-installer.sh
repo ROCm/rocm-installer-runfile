@@ -42,7 +42,7 @@ COMPO_AMDGPU_FILE="$EXTRACT_AMDGPU_DIR/amdgpu-packages.config"
 COMPONENTS=
 
 # Install Configuration
-RSYNC_OPTS_ROCM="-a --keep-dirlinks --no-owner --no-group --omit-dir-times "
+RSYNC_OPTS_ROCM="--keep-dirlinks -rlp "
 RSYNC_OPTS_AMDGPU="-a --keep-dirlinks --no-perms --no-owner --no-group --omit-dir-times "
 ROCM_INSTALL=0
 AMDGPU_INSTALL=0
