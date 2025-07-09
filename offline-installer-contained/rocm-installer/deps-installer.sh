@@ -684,7 +684,7 @@ get_kernel_package_for_kernel_version() {
     
     kernel_package="$1"
     
-    output=$($SUDO zypper search -s "$kernel_package" | grep $KERNEL_PACKAGE_VER)
+    local output=$($SUDO zypper search -s "$kernel_package" | grep $KERNEL_PACKAGE_VER)
     for col_value in ${output}; do
         grep -q $KERNEL_PACKAGE_VER <<< "$col_value"
         if [ $? -eq 0 ]; then
