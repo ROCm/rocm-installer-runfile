@@ -49,7 +49,7 @@ os_release() {
 	    DISTRO_PACKAGE_MGR="apt"
 	    PACKAGE_TYPE="deb"
 	    ;;
-	rhel|ol)
+	rhel|ol|rocky)
 	    DISTRO_PACKAGE_MGR="dnf"
 	    PACKAGE_TYPE="rpm"
             ;;
@@ -100,14 +100,18 @@ install_deps() {
     elif [ $DISTRO_PACKAGE_MGR == "dnf" ]; then
     
         if [[ $DISTRO_VER == 8* ]]; then
-            echo Installing deps for RHEL8...
+            echo Installing deps for ${DISTRO_NAME}8...
             $SUDO dnf install -y gcc-c++ git cmake glfw-devel vulkan-headers vulkan-loader vulkan-validation-layers mesa-libGL-devel
             $SUDO dnf install -y gcc-toolset-11
             install_glslang
             
         elif [[ $DISTRO_VER == 9* ]]; then
-	    echo Installing deps for RHEL9...
-            $SUDO dnf install -y gcc-c++ git cmake glfw-devel glslang-devel vulkan-loader-devel libshaderc-devel
+	        echo Installing deps for ${DISTRO_NAME}9...
+            if [ $DISTRO_NAME = "rocky" ]; then
+                $SUDO dnf install -y gcc-c++ git cmake glslang-devel vulkan-loader-devel libshaderc-devel
+            else
+                $SUDO dnf install -y gcc-c++ git cmake glfw-devel glslang-devel vulkan-loader-devel libshaderc-devel
+            fi
         else
             echo "Unsupported version for EL."
             exit 1

@@ -37,7 +37,7 @@ os_release() {
 	    DISTRO_PACKAGE_MGR="apt"
 	    PACKAGE_TYPE="deb"
 	    ;;
-	rhel|ol)
+	rhel|ol|rocky)
 	    DISTRO_PACKAGE_MGR="dnf"
 	    PACKAGE_TYPE="rpm"
             ;;
@@ -75,7 +75,7 @@ install_deps() {
         
     elif [ $DISTRO_PACKAGE_MGR == "dnf" ]; then
         $SUDO dnf install pkg-config
-        
+
         if [[ $DISTRO_VER == 8* ]]; then
             echo Installing deps for RHEL8...
             
@@ -261,6 +261,21 @@ test_simple() {
     echo TESTING simple [ctests]...Complete
 }
 
+test_rocdecodenegativetest() {
+    echo ------------------------------------------------------
+    echo TESTING rocdecodenegativetest...
+    echo ------------------------------------------------------
+    
+    cmake -B rocdecode-test/rocdecodenegativetest/build $ROCM_PATH/share/rocdecode/test/rocDecodeNegativeApiTests
+    cmake --build rocdecode-test/rocdecodenegativetest/build
+
+    echo ">>>>> running test >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
+    ./rocdecode-test/rocdecodenegativetest/build/rocdecodenegativetest
+    
+    echo TESTING rocdecodenegativetest...Complete
+
+}
+
 ####### Main script ###############################################################
 
 echo ===============================
@@ -287,8 +302,18 @@ test_va
 test_samples
 
 test_perf
- 
-test_simple
+
+if [ -f "$ROCM_PATH/share/rocdecode/test/CMakeLists.txt" ]; then
+    test_simple
+else
+    echo "Unable to run test_simple as the file $ROCM_PATH/share/rocdecode/test/CMakeLists.txt doesn't exist"
+fi
+
+if [ -f "$ROCM_PATH/share/rocdecode/test/rocDecodeNegativeApiTests/CMakeLists.txt" ]; then
+    test_rocdecodenegativetest
+else
+    echo "Unable to run test_rocdecodenegativetest as the file $ROCM_PATH/share/rocdecode/test/rocDecodeNegativeApiTests/CMakeLists.txt doesn't exist"
+fi
 
 cleanup
 
