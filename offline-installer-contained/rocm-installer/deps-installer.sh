@@ -678,6 +678,24 @@ get_kernel_packages_ol() {
     fi
 }
 
+get_kernel_package_for_kernel_version() {
+    print_str "--------------------------------"
+    print_str "Find kernel package $1 for kernel version $KERNEL_PACKAGE_VER..."
+    
+    kernel_package="$1"
+    
+    local output=$($SUDO zypper search -s "$kernel_package" | grep $KERNEL_PACKAGE_VER)
+    for col_value in ${output}; do
+        grep -q $KERNEL_PACKAGE_VER <<< "$col_value"
+        if [ $? -eq 0 ]; then
+            NEW_KERNEL_PACKAGE_VER="$col_value"
+            echo "Using $NEW_KERNEL_PACKAGE_VER for $kernel_package"
+            KERNEL_PACKAGES+="$kernel_package-$NEW_KERNEL_PACKAGE_VER "
+            break;
+        fi
+    done
+}
+
 get_kernel_packages() {
     echo "------------------------------------"
     
@@ -703,18 +721,10 @@ get_kernel_packages() {
             $SUDO zypper search -s kernel-default-devel | grep $KERNEL_PACKAGE_VER &> /dev/null
             if [ $? -eq 0 ]; then
                 echo "Kernel Packages for $KERNEL_PACKAGE_VER are available in the repositories."
-            
-                KERNEL_PACKAGE_VER=$($SUDO zypper search -s kernel-default-devel | grep $(uname -r | sed "s/-default//") | awk '{print $6}' | head -n 1)
-                KERNEL_PACKAGES="kernel-default-devel-$KERNEL_PACKAGE_VER "
-                echo "Using $KERNEL_PACKAGE_VER for kernel-default-devel"
-                
-                KERNEL_PACKAGE_VER=$($SUDO zypper search -s kernel-syms | grep $(uname -r | sed "s/-default//") | awk '{print $6}' | head -n 1)
-                KERNEL_PACKAGES+="kernel-syms-$KERNEL_PACKAGE_VER "
-                echo "Using $KERNEL_PACKAGE_VER for kernel-syms"
-        
-                KERNEL_PACKAGE_VER=$($SUDO zypper search -s kernel-macros | grep $(uname -r | sed "s/-default//") | awk '{print $6}' | head -n 1)
-                KERNEL_PACKAGES+="kernel-macros-$KERNEL_PACKAGE_VER "
-                echo "Using $KERNEL_PACKAGE_VER for kernel-macros"
+
+                get_kernel_package_for_kernel_version "kernel-default-devel"
+                get_kernel_package_for_kernel_version "kernel-syms"
+                get_kernel_package_for_kernel_version "kernel-macros"
             else
                 echo "Kernel Packages not available in the repositories.  Using defaults."
                 KERNEL_PACKAGES="kernel-default-devel"
