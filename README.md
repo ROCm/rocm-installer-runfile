@@ -132,6 +132,7 @@ The <options> parameter can be set to these options:
 * Runfile options
   * noexec: Disable all installer execution. Extract the .run file content only.
   * noexec-cleanup: Disable cleanup after installer execution. Keep all .run extracted and runtime files.
+  * untar <file_path>: Extract only ROCm installation components from the .run file tarball to <file_path>.
 
 * Dependencies
   * deps=[arg] [compo]:
