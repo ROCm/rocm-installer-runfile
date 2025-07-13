@@ -32,6 +32,10 @@ PACKAGE_AMDGPU_DIR="$PWD/packages-amdgpu"
 EXTRACT_ROCM_DIR="$PWD/component-rocm"
 EXTRACT_AMDGPU_DIR="$PWD/component-amdgpu"
 
+# Extra install setup
+EXTRACT_TAR_DIR="$PWD/setup-install"
+
+# Extraction Files
 EXTRACT_ROCM_PKG_CONFIG_FILE="rocm-packages.config"
 EXTRACT_AMDGPU_PKG_CONFIG_FILE="amdgpu-packages.config"
 
@@ -111,8 +115,8 @@ os_release() {
         DISTRO_VER=$(awk -F= '/^VERSION_ID=/{print $2}' /etc/os-release | tr -d '"')
 
         case "$ID" in
-        rhel|ol)
-            echo "Extracting for RHEL $DISTRO_VER."
+        rhel|ol|rocky)
+            echo "Extracting for EL $DISTRO_VER."
             EXTRACT_DISTRO_TYPE=el
             ;;
         sles)
@@ -155,10 +159,14 @@ prompt_user() {
 install_tools() {
     echo ++++++++++++++++++++++++++++++++
     echo Installing tools...
-    
+   
     # Install rpmdevtools for dep version
     if [ $EXTRACT_DISTRO_TYPE == "el" ]; then
-        $SUDO dnf install -y rpmdevtools
+        if [[ "$DISTRO_NAME" = "rocky" ]]; then
+            $SUDO dnf install -y cpio
+        else
+            $SUDO dnf install -y rpmdevtools
+        fi
     elif [ $EXTRACT_DISTRO_TYPE == "sle" ]; then
         $SUDO zypper install -y rpmdevtools
     else
@@ -388,6 +396,10 @@ extract_data() {
     pushd $package_dir_content
     
         rpm2cpio "$PACKAGE" | cpio -idmv > /dev/null 2>&1
+        if [[ $? -ne 0 ]]; then
+            print_err "Failed rpm2cpio"
+            exit 1
+        fi
         
     popd
     
@@ -910,6 +922,37 @@ extract_amdgpu_rpms() {
     echo "Reordered packages written to '$config_file'."
 }
 
+extract_tar_setup() {
+    echo ===================================================
+    echo Extracting Tar Setup...
+    
+    echo -----------------------------------------
+    echo "EXTRACT_TAR_DIR = $EXTRACT_TAR_DIR"
+    echo ------------------------------------------
+    
+    SCRIPT_NAME="setup-rocm.sh"
+    SCRIPT_DIR="$EXTRACT_ROCM_DIR/setup/script/rocm-$ROCM_VER"
+
+    echo "Script           = $SCRIPT_NAME"
+    echo "Script Directory = $SCRIPT_DIR"
+    
+    if [ -f "$EXTRACT_TAR_DIR/$SCRIPT_NAME" ]; then
+        # copy the setup script into the rocm directory for untarring
+        if [ ! -d $SCRIPT_DIR ]; then
+            echo Create directory $SCRIPT_DIR
+            mkdir -p $SCRIPT_DIR
+        fi
+        
+        echo "Copying tar setup script to rocm directory."
+        
+        cp "$EXTRACT_TAR_DIR/$SCRIPT_NAME" "$SCRIPT_DIR/"
+    else
+        echo "Tar setup script not found."
+    fi
+    
+    echo Extracting Tar Setup...Complete.
+}
+
 write_extract_info() {
     dump_extract_stats "$EXTRACT_DIR"
     
@@ -1007,6 +1050,8 @@ if [[ $ROCM_EXTRACT == 1 ]]; then
     write_extract_info
     
     filter_deps_version
+    
+    extract_tar_setup
 fi
 
 if [[ $AMDGPU_EXTRACT == 1 ]]; then

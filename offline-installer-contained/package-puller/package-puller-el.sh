@@ -84,7 +84,7 @@ os_release() {
         DISTRO_VER=$(awk -F= '/^VERSION_ID=/{print $2}' /etc/os-release | tr -d '"')
         
         case "$ID" in
-        rhel|ol)
+        rhel|ol|rocky)
             echo "Pulling packages for EL $DISTRO_VER."
             ;;
         *)

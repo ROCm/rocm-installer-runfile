@@ -51,7 +51,7 @@ os_release() {
         ubuntu|debian)
             PULL_DISTRO_TYPE=deb
             ;;
-        rhel|ol)
+        rhel|ol|rocky)
             PULL_DISTRO_TYPE=el
             ;;
         sles)

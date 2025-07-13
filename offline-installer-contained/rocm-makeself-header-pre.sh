@@ -5,7 +5,7 @@ cat << EOF  > "$archname"
 
 ORIG_UMASK=\`umask\`
 if test "$KEEP_UMASK" = n; then
-    umask 077
+    umask \$ORIG_UMASK
 fi
 
 CRCsum="$CRCsum"
@@ -203,6 +203,8 @@ Usage:
     ----------------
     noexec         = Disable all installer execution. Extract .run file content only.
     noexec-cleanup = Disable cleanup after installer execution. Keep all .run extracted and runtime files.
+    
+    untar <file_path> = Extract only ROCm installation components from the .run file tarball to <file_path>.
     
     Dependencies:
     -------------
@@ -446,6 +448,14 @@ get_version() {
 EOH
 }
 
+get_rocm_version() {
+    output=\$(cat << EOH
+\${helpheader}
+EOH
+)
+    rocm_ver=\$(echo "\$output" | head -n 2 | tail -n 1)
+}
+
 get_name() {
     output=\$(cat << EOH
 \${helpheader}
@@ -547,6 +557,26 @@ EOLSM
 	    MS_dd "\$0" \$offset \$s | MS_Decompress | UnTAR t
 	    offset=\`expr \$offset + \$s\`
 	done
+	exit 0
+	;;
+	untar)
+	get_rocm_version
+	arg1="\$2"
+	echo Extracting tar for ROCm \$rocm_ver to \$arg1
+	offset=\`head -n "\$skip" "\$0" | wc -c | tr -d " "\`
+    shift 2 || { MS_Help; exit 1; }
+	for s in \$filesizes
+	do
+	    MS_dd "\$0" \$offset \$s | MS_Decompress | tar -xvf - --directory=\$arg1 --wildcards */rocm-\$rocm_ver/* --strip-components=4
+	    offset=\`expr \$offset + \$s\`
+	done
+	setup_script_dir=\$arg1/rocm-\$rocm_ver
+	setup_script="setup-rocm.sh"
+	setup_script_args=
+	echo setup script directory = "\$setup_script_dir"
+	echo Running setup script: \$setup_script
+    cd "\$setup_script_dir"
+    eval "\"\$setup_script_dir/\$setup_script\" \$setup_script_args"
 	exit 0
 	;;
 	--tar)
