@@ -122,6 +122,8 @@ install_deps() {
            source ../package-puller/config/sle/15.5/rocm-$ROCM_VER-sle-15.5.config
        elif [[ $DISTRO_VER == 15.6 ]]; then
            source ../package-puller/config/sle/15.6/rocm-$ROCM_VER-sle-15.6.config
+       elif [[ $DISTRO_VER == 15.7 ]]; then
+           source ../package-puller/config/sle/15.6/rocm-$ROCM_VER-sle-15.6.config
        else
            echo SLES $DISTRO_VER is not supported.
            exit 1
