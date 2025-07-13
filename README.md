@@ -22,8 +22,9 @@ The ROCm Runfile installer is designed to support the follow list of Linux Distr
 
 * Ubuntu        : `22.04, 24.04`
 * RHEL          : `8.10, 9.4, 9.6`
-* SLES          : `15.6`
 * Oracle Linux  : `8.10, 9.6`
+* Rocky Linux   : `9.4, 9.6`
+* SLES          : `15.6, 15.7`
 * Debian        : `12`
 
 ## Building
