@@ -69,6 +69,16 @@ os_release() {
         ol)
             echo "Installer running on Oracle Linux $DISTRO_VER."
             ;;
+        rocky)
+            echo "Installer running on Rocky Linux $DISTRO_VER."
+            
+            # Rocky 9 support only
+            if [[ $DISTRO_VER != 9* ]]; then
+                echo "$DISTRO_NAME $DISTRO_VER is not a supported OS"
+                exit 1
+            fi
+            
+            ;;
         sles)
             echo "Installer running on SLES $DISTRO_VER."
             ;;

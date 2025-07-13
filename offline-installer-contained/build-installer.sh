@@ -74,7 +74,7 @@ os_release() {
             BUILD_DISTRO_TYPE=deb
             BUILD_OS=$DISTRO_VER
             ;;
-        rhel|ol)
+        rhel|ol|rocky)
             BUILD_DISTRO_TYPE=el
                         	    
             if [[ $DISTRO_VER == 8* ]]; then

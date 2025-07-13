@@ -206,8 +206,13 @@ os_release() {
             UNINSTALL_SCRIPTLET_ARG="remove"
             PKG_INSTALLED_CMD="apt list --installed"
             ;;
-        rhel|ol)
+        rhel|ol|rocky)
             DISTRO_VER=$(awk -F= '/^VERSION_ID=/{print $2}' /etc/os-release | tr -d '"')
+            
+            if [[ $DISTRO_VER != 9* ]] && [[ "$DISTRO_NAME" = "rocky" ]]; then
+                echo "$DISTRO_NAME $DISTRO_VER is not a supported OS"
+                exit 1
+            fi
             	   
             INSTALL_SCRIPTLET_ARG="1"
             UNINSTALL_SCRIPTLET_ARG="0"

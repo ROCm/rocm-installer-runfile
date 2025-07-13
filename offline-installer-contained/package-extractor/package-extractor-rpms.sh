@@ -115,8 +115,8 @@ os_release() {
         DISTRO_VER=$(awk -F= '/^VERSION_ID=/{print $2}' /etc/os-release | tr -d '"')
 
         case "$ID" in
-        rhel|ol)
-            echo "Extracting for RHEL $DISTRO_VER."
+        rhel|ol|rocky)
+            echo "Extracting for EL $DISTRO_VER."
             EXTRACT_DISTRO_TYPE=el
             ;;
         sles)
@@ -159,10 +159,14 @@ prompt_user() {
 install_tools() {
     echo ++++++++++++++++++++++++++++++++
     echo Installing tools...
-    
+   
     # Install rpmdevtools for dep version
     if [ $EXTRACT_DISTRO_TYPE == "el" ]; then
-        $SUDO dnf install -y rpmdevtools
+        if [[ "$DISTRO_NAME" = "rocky" ]]; then
+            $SUDO dnf install -y cpio
+        else
+            $SUDO dnf install -y rpmdevtools
+        fi
     elif [ $EXTRACT_DISTRO_TYPE == "sle" ]; then
         $SUDO zypper install -y rpmdevtools
     else
@@ -392,6 +396,10 @@ extract_data() {
     pushd $package_dir_content
     
         rpm2cpio "$PACKAGE" | cpio -idmv > /dev/null 2>&1
+        if [[ $? -ne 0 ]]; then
+            print_err "Failed rpm2cpio"
+            exit 1
+        fi
         
     popd
     

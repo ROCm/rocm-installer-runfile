@@ -85,7 +85,7 @@ os_release() {
             DISTRO_VIRTUAL_CHK="apt-cache showpkg"
             PACKAGE_TYPE="deb"
             ;;
-        rhel|ol)
+        rhel|ol|rocky)
             DISTRO_PACKAGE_MGR="dnf"
             DISTRO_CACHE_CHK="$SUDO dnf --cacheonly info"
             DISTRO_VIRTUAL_CHK="dnf provides"
@@ -116,6 +116,14 @@ os_release() {
     fi
         
     DISTRO_VER=$(awk -F= '/^VERSION_ID=/{print $2}' /etc/os-release | tr -d '"')
+    DISTRO_MAJOR_VER=${DISTRO_VER%.*}
+    
+    # Rocky 9 support only
+    if [[ $DISTRO_VER != 9* ]] && [[ "$DISTRO_NAME" = "rocky" ]]; then
+        echo "$DISTRO_NAME $DISTRO_VER is not a supported OS"
+        exit 1
+    fi
+    
     echo "Dependency install on $DISTRO_NAME $DISTRO_VER."
 }
 
@@ -152,6 +160,33 @@ print_str() {
             echo "$str"                 # white
         fi
     fi
+}
+
+remove_rocky_kernel_repo() {
+    if [ -f /etc/yum.repos.d/appstream-amdgpu.repo ]; then
+        echo Removing Rocky AppStream repos...
+        
+        echo =-=-=-= Removing appstream-amdgpu.repo =-=-=-=
+        $SUDO rm /etc/yum.repos.d/appstream-amdgpu.repo
+        
+         # Cleanup the dnf caches
+        sudo dnf clean all
+        sudo rm -rf /var/cache/dnf/*
+        sudo dnf makecache
+        
+        echo Removing Rocky AppStream repos...Complete.
+    fi
+}
+
+cleanup() {
+    echo "------------------------------------"
+    echo Cleaning up...
+    
+    if [[ "$DISTRO_NAME" = "rocky" ]]; then
+        remove_rocky_kernel_repo
+    fi
+    
+    echo Cleaning up...Complete.
 }
 
 check_virtual_package_deb() {
@@ -312,6 +347,7 @@ check_dep_installable() {
         # if any dependency is not installable, fail since the package will not be resolved
         if [[ result -ne 0 ]]; then
             print_err "Dependency list cannot be installed."
+            cleanup
             exit 1
         fi
         
@@ -578,8 +614,150 @@ remove_deps() {
     echo Removing deps...Complete.
 }
 
-get_kernel_packages_rhel() {
-    echo RHEL kernel packages...
+install_rocky_kernel_packages() {
+    echo Downloading Rocky kernel packages...
+    
+    # Set base url to rocky vault/kickstart repo and attempt to download the kernel packages
+    local base_url_appstream="https://dl.rockylinux.org/vault/rocky/$DISTRO_VER/AppStream/x86_64/kickstart/Packages/k/"
+    local base_url_baseos="https://dl.rockylinux.org/vault/rocky/$DISTRO_VER/BaseOS/x86_64/kickstart/Packages/k/"
+
+    # Set the kernel packages to download
+    local packages=(
+        "${base_url_appstream}kernel-headers-$KERNEL_VER.rpm"
+        "${base_url_appstream}kernel-devel-$KERNEL_VER.rpm"
+        "${base_url_appstream}kernel-devel-matched-$KERNEL_VER.rpm"
+        "${base_url_baseos}kernel-modules-$KERNEL_VER.rpm"
+    )
+
+    local failed=0
+    
+    echo --------------------------
+    echo "AppStream URL: $base_url_appstream"
+    echo "BaseOS URL   : $base_url_baseos"
+    echo --------------------------
+
+    # Loop through the list of packages and attempt to download each
+    for package in "${packages[@]}"; do
+        echo "Downloading: $(basename "${package}")"
+        wget -q "$package" -O "$(basename "${package}")"
+        if [[ $? -ne 0 ]]; then
+            echo -e "\e[31mFailed to download kernel package: $package\e[0m"
+            failed=1
+            break
+        fi
+    done
+
+    # If any download failed, return failure
+    if [[ $failed -eq 1 ]]; then
+        echo -e "\e[31mOne or more kernel packages failed to download. Exiting.\e[0m"
+        return 1
+    fi
+
+    # Loop through the downloaded packages and install them
+    echo "Installing downloaded packages..."
+    for package in "${packages[@]}"; do
+        echo "Installing: $(basename "${package}")"
+        sudo dnf install -y "./$(basename "${package}")"
+        if [[ $? -ne 0 ]]; then
+            echo -e "\e[31mFailed to install kernel package: $package\e[0m"
+            return 1
+        fi
+    done
+
+    echo Downloading Rocky kernel packages...Complete.
+    return 0
+}
+
+check_rocky_kernel_repos() {
+    echo Checking Rocky AppStream repos...
+    
+    local appstream_pub_kick_url="https://dl.rockylinux.org/pub/rocky/$DISTRO_MAJOR_VER/AppStream/x86_64/kickstart/repodata/"
+    local appstream_vault_os_url="https://dl.rockylinux.org/vault/rocky/$DISTRO_VER/AppStream/x86_64/os/repodata/"
+
+    # Check if the AppStream public kickstart repo is accessible
+    wget --spider $appstream_pub_kick_url > /dev/null 2>&1
+    
+    if [[ $? -eq 0 ]]; then
+        echo -e "\e[32mAppstream public kickstart repo accessible\e[0m"
+cat <<EOF | $SUDO tee -a /etc/yum.repos.d/appstream-amdgpu.repo
+[appstream-kickstart]
+name=Rocky Linux \$releasever - AppStream Pub Kickstart
+baseurl=http://dl.rockylinux.org/\$contentdir/\$releasever/AppStream/\$basearch/kickstart/
+gpgcheck=1
+enabled=1
+countme=1
+metadata_expire=6h
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-Rocky-$DISTRO_MAJOR_VER
+EOF
+    else
+        echo -e "\e[31mAppstream public kickstart repo not accessible\e[0m"
+    fi
+
+    # Check if the AppStream vault OS repo is accessible
+    wget --spider $appstream_vault_os_url > /dev/null 2>&1
+    
+    if [[ $? -eq 0 ]]; then
+        echo -e "\e[32mAppstream vault os repo accessible\e[0m"
+cat <<EOF | $SUDO tee -a /etc/yum.repos.d/appstream-amdgpu.repo
+[appstream-vault]
+name=Rocky Linux \$releasever - AppStream Vault OS $DISTRO_VER
+baseurl=http://dl.rockylinux.org/vault/rocky/$DISTRO_VER/AppStream/\$basearch/os/
+gpgcheck=1
+enabled=1
+countme=1
+metadata_expire=6h
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-Rocky-$DISTRO_MAJOR_VER
+EOF
+    else
+        echo -e "\e[31mAppstream vault os repo not accessible\e[0m"
+    fi
+
+    # Cleanup the dnf caches
+    sudo dnf clean all
+    sudo rm -rf /var/cache/dnf/*
+    sudo dnf makecache
+    
+    dnf repoquery --available --queryformat "%{name}-%{version}-%{release}.%{arch}" | grep kernel-headers-$(uname -r)
+    if [ $? -eq 0 ]; then
+        echo "Kernel Packages for $KERNEL_VER are available in the AppStream repositories."
+        KERNEL_PACKAGES_VER="-$KERNEL_VER"
+    else
+        echo -e "\e[93mKernel Packages not available in the AppStream kickstart/vault repositories.\e[0m"
+        return 1
+    fi
+    
+    echo Checking Rocky AppStream repo...Complete.
+    return 0
+}
+
+get_kernel_packages_rocky() {
+    echo Rocky kernel packages...
+    
+    remove_rocky_kernel_repo
+    
+    dnf repoquery --available --queryformat "%{name}-%{version}-%{release}.%{arch}" | grep kernel-headers-$(uname -r)
+    if [ $? -eq 0 ]; then
+        echo "Kernel Packages for $KERNEL_VER are available in the AppStream repositories."
+        KERNEL_PACKAGES_VER="-$KERNEL_VER"
+    else
+        echo -e "\e[93mKernel Packages not available in the AppStream repositories.\e[0m"
+        
+        # check for legacy kernel headers
+    	check_rocky_kernel_repos
+    	if [ $? -eq 1 ]; then
+    	    # attempt to download and install kernel header using additional vault/kickstart repos
+            install_rocky_kernel_packages
+            if [ $? -eq 1 ]; then
+                echo -e "\e[93mKernel Packages not available in the repositories.  Using defaults.\e[0m"
+            fi
+    	fi
+    fi
+    
+    echo Rocky kernel packages...Complete.
+}
+
+get_kernel_packages_el() {
+    echo EL kernel packages...
     
     if [[ $DEPS_LIST_ONLY == 0 ]]; then
         dnf list "kernel-headers-$KERNEL_VER" &> /dev/null
@@ -587,7 +765,11 @@ get_kernel_packages_rhel() {
             echo "Kernel Packages for $KERNEL_VER are available in the repositories."
             KERNEL_PACKAGES_VER="-$KERNEL_VER"
         else
-            echo "Kernel Packages not available in the repositories.  Using defaults."
+            if [[ "$DISTRO_NAME" = "rocky" ]]; then
+                get_kernel_packages_rocky
+            else
+                echo -e "\e[93mKernel Packages not available in the repositories.  Using defaults.\e[0m"
+            fi
         fi
     else
         KERNEL_PACKAGES_VER="-$KERNEL_VER"
@@ -623,7 +805,7 @@ get_kernel_packages_ol() {
             echo "Kernel Packages for UEK $KERNEL_VER are available in the repositories."
             KERNEL_PACKAGES+="kernel-uek-devel-$KERNEL_VER "
         else
-            echo "Kernel Packages for UEK not available in the repositories.  Using defaults."
+            echo -e "\e[93mKernel Packages for UEK not available in the repositories.  Using defaults.\e[0m"
         fi
 
         # check for the rhck kernel packages
@@ -637,7 +819,7 @@ get_kernel_packages_ol() {
                     KERNEL_PACKAGES+="kernel-devel-matched-$kernel_version "
                 fi
             else
-                echo "Kernel Packages for RHCK not available in the repositories.  Using defaults."
+                echo -e "\e[93mKernel Packages for RHCK not available in the repositories.  Using defaults.\e[0m"
             fi
         done
 
@@ -709,10 +891,12 @@ get_kernel_packages() {
         
     elif [ $DISTRO_PACKAGE_MGR == "dnf" ]; then
     
-        if [ "$DISTRO_NAME" = "rhel" ]; then
-            get_kernel_packages_rhel
-        else
+        if [[ "$DISTRO_NAME" = "rhel" || "$DISTRO_NAME" = "rocky" ]]; then
+            get_kernel_packages_el
+        elif [ "$DISTRO_NAME" = "ol" ]; then
             get_kernel_packages_ol
+        else
+            get_kernel_packages_el
         fi
         
     elif [ $DISTRO_PACKAGE_MGR == "zypper" ]; then
@@ -726,7 +910,7 @@ get_kernel_packages() {
                 get_kernel_package_for_kernel_version "kernel-syms"
                 get_kernel_package_for_kernel_version "kernel-macros"
             else
-                echo "Kernel Packages not available in the repositories.  Using defaults."
+                echo -e "\e[93mKernel Packages not available in the repositories.  Using defaults.\e[0m"
                 KERNEL_PACKAGES="kernel-default-devel"
             fi
         else
@@ -966,6 +1150,8 @@ install_dependencies() {
             $SUDO zypper install "$installopt" $INSTALL_LIST
         fi
     fi
+    
+    cleanup
     
     print_no_err "Dependencies Installed."
 }
