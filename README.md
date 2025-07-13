@@ -132,7 +132,7 @@ The <options> parameter can be set to these options:
 * Runfile options
   * noexec: Disable all installer execution. Extract the .run file content only.
   * noexec-cleanup: Disable cleanup after installer execution. Keep all .run extracted and runtime files.
-  * untar <file_path>: Extract only ROCm installation components from the .run file tarball to <file_path>.
+  * untar [directory]: Extract only ROCm installation components from the .run file tarball to [directory].
 
 * Dependencies
   * deps=[arg] [compo]:
@@ -198,6 +198,16 @@ bash rocm-installer.sh amdgpu
 * noexec-cleanup
 
 The noexec-cleanup option disables the cleanup process after the GUI or command line interface exits. Unlike the noexec option, all command line arguments are processed as normal, but no content is deleted upon exit or completion. At this point, you can switch to using the rocm-installer.sh script within the rocm-installer directory to avoid re-extracting the contents.
+
+* untar [directory]
+
+The ROCm Runfile Installer provides an extraction-only mode of installing ROCm without installation processing.  In this extraction-only mode, the Runfile Installer will untar the contents of tarball archive within the runfile to a target directory.  The output will be the extraction of the rocm-x.y.z directory included in the build of the installer as well as setup scripts for simple rocm post-install.
+
+For example, to extract-only to a directory called **myrocm** in the $USER directory, the command line is as follows:
+
+``` shell
+bash rocm-installer.run untar "/home/amd/myrocm"
+```
 
 ### Dependency options
 
