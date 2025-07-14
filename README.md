@@ -220,7 +220,7 @@ source /etc/profile.d/modules.sh
 module load rocm/6.4.2
 ```
 
-Note, that the setup-modules script will install the environment-modules package as part of the setup process to enable environment modules support.  Also, the setup-modules script will not setup any required ROCm dependencies.  Dependencies must be installed manually or using the Runfile installer dependency installation via the **deps=install-only rocm** command line argument or installation using the Runfile GUI.
+Note, that the setup-modules script will install the environment-modules package as part of the setup process to enable environment modules support.  Also, the setup-modules script will not setup any required ROCm dependencies.  Dependencies must be installed manually or using the Runfile installer dependency installation via the **deps=install-only rocm** command line argument or installation using the Runfile GUI.  In addition to dependencies, manualy setup or installation via the Runfile installer may be required for access to GPU resource for ROCm operation (**gpu-access=all/user**).
 
 ### Dependency options
 
