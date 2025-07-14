@@ -209,6 +209,19 @@ For example, to extract-only to a directory called **myrocm** in the $USER direc
 bash rocm-installer.run untar "/home/amd/myrocm"
 ```
 
+Once the extraction completes, the **untar** command will generate a setup script called **setup-modules**.  The **setup-modules** script will be specific for the ROCm version based on the runfile build and found in the rocm-x.y.z output directory of extraction.  Users may run the **setup-modules-x.y.z.sh** script to perform a basic ROCm setup using environment modules. 
+
+For example, to set up an untar extraction of ROCm 6.4.2 into output directory  /home/amd/myrocm, run the following command line:
+
+``` shell
+cd /home/amd/myrocm/rocm-6.4.2
+./setup-modules-6.4.2.sh
+source /etc/profile.d/modules.sh
+module load rocm/6.4.2
+```
+
+Note, that the setup-modules script will install the environment-modules package as part of the setup process to enable environment modules support.  Also, the setup-modules script will not setup any required ROCm dependencies.  Dependencies must be installed manually or using the Runfile installer dependency installation via the **deps=install-only rocm** command line argument or installation using the Runfile GUI.  In addition to dependencies, manualy setup or installation via the Runfile installer may be required for access to GPU resource for ROCm operation (**gpu-access=all/user**).
+
 ### Dependency options
 
 ROCm or AMDGPU driver installation by the Runfile installer requires the pre-installation of non-AMD libraries and frameworks for ROCm and the driver to function correctly.  These dependencies are packages that may be installed seperately or via the Runfile installer.  The following provides options for listing, validating and installing the required non-AMD package dependencies.

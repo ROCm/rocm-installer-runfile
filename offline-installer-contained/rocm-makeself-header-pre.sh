@@ -562,6 +562,10 @@ EOLSM
 	untar)
 	get_rocm_version
 	arg1="\$2"
+	if ! test -d "\$arg1"; then
+            echo "Target extract directory \$arg1 does not exist.  Ensure full directory path is used with untar, aborting." >&2
+            exit 1
+	fi
 	echo Extracting tar for ROCm \$rocm_ver to \$arg1
 	offset=\`head -n "\$skip" "\$0" | wc -c | tr -d " "\`
     shift 2 || { MS_Help; exit 1; }
@@ -577,6 +581,7 @@ EOLSM
 	echo Running setup script: \$setup_script
     cd "\$setup_script_dir"
     eval "\"\$setup_script_dir/\$setup_script\" \$setup_script_args"
+    rm -f "\$setup_script"
 	exit 0
 	;;
 	--tar)
