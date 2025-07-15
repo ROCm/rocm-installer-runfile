@@ -103,7 +103,8 @@ install_deps() {
             exit 1
         fi
         
-        python3 -m pip install pandas tabulate
+        # Install Python packages for user because site package not writable for user in RHEL
+        python3 -m pip install --user pandas tabulate
 	
    	echo "$AMDGPU_REPO" | $SUDO tee -a /etc/yum.repos.d/amdgpu-build.repo
 
