@@ -562,8 +562,17 @@ EOLSM
 	untar)
 	get_rocm_version
 	arg1="\$2"
+        if ! arg1=\$(readlink -f "\$arg1" 2>/dev/null); then
+            echo "Target extract directory \$arg1 is invalid, aborting." >&2
+            exit 1
+        fi
 	if ! test -d "\$arg1"; then
-            echo "Target extract directory \$arg1 does not exist.  Ensure full directory path is used with untar, aborting." >&2
+            echo "Target extract directory \$arg1 does not exist, aborting." >&2
+            exit 1
+	fi
+	setup_script_dir=\$arg1/rocm-\$rocm_ver
+	if test -d "\$setup_script_dir"; then
+            echo "ROCm \$rocm_ver extraction already exists." >&2
             exit 1
 	fi
 	echo Extracting tar for ROCm \$rocm_ver to \$arg1
@@ -574,7 +583,6 @@ EOLSM
 	    MS_dd "\$0" \$offset \$s | MS_Decompress | tar -xvf - --directory=\$arg1 --wildcards */rocm-\$rocm_ver/* --strip-components=4
 	    offset=\`expr \$offset + \$s\`
 	done
-	setup_script_dir=\$arg1/rocm-\$rocm_ver
 	setup_script="setup-rocm.sh"
 	setup_script_args=
 	echo setup script directory = "\$setup_script_dir"
