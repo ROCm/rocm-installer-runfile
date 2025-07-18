@@ -110,7 +110,7 @@ install_deps() {
             if [ $DISTRO_NAME = "rocky" ]; then
                 $SUDO dnf install -y gcc-c++ git cmake glslang-devel vulkan-loader-devel libshaderc-devel
             else
-                $SUDO dnf install -y gcc-c++ git cmake glfw-devel glslang-devel vulkan-loader-devel libshaderc-devel
+                $SUDO dnf install -y gcc-c++ git cmake glfw-devel glslang-devel vulkan-loader-devel libshaderc-devel glslc
             fi
         else
             echo "Unsupported version for EL."
