@@ -1024,32 +1024,67 @@ build_dependencies_list() {
 }
 
 install_repos_el() {
-    echo "EPEL repo setup."
+    echo "------------------------------------"
+    echo "Setting up Repos..."
     
-    # Setup EPEL/crb
+    # Install wget if required
+    if ! rpm -q "wget" > /dev/null 2>&1; then
+        echo "Package: wget Installing..."
+        $SUDO dnf install -y wget > /dev/null 2>&1
+        echo "Package: wget installed."
+    fi
+    
+    # Install dnf-plugin-config-manager if required
+    if ! rpm -q "dnf-plugins-core" > /dev/null 2>&1; then
+        echo "Package: dnf-plugins-core Installing..."
+        $SUDO dnf install -y dnf-plugins-core > /dev/null 2>&1
+        echo "Package: dnf-plugins-core installed."
+    fi
+    
+    # Setup for installing EL repos
+    local epel_pkg=
+    local codeready_repo=
+    if [[ $DISTRO_VER == 8* ]]; then
+        epel_pkg="epel-release-latest-8.noarch.rpm"
+        codeready_repo="codeready-builder-for-rhel-8-x86_64-rpms"
+    elif [[ $DISTRO_VER == 9* ]]; then
+        epel_pkg="epel-release-latest-9.noarch.rpm"
+        codeready_repo="codeready-builder-for-rhel-9-x86_64-rpms"
+    else
+        print_err "Repos/packages for $DISTRO_VER are not supported."
+        exit 1
+    fi
+    
+    # Setup EPEL/crb if required
     if [ -f /etc/yum.repos.d/epel.repo ]; then
         echo "EPEL repo exists."
+        
     else
-        # install wget if required
-        if ! rpm -qa | grep -q "wget"; then
-            echo "Package: wget missing. Installing..."
-            $SUDO dnf install -y wget > /dev/null 2>&1
-            echo "Package: wget installed."
-        fi
+        echo "EPEL repo setup..."
+        
+        wget --tries 5 https://dl.fedoraproject.org/pub/epel/$epel_pkg
+        $SUDO rpm -ivh $epel_pkg
+        $SUDO crb enable
+        
+        echo "EPEL repo setup...Complete."
+    fi
     
-        if [[ $DISTRO_VER == 8* ]]; then
-            wget --tries 5 https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
-            $SUDO rpm -ivh epel-release-latest-8.noarch.rpm
-        elif [[ $DISTRO_VER == 9* ]]; then
-            wget --tries 5 https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
-            $SUDO rpm -ivh epel-release-latest-9.noarch.rpm
-        else
-            echo "Unsupported version for EPEL."
+    # Enable the codeready-builder repo (RHEL only)
+    if [[ "$DISTRO_NAME" = "rhel" ]]; then
+        if ! $SUDO dnf repolist all | grep -q "^$codeready_repo"; then
+            print_err "$codeready_repo repo not configured."
             exit 1
         fi
         
-        $SUDO crb enable
+        local repo_status=$(dnf repolist all | grep "^$codeready_repo" | awk '{print $NF}')
+        if [[ "$repo_status" == "disabled" ]]; then
+            echo "Enabling $codeready_repo."
+            $SUDO dnf config-manager --enable "$codeready_repo"
+        fi
     fi
+    
+    echo "Setting up Repos...Complete."
+    echo "------------------------------------"
 }
 
 install_repos_sle() {
