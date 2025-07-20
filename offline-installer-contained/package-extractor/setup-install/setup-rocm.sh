@@ -104,6 +104,14 @@ for loc in "/usr/share/modules/modulefiles" "/usr/local/Modules/modulefiles" "/u
         break;
     fi
 done
+
+echo Setting up rocm-llvm
+ln -s "$ROCM_INSTALL_PATH/lib/llvm/bin/amdclang" "$ROCM_INSTALL_PATH/bin/amdclang"
+ln -s "$ROCM_INSTALL_PATH/lib/llvm/bin/amdclang++" "$ROCM_INSTALL_PATH/bin/amdclang++"
+ln -s "$ROCM_INSTALL_PATH/lib/llvm/bin/amdclang-cl" "$ROCM_INSTALL_PATH/bin/amdclang-cl"
+ln -s "$ROCM_INSTALL_PATH/lib/llvm/bin/amdclang-cpp" "$ROCM_INSTALL_PATH/bin/amdclang-cpp"
+ln -s "$ROCM_INSTALL_PATH/lib/llvm/bin/amdflang" "$ROCM_INSTALL_PATH/bin/amdflang"
+ln -s "$ROCM_INSTALL_PATH/lib/llvm/bin/amdlld" "$ROCM_INSTALL_PATH/bin/amdlld"
 EOF
 
     # Make the new script executable
