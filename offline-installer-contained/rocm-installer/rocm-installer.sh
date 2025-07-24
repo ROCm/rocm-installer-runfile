@@ -1507,6 +1507,42 @@ install_postint_scriptlets() {
     echo Running post install scripts...Complete.
 }
 
+install_post_rocm_etc() {
+    local component=$1
+    local content_etc_dir="$2"
+    
+    if [[ "$component" == "rocm-opencl" ]]; then
+        echo -e "\e[32mProcessing for rocm-opencl.\e[0m"
+        if [ -d "$content_etc_dir/OpenCL/vendors/" ]; then
+            echo /etc/OpenCL/vendors/
+            $SUDO mkdir -p /etc/OpenCL/vendors
+            $SUDO rsync $RSYNC_OPTS_ROCM "$content_etc_dir/OpenCL/vendors/"* "/etc/OpenCL/vendors/"
+            if [ $? -ne 0 ]; then
+                print_err "rsync error."
+                exit 1
+            fi
+            $SUDO ldconfig
+        fi
+    fi
+}
+
+install_post_rocm_extras() {
+    echo ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    echo Setting up extra ROCm post install...
+    
+    local content_etc_dir=
+    
+    for compo in ${COMPONENTS[@]}; do
+        content_etc_dir="$EXTRACT_DIR/$compo/content-etc"
+        if [ -d "$content_etc_dir" ]; then
+            echo "/etc content for component: $compo"
+            install_post_rocm_etc "$compo" "$content_etc_dir"
+        fi
+    done
+    
+    echo Setting up extra ROCm post install...Complete.
+}
+
 install_post_rocm() {
     echo =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     echo -e "\e[96mINSTALL ROCm post-install config\e[0m"
@@ -1577,6 +1613,9 @@ install_post_rocm() {
     
     # Run all postinstall scripts for the components
     install_postint_scriptlets
+    
+    # Execute any extra non-scriptlet post install
+    install_post_rocm_extras   
 }
 
 set_gpu_access() {

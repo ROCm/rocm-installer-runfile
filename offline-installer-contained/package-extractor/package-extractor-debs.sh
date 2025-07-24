@@ -300,8 +300,45 @@ get_package_list() {
     echo Getting package list...Complete.
 }
 
-move_opt_contents_to_root() {
-    echo Moving opt contents...
+move_opt_contents() {
+    local content_dir="$1"
+    local dir="$2"
+
+    # Move all contents of the 'opt' directory to the root content directory
+    mv "$dir/"* "$content_dir/"
+
+    # Remove the empty 'opt' directory
+    rmdir "$dir"
+    echo "Moved contents of '$dir' to '$content_dir'."
+}
+
+move_etc_contents_rocm() {
+    local content_etc_dir="$PACKAGE_DIR/content-etc"
+             
+    echo Creating content-etc directory: "$content_etc_dir"
+    mkdir "$content_etc_dir"
+     
+    # Move all contents of the 'etc' directory to the content-etc directory
+    mv "$dir/"* "$content_etc_dir/"
+    
+    # Remove the empty 'etc' directory
+    rmdir "$dir"
+    
+    echo "Moved contents of '$dir' to '$content_etc_dir'."
+}
+
+move_usr_contents_rocm() {
+    local dir="$1"
+
+    # workaround for extra /usr content
+    if [[ -d "$dir/share/lintian/overrides" ]]; then
+        echo -e "\e[31m$dir/share/lintian/overrides delete\e[0m"
+        $SUDO rm -rf "$dir"
+    fi
+}
+
+move_data() {
+    echo -e "\e[36mMoving data...\e[0m"
     
     local content_dir="$1"
     echo "Content root: $content_dir"
@@ -309,30 +346,30 @@ move_opt_contents_to_root() {
     # Loop through the content directory
     for dir in "$content_dir"/*; do
         local dirname=$(basename "$dir")
-        # Check if the current directory is the opt directory
-        if [[ -d "$dir" && $(basename "$dir") == "opt" ]]; then
-            echo "Found 'opt' directory: $dir"
-
-            # Move all contents of the 'opt' directory to the root content directory
-            mv "$dir/"* "$content_dir/"
-
-            # Remove the empty 'opt' directory
-            rmdir "$dir"
-            echo "Moved contents of '$dir' to '$content_dir'."
+        
+        # Check if the current directory is the opt / etc / or usr directories
+        if [[ -d "$dir" && "$dirname" == "opt" ]]; then
+            echo -e "\e[93m'opt' directory detected: $dir\e[0m"
+            move_opt_contents "$content_dir" "$dir"
+        
+        elif [[ -d "$dir" && "$dirname" == "etc" ]]; then
+            echo -e "\e[93m'etc' directory detected: $dir\e[0m"
+            if [[ $content_dir =~ "component-rocm" ]]; then
+                move_etc_contents_rocm 
+            fi 
+             
+        elif [[ -d "$dir" && "$dirname" == "usr" ]]; then
+            echo -e "\e[93m'usr' directory detected: $dir\e[0m"
+            if [[ $content_dir =~ "component-rocm" ]]; then
+                move_usr_contents_rocm "$dir"
+            fi
+              
         else
             echo -e "\e[93m$dir not moved.\e[0m"
-            
-            # workaround for extra /usr content
-            if [[ $content_dir =~ "component-rocm" && $dirname == "usr"  ]]; then
-                if [[ -d "$dir/share/lintian/overrides" ]]; then
-                    echo -e "\e[31m$dir/share/lintian/overrides delete\e[0m"
-                    $SUDO rm -rf "$dir"
-                fi
-            fi
         fi
     done
     
-    echo Moving opt contents...Complete.
+    echo Moving data...Complete.
 }
 
 extract_data() {
@@ -362,8 +399,8 @@ extract_data() {
     
     rm $data
     
-    # Move content out of the opt directory to root content directory
-    move_opt_contents_to_root "$package_dir_content"
+    # Move data content to the correct directories for the installer
+    move_data "$package_dir_content"
     
     echo Extracting Data...Complete.
     echo ---------------------------
