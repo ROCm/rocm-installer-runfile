@@ -1521,6 +1521,7 @@ install_post_rocm_etc() {
         if [ -d "$content_etc_dir/OpenCL/vendors/" ]; then
             echo /etc/OpenCL/vendors/
             $SUDO mkdir -p /etc/OpenCL/vendors
+            $SUDO chmod 755 /etc/OpenCL /etc/OpenCL/vendors
             $SUDO rsync $RSYNC_OPTS_ROCM "$content_etc_dir/OpenCL/vendors/"* "/etc/OpenCL/vendors/"
             if [ $? -ne 0 ]; then
                 print_err "rsync error."
