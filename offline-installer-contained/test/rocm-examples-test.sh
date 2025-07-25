@@ -108,7 +108,7 @@ install_deps() {
         elif [[ $DISTRO_VER == 9* ]]; then
 	        echo Installing deps for ${DISTRO_NAME}9...
             if [ $DISTRO_NAME = "rocky" ]; then
-                $SUDO dnf install -y gcc-c++ git cmake glslang-devel vulkan-loader-devel libshaderc-devel
+                $SUDO dnf install -y gcc-c++ git cmake glfw-devel glslang-devel vulkan-loader-devel libshaderc-devel glslc
             else
                 $SUDO dnf install -y gcc-c++ git cmake glfw-devel glslang-devel vulkan-loader-devel libshaderc-devel glslc
             fi
@@ -188,7 +188,7 @@ build_rocm_examples() {
     # Build rocm-examples
     mkdir build && cd build
 
-    cmake .. -DROCM_ROOT=$ROCM_PATH
+    cmake .. -DROCM_ROOT=$ROCM_PATH -Wno-dev
     cmake --build . -- -j$(nproc)
     
     echo Building rocm-examples...Complete.
