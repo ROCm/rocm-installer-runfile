@@ -188,6 +188,8 @@ build_rocm_examples() {
     # Build rocm-examples
     mkdir build && cd build
 
+    # Using -Wno-dev to suppress lots of warnings during compilation.
+    # To be removed after test update.
     cmake .. -DROCM_ROOT=$ROCM_PATH -Wno-dev
     cmake --build . -- -j$(nproc)
     
