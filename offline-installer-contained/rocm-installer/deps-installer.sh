@@ -618,28 +618,29 @@ install_rocky_kernel_packages() {
     echo Downloading Rocky kernel packages...
     
     # Set base url to rocky vault/kickstart repo and attempt to download the kernel packages
-    local base_url_appstream="https://dl.rockylinux.org/vault/rocky/$DISTRO_VER/AppStream/x86_64/kickstart/Packages/k/"
-    local base_url_baseos="https://dl.rockylinux.org/vault/rocky/$DISTRO_VER/BaseOS/x86_64/kickstart/Packages/k/"
+    local base_url="$1"
 
     # Set the kernel packages to download
     local packages=(
-        "${base_url_appstream}kernel-headers-$KERNEL_VER.rpm"
-        "${base_url_appstream}kernel-devel-$KERNEL_VER.rpm"
-        "${base_url_appstream}kernel-devel-matched-$KERNEL_VER.rpm"
-        "${base_url_baseos}kernel-modules-$KERNEL_VER.rpm"
+        "$base_url/Packages/k/kernel-headers-$KERNEL_VER.rpm"
+        "$base_url/Packages/k/kernel-devel-$KERNEL_VER.rpm"
+        "$base_url/Packages/k/kernel-devel-matched-$KERNEL_VER.rpm"
     )
 
     local failed=0
+    local package_name=
+    local package_list=
     
     echo --------------------------
-    echo "AppStream URL: $base_url_appstream"
-    echo "BaseOS URL   : $base_url_baseos"
+    echo "URL: $base_url"
     echo --------------------------
 
     # Loop through the list of packages and attempt to download each
+    
     for package in "${packages[@]}"; do
-        echo "Downloading: $(basename "${package}")"
-        wget -q "$package" -O "$(basename "${package}")"
+        package_name=$(basename "${package}")
+        echo "Downloading: $package_name"
+        wget -q "$package" -O "$package_name"
         if [[ $? -ne 0 ]]; then
             echo -e "\e[31mFailed to download kernel package: $package\e[0m"
             failed=1
@@ -652,37 +653,46 @@ install_rocky_kernel_packages() {
         echo -e "\e[31mOne or more kernel packages failed to download. Exiting.\e[0m"
         return 1
     fi
-
+    
     # Loop through the downloaded packages and install them
     echo "Installing downloaded packages..."
+    
     for package in "${packages[@]}"; do
-        echo "Installing: $(basename "${package}")"
-        sudo dnf install -y "./$(basename "${package}")"
-        if [[ $? -ne 0 ]]; then
-            echo -e "\e[31mFailed to install kernel package: $package\e[0m"
-            return 1
-        fi
+        package_list+="./$(basename "${package}") "
     done
+    
+    echo "Installing: $package_list"
+    
+    $SUDO dnf install -y $package_list
+    if [[ $? -ne 0 ]]; then
+        echo -e "\e[31mFailed to install kernel packages: $package_list\e[0m"
+        $SUDO rm $package_list
+        return 1
+    fi
+    
+    # Clean up any downloaded packages
+    $SUDO rm $package_list
 
     echo Downloading Rocky kernel packages...Complete.
     return 0
 }
 
-check_rocky_kernel_repos() {
-    echo Checking Rocky AppStream repos...
+add_rocky_repo() {
+    local rocky_repo_url="$1"
+    local rocky_repo_name="$2"
+    local rocky_repo_desc="$3"
     
-    local appstream_pub_kick_url="https://dl.rockylinux.org/pub/rocky/$DISTRO_MAJOR_VER/AppStream/x86_64/kickstart/repodata/"
-    local appstream_vault_os_url="https://dl.rockylinux.org/vault/rocky/$DISTRO_VER/AppStream/x86_64/os/repodata/"
-
-    # Check if the AppStream public kickstart repo is accessible
-    wget --spider $appstream_pub_kick_url > /dev/null 2>&1
+    echo "Adding URL: $rocky_repo_url"
+    
+     # Check if the repo is accessible
+    wget --spider "$rocky_repo_url/repodata" > /dev/null 2>&1
     
     if [[ $? -eq 0 ]]; then
-        echo -e "\e[32mAppstream public kickstart repo accessible\e[0m"
+        echo -e "\e[32mRepo $rocky_repo_desc accessible\e[0m"
 cat <<EOF | $SUDO tee -a /etc/yum.repos.d/appstream-amdgpu.repo
-[appstream-kickstart]
-name=Rocky Linux \$releasever - AppStream Pub Kickstart
-baseurl=http://dl.rockylinux.org/\$contentdir/\$releasever/AppStream/\$basearch/kickstart/
+[$rocky_repo_name]
+name=Rocky Linux $DISTRO_VER - $rocky_repo_desc
+baseurl=$rocky_repo_url
 gpgcheck=1
 enabled=1
 countme=1
@@ -690,43 +700,79 @@ metadata_expire=6h
 gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-Rocky-$DISTRO_MAJOR_VER
 EOF
     else
-        echo -e "\e[31mAppstream public kickstart repo not accessible\e[0m"
-    fi
-
-    # Check if the AppStream vault OS repo is accessible
-    wget --spider $appstream_vault_os_url > /dev/null 2>&1
-    
-    if [[ $? -eq 0 ]]; then
-        echo -e "\e[32mAppstream vault os repo accessible\e[0m"
-cat <<EOF | $SUDO tee -a /etc/yum.repos.d/appstream-amdgpu.repo
-[appstream-vault]
-name=Rocky Linux \$releasever - AppStream Vault OS $DISTRO_VER
-baseurl=http://dl.rockylinux.org/vault/rocky/$DISTRO_VER/AppStream/\$basearch/os/
-gpgcheck=1
-enabled=1
-countme=1
-metadata_expire=6h
-gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-Rocky-$DISTRO_MAJOR_VER
-EOF
-    else
-        echo -e "\e[31mAppstream vault os repo not accessible\e[0m"
-    fi
-
-    # Cleanup the dnf caches
-    sudo dnf clean all
-    sudo rm -rf /var/cache/dnf/*
-    sudo dnf makecache
-    
-    dnf repoquery --available --queryformat "%{name}-%{version}-%{release}.%{arch}" | grep kernel-headers-$(uname -r)
-    if [ $? -eq 0 ]; then
-        echo "Kernel Packages for $KERNEL_VER are available in the AppStream repositories."
-        KERNEL_PACKAGES_VER="-$KERNEL_VER"
-    else
-        echo -e "\e[93mKernel Packages not available in the AppStream kickstart/vault repositories.\e[0m"
+        echo -e "\e[31mRepo $rocky_repo_desc not accessible\e[0m"
         return 1
     fi
     
-    echo Checking Rocky AppStream repo...Complete.
+    # Cleanup the dnf caches
+    $SUDO dnf clean all
+    $SUDO rm -rf /var/cache/dnf/*
+    $SUDO dnf makecache
+    
+    return 0
+}
+
+get_kernel_pacakges_repo_rocky() {
+    local package="kernel-headers-$KERNEL_VER.rpm"
+    
+    # Repo URL list for kernel packages
+    local base_urls=(
+        "https://dl.rockylinux.org/pub/rocky/$DISTRO_VER/AppStream/x86_64/kickstart"
+        "https://dl.rockylinux.org/vault/rocky/$DISTRO_VER/AppStream/x86_64/kickstart"
+        "https://dl.rockylinux.org/vault/rocky/$DISTRO_VER/AppStream/x86_64/os"
+    )
+    
+    local pkg_avail=0
+    
+    # Check each repo for the required kernel packages
+    for url in "${base_urls[@]}"; do
+        wget --spider "$url/Packages/k/$package" > /dev/null 2>&1
+    
+        if [[ $? -eq 0 ]]; then
+            echo -e "Packages in $url : \e[32mAvailable.\e[0m"
+            pkg_avail=1
+            break
+        else
+            echo -e "Packages in $url : \e[93mNot Available.\e[0m"
+        fi
+    done
+    
+    if [[ $pkg_avail == 0 ]]; then
+        print_err "Kernel packages not found in repos."
+        return 1
+    fi
+    
+    local dir_subtype=appstream
+    local dir_type=
+    local dir_package=
+    
+    if [[ $url =~ "vault" ]]; then
+        dir_type=vault
+    elif [[ $url =~ "pub" ]]; then
+        dir_type=pub
+    fi
+    
+    if [[ $url =~ "x86_64/kickstart" ]]; then
+        dir_package=kickstart
+    elif [[ $url =~ "x86_64/os" ]]; then
+        dir_package=os
+    fi
+    
+    # Attempt to add the repo for the kernel packages
+    add_rocky_repo "$url" "$dir_subtype-$dir_type-$dir_package" "$dir_subtype $dir_type $dir_package"
+    if [[ $? -eq 0 ]]; then
+        KERNEL_PACKAGES_VER="-$KERNEL_VER"
+    else
+        echo "Repo not available. Downloading package."
+        
+        # The repo may not be accessible, so manually download and install from the repo
+        install_rocky_kernel_packages "$url"
+        if [[ $? -ne 0 ]]; then
+            print_err "Unable to download and install kernel packages."
+            return 1
+        fi
+    fi
+    
     return 0
 }
 
@@ -743,13 +789,9 @@ get_kernel_packages_rocky() {
         echo -e "\e[93mKernel Packages not available in the AppStream repositories.\e[0m"
         
         # check for legacy kernel headers
-    	check_rocky_kernel_repos
+    	get_kernel_pacakges_repo_rocky
     	if [ $? -eq 1 ]; then
-    	    # attempt to download and install kernel header using additional vault/kickstart repos
-            install_rocky_kernel_packages
-            if [ $? -eq 1 ]; then
-                echo -e "\e[93mKernel Packages not available in the repositories.  Using defaults.\e[0m"
-            fi
+    	    echo -e "\e[93mKernel Packages not available in the repositories.  Using defaults.\e[0m"
     	fi
     fi
     
@@ -769,13 +811,14 @@ get_kernel_packages_el() {
                 get_kernel_packages_rocky
             else
                 echo -e "\e[93mKernel Packages not available in the repositories.  Using defaults.\e[0m"
+                KERNEL_PACKAGES_VER="-$KERNEL_VER"
             fi
         fi
     else
         KERNEL_PACKAGES_VER="-$KERNEL_VER"
     fi
     
-    KERNEL_PACKAGES="kernel-headers$KERNEL_PACKAGES_VER kernel-devel$KERNEL_PACKAGES_VER kernel-modules$KERNEL_PACKAGES_VER "
+    KERNEL_PACKAGES="kernel-headers$KERNEL_PACKAGES_VER kernel-devel$KERNEL_PACKAGES_VER "
     
     if [[ $DISTRO_VER == 9* ]]; then
         echo Adding EL9 amdgpu packages
