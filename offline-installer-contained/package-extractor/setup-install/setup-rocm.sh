@@ -69,9 +69,21 @@ if [[ "$current_dir" =~ ^rocm-[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 
     # Save the current working directory path
     ROCM_INSTALL_PATH=$(pwd)
-
-    echo "ROCM_VERSION: $ROCM_VERSION"
-    echo "ROCM_INSTALL_PATH: $ROCM_INSTALL_PATH"
+    
+    # Get the full rocm version
+    ROCM_BUILD_VERSION=$(<"$ROCM_INSTALL_PATH/.info/version")
+    
+     # Convert x.y.z to x0y0z format for ROCM_STR
+    ROCM_VERSION_STR=$(echo "$ROCM_VERSION" | awk -F. '{printf "%d%02d%02d", $1, $2, $3}')
+    
+    # Extract the build number
+    ROCM_BUILD_NUM=${ROCM_BUILD_VERSION##*-}
+    
+    echo "ROCM_VERSION      : $ROCM_VERSION"
+    echo "ROCM_BUILD_VERSION: $ROCM_BUILD_VERSION"
+    echo "ROCM_BUILD_NUM    : $ROCM_BUILD_NUM"
+    echo "ROCM_VERSION_STR  : $ROCM_VERSION_STR"
+    echo "ROCM_INSTALL_PATH : $ROCM_INSTALL_PATH"
 
     # Create the new script setup-modules-$ROCM_VERSION.sh
     SETUP_SCRIPT="setup-modules-$ROCM_VERSION.sh"
@@ -81,10 +93,63 @@ if [[ "$current_dir" =~ ^rocm-[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 ROCM_INSTALL_PATH=$ROCM_INSTALL_PATH
 ROCM_VERSION=$ROCM_VERSION
 
+setup_rocm_gdb() {
+    echo Setting up rocm-gdb
+    PYTHON_LIB_INSTALLED=\$(find /lib/ -name 'libpython3*.so' | head -n 1)
+    echo "Installing rocm-gdb with \$PYTHON_LIB_INSTALLED."
+    ln -s \$PYTHON_LIB_INSTALLED $ROCM_INSTALL_PATH/lib/amdpythonlib.so
+    echo Setting up rocm-gdb. Complete.
+}
+
+setup_rocm_llvm() {
+    echo Setting up rocm-llvm
+    ln -s "$ROCM_INSTALL_PATH/lib/llvm/bin/amdclang" "$ROCM_INSTALL_PATH/bin/amdclang"
+    ln -s "$ROCM_INSTALL_PATH/lib/llvm/bin/amdclang++" "$ROCM_INSTALL_PATH/bin/amdclang++"
+    ln -s "$ROCM_INSTALL_PATH/lib/llvm/bin/amdclang-cl" "$ROCM_INSTALL_PATH/bin/amdclang-cl"
+    ln -s "$ROCM_INSTALL_PATH/lib/llvm/bin/amdclang-cpp" "$ROCM_INSTALL_PATH/bin/amdclang-cpp"
+    ln -s "$ROCM_INSTALL_PATH/lib/llvm/bin/amdflang" "$ROCM_INSTALL_PATH/bin/amdflang"
+    if [[ -L "$ROCM_INSTALL_PATH/lib/llvm/bin/amdflang-new" ]]; then
+        ln -s "$ROCM_INSTALL_PATH/lib/llvm/bin/amdflang-new" "$ROCM_INSTALL_PATH/bin/amdflang-new"
+    fi
+    if [[ -L "$ROCM_INSTALL_PATH/lib/llvm/bin/amdflang-classic" ]]; then
+        ln -s "$ROCM_INSTALL_PATH/lib/llvm/bin/amdflang-classic" "$ROCM_INSTALL_PATH/bin/amdflang-classic"
+    fi
+    ln -s "$ROCM_INSTALL_PATH/lib/llvm/bin/amdlld" "$ROCM_INSTALL_PATH/bin/amdlld"
+    echo Setting up rocm-llvm. Complete.
+}
+
+setup_rocm_opencl() {
+    echo Setting up rocm-opencl
+    \$SUDO echo "$ROCM_INSTALL_PATH"/lib | \$SUDO tee /etc/ld.so.conf.d/10-rocm-opencl.conf > /dev/null
+    \$SUDO chmod 644 /etc/ld.so.conf.d/10-rocm-opencl.conf
+    \$SUDO ldconfig
+
+    \$SUDO mkdir -p /etc/OpenCL/vendors
+    \$SUDO chmod 755 /etc/OpenCL /etc/OpenCL/vendors
+    \$SUDO echo "libamdocl64.so" | \$SUDO tee /etc/OpenCL/vendors/amdocl64_${ROCM_VERSION_STR}_${ROCM_BUILD_NUM}.icd > /dev/null
+    \$SUDO chmod 644 /etc/OpenCL/vendors/amdocl64_${ROCM_VERSION_STR}_${ROCM_BUILD_NUM}.icd
+    echo Setting up rocm-opencl. Complete.
+}
+
+setup_migraphx() {
+    \$SUDO mkdir -p /usr/lib/python3/dist-packages
+    \$SUDO echo "$ROCM_INSTALL_PATH/lib" | \$SUDO tee /usr/lib/python3/dist-packages/MIGraphX.pth > /dev/null
+            
+    \$SUDO mkdir -p /usr/lib/python2.7/dist-packages
+    \$SUDO echo "$ROCM_INSTALL_PATH/lib" | \$SUDO tee /usr/lib/python2.7/dist-packages/MIGraphX.pth > /dev/null
+}
+
+echo =================================
+echo ROCm $ROCM_VERSION Module Setup 
+echo =================================
+
+SUDO=\$([[ \$(id -u) -ne 0 ]] && echo "sudo" ||:)
+
 echo Setting Paths
 export ROCM_PATH=\$ROCM_INSTALL_PATH
 export PATH=\$PATH:\$ROCM_PATH/bin:\$ROCM_PATH/llvm/bin
 export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:\$ROCM_PATH/lib:\$ROCM_PATH/llvm/lib
+echo Setting Paths. Complete.
 
 now=\$(date -u +%s)
 altscore=\$((6 - 3))
@@ -95,23 +160,24 @@ altscore=\$((altscore*1000000+(\$now-1600000000)/60))
 echo altscore = \$altscore
 
 echo Setting up modules
-sudo $DISTRO_PACKAGE_MGR install -y environment-modules
+\$SUDO $DISTRO_PACKAGE_MGR install -y environment-modules
 
 for loc in "/usr/share/modules/modulefiles" "/usr/local/Modules/modulefiles" "/usr/share/Modules/modulefiles"; do
     if [ -d "\$loc" ]; then
-        sudo mkdir -p "\$loc/rocm"
-        sudo update-alternatives --install "\$loc/rocm/\$ROCM_VERSION" "rocmmod\$ROCM_VERSION" "\$ROCM_PATH/lib/rocmmod" "\$altscore"
+        \$SUDO mkdir -p "\$loc/rocm"
+        \$SUDO update-alternatives --install "\$loc/rocm/\$ROCM_VERSION" "rocmmod\$ROCM_VERSION" "\$ROCM_PATH/lib/rocmmod" "\$altscore"
         break;
     fi
 done
 
-echo Setting up rocm-llvm
-ln -s "$ROCM_INSTALL_PATH/lib/llvm/bin/amdclang" "$ROCM_INSTALL_PATH/bin/amdclang"
-ln -s "$ROCM_INSTALL_PATH/lib/llvm/bin/amdclang++" "$ROCM_INSTALL_PATH/bin/amdclang++"
-ln -s "$ROCM_INSTALL_PATH/lib/llvm/bin/amdclang-cl" "$ROCM_INSTALL_PATH/bin/amdclang-cl"
-ln -s "$ROCM_INSTALL_PATH/lib/llvm/bin/amdclang-cpp" "$ROCM_INSTALL_PATH/bin/amdclang-cpp"
-ln -s "$ROCM_INSTALL_PATH/lib/llvm/bin/amdflang" "$ROCM_INSTALL_PATH/bin/amdflang"
-ln -s "$ROCM_INSTALL_PATH/lib/llvm/bin/amdlld" "$ROCM_INSTALL_PATH/bin/amdlld"
+setup_rocm_gdb
+
+setup_rocm_llvm
+
+setup_rocm_opencl
+
+setup_migraphx
+
 EOF
 
     # Make the new script executable
