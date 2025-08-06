@@ -214,7 +214,8 @@ Usage:
     noexec         = Disable all installer execution. Extract .run file content only.
     noexec-cleanup = Disable cleanup after installer execution. Keep all .run extracted and runtime files.
     
-    untar <directory> = Extract only ROCm installation components from the .run file tarball to <directory>.
+    untar <directory>         = Extract only ROCm installation components from the .run file tarball to <directory>.  
+    untar <directory> verbose = Extract only ROCm installation components from the .run file tarball to <directory>, verbosely list files processed.
     
     Dependencies:
     -------------
@@ -504,6 +505,48 @@ EOH
     installer_name=\$(echo "\$output" | tail -n 1)
 }
 
+untar_rocm() {
+	get_rocm_version
+	arg1="\$1"
+	arg2="\$2"
+	if test "\$2" = "verbose"; then
+	    echo Verbose extract enabled.
+	    out="--verbose"
+	else
+	    echo Quiet extract enabled.
+	    out="--checkpoint=100000"
+	fi
+        if ! arg1=\$(readlink -f "\$arg1" 2>/dev/null); then
+            echo "Target extract directory \$arg1 is invalid, aborting." >&2
+            exit 1
+        fi
+	if ! test -d "\$arg1"; then
+            echo "Target extract directory \$arg1 does not exist, aborting." >&2
+            exit 1
+	fi
+	setup_script_dir=\$arg1/rocm-\$rocm_ver
+	if test -d "\$setup_script_dir"; then
+            echo "ROCm \$rocm_ver extraction already exists." >&2
+            exit 1
+	fi
+	echo Extracting tar for ROCm \$rocm_ver to \$arg1
+	offset=\`head -n "\$skip" "\$0" | wc -c | tr -d " "\`
+    shift 2 || { MS_Help; exit 1; }
+	for s in \$filesizes
+	do
+	    MS_dd "\$0" \$offset \$s | MS_Decompress | tar -xf - "\$out" --directory=\$arg1 --wildcards "*/rocm-\$rocm_ver/*" --strip-components=4
+	    offset=\`expr \$offset + \$s\`
+	done
+	setup_script="setup-rocm.sh"
+	setup_script_args=
+	echo setup script directory = "\$setup_script_dir"
+	echo Running setup script: \$setup_script
+    cd "\$setup_script_dir"
+    eval "\"\$setup_script_dir/\$setup_script\" \$setup_script_args"
+    rm -f "\$setup_script"
+	exit 0
+}
+
 finish=true
 xterm_loop=
 noprogress=$NOPROGRESS
@@ -602,37 +645,7 @@ EOLSM
 	exit 0
 	;;
 	untar)
-	get_rocm_version
-	arg1="\$2"
-        if ! arg1=\$(readlink -f "\$arg1" 2>/dev/null); then
-            echo "Target extract directory \$arg1 is invalid, aborting." >&2
-            exit 1
-        fi
-	if ! test -d "\$arg1"; then
-            echo "Target extract directory \$arg1 does not exist, aborting." >&2
-            exit 1
-	fi
-	setup_script_dir=\$arg1/rocm-\$rocm_ver
-	if test -d "\$setup_script_dir"; then
-            echo "ROCm \$rocm_ver extraction already exists." >&2
-            exit 1
-	fi
-	echo Extracting tar for ROCm \$rocm_ver to \$arg1
-	offset=\`head -n "\$skip" "\$0" | wc -c | tr -d " "\`
-    shift 2 || { MS_Help; exit 1; }
-	for s in \$filesizes
-	do
-	    MS_dd "\$0" \$offset \$s | MS_Decompress | tar -xvf - --directory=\$arg1 --wildcards */rocm-\$rocm_ver/* --strip-components=4
-	    offset=\`expr \$offset + \$s\`
-	done
-	setup_script="setup-rocm.sh"
-	setup_script_args=
-	echo setup script directory = "\$setup_script_dir"
-	echo Running setup script: \$setup_script
-    cd "\$setup_script_dir"
-    eval "\"\$setup_script_dir/\$setup_script\" \$setup_script_args"
-    rm -f "\$setup_script"
-	exit 0
+	untar_rocm "\$2" "\$3"
 	;;
 	--tar)
 	offset=\`head -n "\$skip" "\$0" | wc -c | tr -d " "\`

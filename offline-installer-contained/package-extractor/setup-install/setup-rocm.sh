@@ -162,7 +162,7 @@ echo altscore = \$altscore
 echo Setting up modules
 \$SUDO $DISTRO_PACKAGE_MGR install -y environment-modules
 
-for loc in "/usr/share/modules/modulefiles" "/usr/local/Modules/modulefiles" "/usr/share/Modules/modulefiles"; do
+for loc in "/usr/share/modules/modulefiles" "/usr/local/Modules/modulefiles" "/usr/share/Modules/modulefiles" "/usr/share/Modules/3.2.10/modulefiles"; do
     if [ -d "\$loc" ]; then
         \$SUDO mkdir -p "\$loc/rocm"
         \$SUDO update-alternatives --install "\$loc/rocm/\$ROCM_VERSION" "rocmmod\$ROCM_VERSION" "\$ROCM_PATH/lib/rocmmod" "\$altscore"

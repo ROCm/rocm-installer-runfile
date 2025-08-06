@@ -25,6 +25,7 @@
 # Inputs
 ROCM_REPO=
 AMDGPU_REPO=
+GRAPHICS_REPO=
 
 # Packaging repos
 PACKAGE_REPO=$PWD/packages
@@ -39,7 +40,7 @@ DOWNLOAD_MODE=minimum
 PACKAGES="rocm"
 VERBOSE=0
 
-REPO_LIST=(rocm-build.repo rocm.repo amdgpu-build.repo amdgpu.repo)
+REPO_LIST=(rocm-build.repo graphics-build.repo rocm.repo amdgpu-build.repo amdgpu.repo)
 
 PROMPT_USER=0
 DUMP_AMD_PKGS=0
@@ -264,6 +265,19 @@ setup_amdgpu_repo() {
     $SUDO zypper --gpg-auto-import-keys refresh
     
     echo Setting up amdgpu repo...Complete.
+}
+
+setup_graphics_repo() {
+    echo ++++++++++++++++++++++++++++++++
+    echo Setting up graphics repo...
+    
+    echo "$GRAPHICS_REPO" | $SUDO tee -a /etc/zypp/repos.d/graphics-build.repo
+    
+    # cleanup the zypper cache
+    $SUDO zypper clean
+    $SUDO zypper --gpg-auto-import-keys refresh
+    
+    echo Setting up graphics repo...Complete.
 }
 
 download_packages() {
@@ -520,6 +534,7 @@ echo "DOWNLOAD_MODE = $DOWNLOAD_MODE"
 echo -----------------------------------------
 echo "ROCM_REPO     = $ROCM_REPO"
 echo "AMDGPU_REPO   = $AMDGPU_REPO"
+echo "GRAPHICS_REPO = $GRAPHICS_REPO"
 echo -----------------------------------------
 echo PACKAGES       = $PACKAGES
 echo --------------------------------------------------
@@ -541,6 +556,10 @@ fi
 
 setup_rocm_repo
 setup_amdgpu_repo
+
+if [[ -n $GRAPHICS_REPO ]]; then
+    setup_graphics_repo
+fi
 
 download_packages
 

@@ -25,6 +25,7 @@
 # Inputs
 ROCM_REPO=
 AMDGPU_REPO=
+GRAPHICS_REPO=
 
 # Packaging repos
 PACKAGE_REPO=$PWD/packages
@@ -40,7 +41,7 @@ DOWNLOAD_PKG_CONFIG="--recurse --no-recommends --no-suggests --no-conflicts --no
 PACKAGES="rocm"
 VERBOSE=0
 
-REPO_LIST=(rocm-build.list amdgpu-build.list rocm.list amdgpu.list amdgpu-proprietary.list)
+REPO_LIST=(rocm-build.list amdgpu-build.list graphics-build.list rocm.list amdgpu.list amdgpu-proprietary.list)
 
 PIN_PATH=$SETUP_PATH/pin
 PIN_LIST=(repo-radeon-pin-600 artifactory-pin-600)
@@ -255,6 +256,17 @@ setup_amdgpu_repo() {
     $SUDO apt-get update
     
     echo Setting up amdgpu repo...Complete.
+}
+
+setup_graphics_repo() {
+    echo ++++++++++++++++++++++++++++++++
+    echo Setting up graphics repo...
+    
+    echo "$GRAPHICS_REPO" | $SUDO tee -a /etc/apt/sources.list.d/graphics-build.list
+    
+    $SUDO apt-get update
+    
+    echo Setting up graphics repo...Complete.
 }
 
 download_packages() {
@@ -533,6 +545,7 @@ echo "DOWNLOAD_MODE = $DOWNLOAD_MODE"
 echo -----------------------------------------
 echo "ROCM_REPO     = $ROCM_REPO"
 echo "AMDGPU_REPO   = $AMDGPU_REPO"
+echo "GRAPHICS_REPO = $GRAPHICS_REPO"
 echo -----------------------------------------
 echo PACKAGES       = $PACKAGES
 echo --------------------------------------------------
@@ -556,6 +569,10 @@ setup_apt
 
 setup_rocm_repo
 setup_amdgpu_repo
+
+if [[ -n $GRAPHICS_REPO ]]; then
+    setup_graphics_repo
+fi
 
 download_packages
 
