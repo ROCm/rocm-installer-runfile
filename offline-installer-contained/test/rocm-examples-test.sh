@@ -95,7 +95,7 @@ install_deps() {
 
     # install any dependencies for rocm-examples
     if [ $DISTRO_PACKAGE_MGR == "apt" ]; then
-        $SUDO apt-get install -y git cmake libglfw3-dev libsuitesparse-dev libtbb-dev glslang-tools
+        $SUDO apt-get install -y git cmake libglfw3-dev libsuitesparse-dev libtbb-dev glslang-tools glslc
         
     elif [ $DISTRO_PACKAGE_MGR == "dnf" ]; then
     
