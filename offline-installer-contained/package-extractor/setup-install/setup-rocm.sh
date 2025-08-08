@@ -164,9 +164,12 @@ echo Setting up modules
 
 for loc in "/usr/share/modules/modulefiles" "/usr/local/Modules/modulefiles" "/usr/share/Modules/modulefiles" "/usr/share/Modules/3.2.10/modulefiles"; do
     if [ -d "\$loc" ]; then
-        \$SUDO mkdir -p "\$loc/rocm"
-        \$SUDO update-alternatives --install "\$loc/rocm/\$ROCM_VERSION" "rocmmod\$ROCM_VERSION" "\$ROCM_PATH/lib/rocmmod" "\$altscore"
-        break;
+        check=\${loc%%\/modulefiles}
+        if grep -q "\$check" "/etc/profile.d/modules.sh"; then
+            \$SUDO mkdir -p "\$loc/rocm"
+            \$SUDO update-alternatives --install "\$loc/rocm/\$ROCM_VERSION" "rocmmod\$ROCM_VERSION" "\$ROCM_PATH/lib/rocmmod" "\$altscore"
+            break;
+        fi
     fi
 done
 
