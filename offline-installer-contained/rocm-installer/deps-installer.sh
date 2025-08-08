@@ -823,6 +823,9 @@ get_kernel_packages_el() {
     if [[ $DISTRO_VER == 9* ]]; then
         echo Adding EL9 amdgpu packages
         KERNEL_PACKAGES+="kernel-devel-matched$KERNEL_PACKAGES_VER "
+    elif [[ $DISTRO_VER == 10* ]]; then
+        echo Adding EL10 amdgpu packages
+        KERNEL_PACKAGES+="kernel-devel-matched$KERNEL_PACKAGES_VER "
     fi
     
     FILTER_PACKAGES="kernel-devel"
@@ -856,9 +859,12 @@ get_kernel_packages_ol() {
             dnf list "kernel-headers-$kernel_version" &> /dev/null
             if [[ $? -eq 0 ]]; then
                 echo "Kernel Packages for RHCK $kernel_version are available in the repositories."
-                KERNEL_PACKAGES+="kernel-headers-$kernel_version kernel-devel-$kernel_version kernel-modules-$kernel_version "
+                KERNEL_PACKAGES+="kernel-headers-$kernel_version kernel-devel-$kernel_version "
                 if [[ $DISTRO_VER == 9* ]]; then
                     echo Adding EL9 amdgpu packages
+                    KERNEL_PACKAGES+="kernel-devel-matched-$kernel_version "
+                elif [[ $DISTRO_VER == 10* ]]; then
+                    echo Adding EL10 amdgpu packages
                     KERNEL_PACKAGES+="kernel-devel-matched-$kernel_version "
                 fi
             else
@@ -870,9 +876,12 @@ get_kernel_packages_ol() {
         KERNEL_PACKAGES+="kernel-uek-devel-$KERNEL_VER "
 
         for kernel_version in $rhck_kernels; do
-            KERNEL_PACKAGES+="kernel-headers-$kernel_version kernel-devel-$kernel_version kernel-modules-$kernel_version "
+            KERNEL_PACKAGES+="kernel-headers-$kernel_version kernel-devel-$kernel_version "
             if [[ $DISTRO_VER == 9* ]]; then
                 echo Adding EL9 amdgpu packages
+                KERNEL_PACKAGES+="kernel-devel-matched-$kernel_version "
+            elif [[ $DISTRO_VER == 10* ]]; then
+                echo Adding EL10 amdgpu packages
                 KERNEL_PACKAGES+="kernel-devel-matched-$kernel_version "
             fi
         done
@@ -891,13 +900,15 @@ get_kernel_packages_ol() {
                 gcc_package_ver=$(sudo dnf --disablerepo="*" --enablerepo="ol8_appstream" repoquery --all --nvr | grep "$gcc_package-$TARGET_GCC_VERSION" | awk '{print $NF}' | sort | uniq | tail -1)
             elif [[ $DISTRO_VER == 9* ]]; then
                 gcc_package_ver=$(sudo dnf --disablerepo="*" --enablerepo="ol9_appstream" repoquery --all --nvr | grep "$gcc_package-$TARGET_GCC_VERSION" | awk '{print $NF}' | sort | uniq | tail -1)
+            elif [[ $DISTRO_VER == 10* ]]; then
+                gcc_package_ver=$(sudo dnf --disablerepo="*" --enablerepo="ol10_appstream" repoquery --all --nvr | grep "$gcc_package-$TARGET_GCC_VERSION" | awk '{print $NF}' | sort | uniq | tail -1)
             fi
 
             if [ ! -z "$gcc_package_ver" ]; then
                 echo "Install $gcc_package version $gcc_package_ver"
                 KERNEL_PACKAGES+="$gcc_package_ver "
             else
-                echo "Unable to gcc version $TARGET_GCC_VERSION for package $gcc_package_ver in repo ol${DISTRO_VER_MAJ}_appstream"
+                echo "Unable to gcc version $TARGET_GCC_VERSION for package $gcc_package in repo ol${DISTRO_VER_MAJ}_appstream"
             fi
         done
     fi
@@ -1093,6 +1104,9 @@ install_repos_el() {
     elif [[ $DISTRO_VER == 9* ]]; then
         epel_pkg="epel-release-latest-9.noarch.rpm"
         codeready_repo="codeready-builder-for-rhel-9-x86_64-rpms"
+    elif [[ $DISTRO_VER == 10* ]]; then
+        epel_pkg="epel-release-latest-10.noarch.rpm"
+        codeready_repo="codeready-builder-for-rhel-10-x86_64-rpms"
     else
         print_err "Repos/packages for $DISTRO_VER are not supported."
         exit 1

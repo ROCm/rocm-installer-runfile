@@ -149,6 +149,13 @@ install_prereqs() {
     if [ -f /etc/yum.repos.d/epel.repo ]; then
         echo "EPEL repo exists."
     else
+        # install wget if required
+        if ! rpm -qa | grep -q "wget"; then
+            echo "Package: wget missing. Installing..."
+            $SUDO dnf install -y wget > /dev/null 2>&1
+            echo "Package: wget installed."
+        fi
+    
         echo "EPEL repo setup."
         if [[ $DISTRO_VER == 8* ]]; then
             wget --tries 5 https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
@@ -156,6 +163,9 @@ install_prereqs() {
         elif [[ $DISTRO_VER == 9* ]]; then
             wget --tries 5 https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
             $SUDO rpm -ivh epel-release-latest-9.noarch.rpm
+        elif [[ $DISTRO_VER == 10* ]]; then
+            wget --tries 5 https://dl.fedoraproject.org/pub/epel/epel-release-latest-10.noarch.rpm
+            $SUDO rpm -ivh epel-release-latest-10.noarch.rpm
         else
             echo "Unsupported version for EPEL."
         fi
@@ -214,16 +224,6 @@ config_create() {
     fi
     
     echo Create Configure...Complete.
-}
-
-install_tools() {
-    echo ++++++++++++++++++++++++++++++++
-    echo Installing tools...
-    
-    # Install dpkg-dev for Package file creation
-    $SUDO dnf install --assumeyes createrepo
-    
-    echo Installing tools...Complete.
 }
 
 setup_rocm_repo() {

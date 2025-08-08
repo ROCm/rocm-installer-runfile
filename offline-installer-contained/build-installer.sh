@@ -82,8 +82,10 @@ os_release() {
                 MAKESELF_OPT_HEADER="--header ./rocm-makeself-header-pre.sh --help-header ./rocm-installer/VERSION"
                 MAKESELF_OPT_TAR=
                 BUILD_OS=el8
-            else
+            elif [[ $DISTRO_VER == 9* ]]; then
                 BUILD_OS=el9
+            else
+                BUILD_OS=el10
             fi	    
             ;;
         sles)
@@ -185,6 +187,39 @@ install_tools_deb() {
     echo Installing DEB tools...Complete
 }
 
+install_makeself() {
+    echo ----------------------
+    echo -e "\e[32mInstalling makeself...\e[0m"
+    
+    local makeself_ver="2.4.5"
+    local makeself_url="https://github.com/megastep/makeself/releases/download/release-$makeself_ver/makeself-$makeself_ver.run"
+    
+    # Download the makeself package
+    echo "Downloading makeself package from github..."
+    wget -q "$makeself_url"
+    
+    if [[ $? -ne 0 ]]; then
+        echo -e "\e[31mmakeself package not found: $makeself_url.\e[0m"
+        exit 1
+    fi
+    
+    $SUDO chmod +x "makeself-$makeself_ver.run"
+
+    # Install the makeself package
+    echo -e "\e[32mInstalling makeself package...\e[0m"
+    bash "makeself-$makeself_ver.run"
+
+    # Clean up
+    echo "Cleaning up..."
+    rm -f makeself-$makeself_ver.run
+
+    # Add makeself to PATH
+    echo "Adding makeself to PATH..."
+    $SUDO ln -sf "$PWD/makeself-$makeself_ver/makeself.sh" /usr/local/bin/makeself
+
+     echo Installing makeself...Complete
+}
+
 install_tools_el(){
     echo Installing EL tools...
     
@@ -193,8 +228,11 @@ install_tools_el(){
     $SUDO dnf install -y gcc gcc-c++
     $SUDO dnf install -y ncurses-devel
     
-    # Install makself for .run creation
+    # Install makself for .run creation either from repos or directly from github
     $SUDO dnf install -y makeself
+    if [[ $? -ne 0 ]]; then
+        install_makeself
+    fi
     
     # Check the version of makself and enable cleanup script support if >= 2.4.2
     makeself_version_min=2.4.2
