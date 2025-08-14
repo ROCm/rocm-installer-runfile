@@ -32,8 +32,10 @@ Usage: $PROG [options]
 [options}:
     help = Display this help information.
 
+    build = Build RVS tool source and use this version
+
     rel=<release number>
-        Set the ROCm release sourced for the rocm-examples test ie.rel=6.3.1
+        Set the RVS release sourced for the build ie.rel=6.3.1
 END_USAGE
 }
 
@@ -150,20 +152,20 @@ setup_rocm() {
 
 get_rocm_rvs() {
     echo ------------------------------------------------------
-    echo Downloading rocm-rvs : $ROCM_REL ...
+    echo Downloading rocm-rvs : $RVS_REL ...
 
     if [ -d ROCmValidationSuite ]; then
         $SUDO rm -r ROCmValidationSuite
     fi
 
     # Download the rocm-rvs source (use release if present)
-    if [[ -n $ROCM_REL ]]; then
-        git clone https://github.com/ROCm/ROCmValidationSuite.git -b "release/rocm-rel-$ROCM_REL"
+    if [[ -n $RVS_REL ]]; then
+        git clone https://github.com/ROCm/ROCmValidationSuite.git -b "release/rocm-rel-$RVS_REL"
     else
         git clone https://github.com/ROCm/ROCmValidationSuite.git
     fi
 
-    echo Downloading rocm-rvs : $ROCM_REL ...Complete
+    echo Downloading rocm-rvs : $RVS_REL ...Complete
 }
 
 build_rocm_rvs() {
@@ -185,11 +187,11 @@ test_rocm_rvs() {
     echo ------------------------------------------------------
     echo Testing rocm-rvs...
 
-    ./build/bin/rvs -g
-# Commented out RCQT tests, it des not work for our installation
-#    ./build/bin/rvs -c ./rvs/conf/rcqt_single.conf
-    ./build/bin/rvs -c ./rvs/conf/gst_selfcheck.conf
-    ./build/bin/rvs -c ./rvs/conf/gst_single.conf
+    $RVS_PATH/rvs -g
+# Commented out RCQT tests, it does not work for our installation
+#    $RVS_PATH/rvs -c $RVS_CONFIG_PATH/rcqt_single.conf
+    $RVS_PATH/rvs -c $RVS_CONFIG_PATH/gst_selfcheck.conf
+    $RVS_PATH/rvs -c $RVS_CONFIG_PATH/gst_single.conf
 
     echo Testing rocm-rvs...Complete.
 }
@@ -201,6 +203,7 @@ echo ROCM-RVS TESTER
 echo ===============================
 
 PROG=${0##*/}
+RVS_BUILD=0
 SUDO=$([[ $(id -u) -ne 0 ]] && echo "sudo" ||:)
 echo SUDO: $SUDO
 
@@ -214,9 +217,14 @@ do
         usage
         exit 0
         ;;
+    build)
+        RVS_BUILD=1
+        echo "Perform RVS buid"
+        shift
+        ;;
     rel=*)
-        ROCM_REL="${1#*=}"
-        echo "Using ROCm release : $ROCM_REL"
+        RVS_REL="${1#*=}"
+        echo "Using RVS release : $RVS_REL"
         shift
         ;;
     *)
@@ -241,11 +249,19 @@ fi
 
 setup_rocm
 
-install_deps
+if [[ $RVS_BUILD == 1 ]]; then
+    install_deps
 
-get_rocm_rvs
+    get_rocm_rvs
 
-build_rocm_rvs
+    build_rocm_rvs
+
+    RVS_PATH="./build/bin"
+    RVS_CONFIG_PATH="./rvs/conf"
+else
+    RVS_PATH="$ROCM_DIR/bin"
+    RVS_CONFIG_PATH="$ROCM_DIR/share/rocm-validation-suite/conf"
+fi
 
 test_rocm_rvs
 
