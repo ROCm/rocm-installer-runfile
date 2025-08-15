@@ -96,7 +96,7 @@ install_deps() {
             $SUDO dnf install -y cmake gcc-c++ ffmpeg ffmpeg-devel
             $SUDO dnf install -y mpg123-libs
 
-	        source ../package-puller/config/el/9/rocm-$ROCM_VER-el9.config
+            source ../package-puller/config/el/9/rocm-$ROCM_VER-el9.config
 	        
         elif [[ $DISTRO_VER == 10* ]]; then
 	        echo Installing deps for RHEL10...
@@ -106,7 +106,7 @@ install_deps() {
             $SUDO dnf install -y cmake gcc-c++ ffmpeg ffmpeg-devel
             $SUDO dnf install -y mpg123-libs
 
-	        source ../package-puller/config/el/10/rocm-$ROCM_VER-el10.config
+            source ../package-puller/config/el/10/rocm-$ROCM_VER-el10.config
 	    
         else
             echo "Unsupported version for EL."
@@ -116,7 +116,7 @@ install_deps() {
         # Install Python packages for user because site package not writable for user in RHEL
         python3 -m pip install --user pandas tabulate
         
-   	    echo "$AMDGPU_REPO" | $SUDO tee -a /etc/yum.repos.d/amdgpu-build.repo
+        echo "$AMDGPU_REPO" | $SUDO tee -a /etc/yum.repos.d/amdgpu-build.repo
    	    
     	$SUDO dnf clean all
     	$SUDO rm -rf /var/cache/dnf/*
