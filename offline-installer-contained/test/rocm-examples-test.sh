@@ -106,12 +106,17 @@ install_deps() {
             install_glslang
             
         elif [[ $DISTRO_VER == 9* ]]; then
-	        echo Installing deps for ${DISTRO_NAME}9...
+            echo Installing deps for ${DISTRO_NAME}9...
             if [ $DISTRO_NAME = "rocky" ]; then
                 $SUDO dnf install -y gcc-c++ git cmake glfw-devel glslang-devel vulkan-loader-devel libshaderc-devel glslc
             else
                 $SUDO dnf install -y gcc-c++ git cmake glfw-devel glslang-devel vulkan-loader-devel libshaderc-devel glslc
             fi
+            
+        elif [[ $DISTRO_VER == 10* ]]; then
+            echo Installing deps for ${DISTRO_NAME}10...
+            $SUDO dnf install -y gcc-c++ git cmake glfw-devel glslang-devel vulkan-loader-devel libshaderc-devel glslc
+            
         else
             echo "Unsupported version for EL."
             exit 1
