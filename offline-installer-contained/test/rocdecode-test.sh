@@ -88,26 +88,36 @@ install_deps() {
             
             source ../package-puller/config/el/8/rocm-$ROCM_VER-el8.config
             
-	elif [[ $DISTRO_VER == 9* ]]; then
-	    echo Installing deps for RHEL9...
-	    
-	    $SUDO dnf install -y https://download1.rpmfusion.org/free/el/rpmfusion-free-release-9.noarch.rpm
+        elif [[ $DISTRO_VER == 9* ]]; then
+	        echo Installing deps for RHEL9...
+	        
+            $SUDO dnf install -y https://download1.rpmfusion.org/free/el/rpmfusion-free-release-9.noarch.rpm
             $SUDO dnf install -y https://download1.rpmfusion.org/nonfree/el/rpmfusion-nonfree-release-9.noarch.rpm
             $SUDO dnf install -y cmake gcc-c++ ffmpeg ffmpeg-devel
             $SUDO dnf install -y mpg123-libs
 
-	    source ../package-puller/config/el/9/rocm-$ROCM_VER-el9.config
+	        source ../package-puller/config/el/9/rocm-$ROCM_VER-el9.config
+	        
+        elif [[ $DISTRO_VER == 10* ]]; then
+	        echo Installing deps for RHEL10...
+	        
+            $SUDO dnf install -y https://download1.rpmfusion.org/free/el/rpmfusion-free-release-10.noarch.rpm
+            $SUDO dnf install -y https://download1.rpmfusion.org/nonfree/el/rpmfusion-nonfree-release-10.noarch.rpm
+            $SUDO dnf install -y cmake gcc-c++ ffmpeg ffmpeg-devel
+            $SUDO dnf install -y mpg123-libs
+
+	        source ../package-puller/config/el/10/rocm-$ROCM_VER-el10.config
 	    
-	else
+        else
             echo "Unsupported version for EL."
             exit 1
         fi
         
         # Install Python packages for user because site package not writable for user in RHEL
         python3 -m pip install --user pandas tabulate
-	
-   	echo "$AMDGPU_REPO" | $SUDO tee -a /etc/yum.repos.d/amdgpu-build.repo
-
+        
+   	    echo "$AMDGPU_REPO" | $SUDO tee -a /etc/yum.repos.d/amdgpu-build.repo
+   	    
     	$SUDO dnf clean all
     	$SUDO rm -rf /var/cache/dnf/*
     
