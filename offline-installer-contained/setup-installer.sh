@@ -33,8 +33,8 @@ PULLER_OUTPUT_AMDGPU="../package-extractor/packages-amdgpu"
 
 # Packages list
 PULLER_PACKAGES="${PULLER_PACKAGES:-rocm rocdecode rocdecode-test rocdecode-dev rocm-validation-suite rocm-llvm-dev rocm-language-runtime rocm-opencl-runtime rocprofiler-systems rocprofiler-compute rdc rocjpeg rocjpeg-dev rocjpeg-test}"
-PULLER_PACKAGES_EL="${PULLER_PACKAGES_EL:-rocm rocdecode rocdecode-test rocdecode-devel rocm-validation-suite rocm-llvm-devel rocprofiler-systems rocprofiler-compute rdc rocjpeg rocjpeg-devel rocjpeg-test}"
-PULLER_PACKAGES_SLE="${PULLER_PACKAGES_SLE:-rocm rocdecode rocdecode-test rocdecode-devel rocm-validation-suite rocm-llvm-devel rocprofiler-systems rocprofiler-compute rdc rocjpeg rocjpeg-devel rocjpeg-test}"
+PULLER_PACKAGES_EL="${PULLER_PACKAGES_EL:-rocm rocdecode rocdecode-test rocdecode-devel rocm-validation-suite rocm-llvm-devel rocm-opencl-runtime rocprofiler-systems rocprofiler-compute rdc rocjpeg rocjpeg-devel rocjpeg-test}"
+PULLER_PACKAGES_SLE="${PULLER_PACKAGES_SLE:-rocm rocdecode rocdecode-test rocdecode-devel rocm-validation-suite rocm-llvm-devel rocm-opencl-runtime rocprofiler-systems rocprofiler-compute rdc rocjpeg rocjpeg-devel rocjpeg-test}"
 PULLER_PACKAGES_AMDGPU="amdgpu-dkms"
 
 
