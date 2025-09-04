@@ -163,7 +163,7 @@ install_tools() {
     # Install rpmdevtools for dep version
     if [ $EXTRACT_DISTRO_TYPE == "el" ]; then
         if [[ "$DISTRO_NAME" = "rocky" ]]; then
-            $SUDO dnf install -y cpio
+            $SUDO dnf install -y cpio diffutils
         else
             $SUDO dnf install -y rpmdevtools
         fi
