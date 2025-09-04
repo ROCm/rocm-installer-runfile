@@ -31,9 +31,11 @@ Usage: $PROG [options]
 
 [options}:
     help = Display this help information.
-    
-    rel=<release number> 
-        Set the ROCm release sourced for the rocm-examples test ie.rel=6.3.1
+
+    build = Build RVS tool source and use this version
+
+    rel=<release number>
+        Set the RVS release sourced for the build ie.rel=6.3.1
 END_USAGE
 }
 
@@ -66,28 +68,10 @@ os_release() {
         echo "Unsupported OS"
         exit 1
     fi
-    
+
     echo "Running test on $DISTRO_NAME $DISTRO_VER."
 }
 
-install_glslang() {
-    echo ------------------------------------------------------
-    echo Install glslang...
-    
-    if [ -d glslang ]; then
-        $SUDO rm -r glslang
-    fi
-    
-    # glslang is not available from repos, build from source
-    git clone https://github.com/KhronosGroup/glslang.git
-    cd glslang
-    python3 ./update_glslang_sources.py
-    cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$(pwd)/install"
-    cd build
-    make -j$(nproc) install
-    
-    echo Install glslang...Complete.
-}
 
 install_deps() {
     echo ------------------------------------------------------
@@ -95,42 +79,42 @@ install_deps() {
 
     # install any dependencies for rocm-examples
     if [ $DISTRO_PACKAGE_MGR == "apt" ]; then
-        $SUDO apt-get install -y git cmake libglfw3-dev libsuitesparse-dev libtbb-dev glslang-tools glslc
-        
+        $SUDO apt-get install -y libpci3 libpci-dev doxygen unzip cmake git libyaml-cpp-dev
+
     elif [ $DISTRO_PACKAGE_MGR == "dnf" ]; then
-    
-        if [[ $DISTRO_VER == 8* ]]; then
-            echo Installing deps for ${DISTRO_NAME}8...
-            $SUDO dnf install -y gcc-c++ git cmake glfw-devel vulkan-headers vulkan-loader vulkan-validation-layers mesa-libGL-devel
-            $SUDO dnf install -y gcc-toolset-11
-            install_glslang
-            
-        elif [[ $DISTRO_VER == 9* ]]; then
-            echo Installing deps for ${DISTRO_NAME}9...
-            if [ $DISTRO_NAME = "rocky" ]; then
-                $SUDO dnf install -y gcc-c++ git cmake glfw-devel glslang-devel vulkan-loader-devel libshaderc-devel glslc
-            else
-                $SUDO dnf install -y gcc-c++ git cmake glfw-devel glslang-devel vulkan-loader-devel libshaderc-devel glslc
-            fi
-            
-        elif [[ $DISTRO_VER == 10* ]]; then
-            echo Installing deps for ${DISTRO_NAME}10...
-            $SUDO dnf install -y gcc-c++ git cmake glfw-devel glslang-devel vulkan-loader-devel libshaderc-devel glslc
-            
-        else
-            echo "Unsupported version for EL."
-            exit 1
-        fi
-        
+        $SUDO dnf install -y cmake3 doxygen git gcc-c++ yaml-cpp-devel pciutils-devel
+
+#  Temporary leave old code here until tests on RHEL8 and Rocky performed,
+#  maybe we will need separate packages installation for RHEL8/9/Rocky
+#        if [[ $DISTRO_VER == 8* ]]; then
+#            echo Installing deps for ${DISTRO_NAME}8...
+#            $SUDO dnf install -y gcc-c++ git cmake glfw-devel vulkan-headers vulkan-loader vulkan-validation-layers mesa-libGL-devel
+#            $SUDO dnf install -y gcc-toolset-11
+#            install_glslang
+#
+#        elif [[ $DISTRO_VER == 9* ]]; then
+#	        echo Installing deps for ${DISTRO_NAME}9...
+#            if [ $DISTRO_NAME = "rocky" ]; then
+#                $SUDO dnf install -y gcc-c++ git cmake glfw-devel glslang-devel vulkan-loader-devel libshaderc-devel glslc
+#            else
+#                $SUDO dnf install -y cmake3 doxygen git gcc-c++ yaml-cpp-devel pciutils-devel
+#            fi
+#        else
+#            echo "Unsupported version for EL."
+#            exit 1
+#        fi
+
     elif [ $DISTRO_PACKAGE_MGR == "zypper" ]; then
-        $SUDO zypper install -y git libglfw-devel gcc14-c++
-        
-        if [[ $DISTRO_VER == 15.5 ]]; then
-            $SUDO pip install cmake
-        else
-            $SUDO zypper install -y cmake
-        fi
-        
+        $SUDO zypper install -y cmake doxygen pciutils-devel libpci3 git gcc-c++ yaml-cpp-devel
+
+#  Temporary leave old code here until tests on different versions of SLES performed,
+#  maybe we will need separate packages installation
+#        if [[ $DISTRO_VER == 15.5 ]]; then
+#            $SUDO pip install cmake
+#        else
+#            $SUDO zypper install -y cmake
+#        fi
+
     else
         echo Unsupported Distro.
         exit 1
@@ -142,13 +126,13 @@ install_deps() {
 setup_rocm() {
     echo ------------------------------------------------------
     echo Setting up ROCm paths...
-    
+
     # Look for the rocm directory
     ROCM_VER_DIR=$(find / -type f -path '*/rocm-*/.info/version' ! -path '*/rocm-installer/component-rocm/*' -print -quit 2>/dev/null)
 
     if [ -n "$ROCM_VER_DIR" ]; then
         echo "ROCm Install Directory found at: $ROCM_VER_DIR"
-        
+
         ROCM_DIR=${ROCM_VER_DIR%%.info*}
         echo ROCM_DIR = $ROCM_DIR
     else
@@ -158,65 +142,68 @@ setup_rocm() {
 
     # Set the ROCm paths
     export ROCM_PATH="$ROCM_DIR"
-    
+
     # Set compiler paths
     export CXX=$ROCM_PATH/llvm/bin/amdclang++
     export CC=$ROCM_PATH/llvm/bin/amdclang
-    
+
     echo Setting up ROCm paths...Complete.
 }
 
-get_rocm_examples() {
+get_rocm_rvs() {
     echo ------------------------------------------------------
-    echo Downloading rocm-examples : $ROCM_REL ...
-    
-    if [ -d rocm-examples ]; then
-        $SUDO rm -r rocm-examples
+    echo Downloading rocm-rvs : $RVS_REL ...
+
+    if [ -d ROCmValidationSuite ]; then
+        $SUDO rm -r ROCmValidationSuite
     fi
 
-    # Download the rocm-example source (use release if present)
-    if [[ -n $ROCM_REL ]]; then
-        git clone https://github.com/ROCm/rocm-examples.git -b "release/rocm-rel-$ROCM_REL"
+    # Download the rocm-rvs source (use release if present)
+    if [[ -n $RVS_REL ]]; then
+        git clone https://github.com/ROCm/ROCmValidationSuite.git -b "release/rocm-rel-$RVS_REL"
     else
-        git clone https://github.com/ROCm/rocm-examples.git --depth=1
+        git clone https://github.com/ROCm/ROCmValidationSuite.git
     fi
-    
-    echo Downloading rocm-examples : $ROCM_REL ...Complete
+
+    echo Downloading rocm-rvs : $RVS_REL ...Complete
 }
 
-build_rocm_examples() {
+build_rocm_rvs() {
     echo ------------------------------------------------------
-    echo Building rocm-examples...
-    
-    cd rocm-examples
-    
-    # Build rocm-examples
-    mkdir build && cd build
+    echo Building rocm-rvs...
 
-    # Using -Wno-dev to suppress lots of warnings during compilation.
-    # To be removed after test update.
-    cmake .. -DROCM_ROOT=$ROCM_PATH -Wno-dev
-    cmake --build . -- -j$(nproc)
-    
-    echo Building rocm-examples...Complete.
+    cd ROCmValidationSuite
+
+    # Build rocm-rvs
+    mkdir build
+
+    cmake -B ./build -DROCM_PATH=$ROCM_PATH -DCMAKE_INSTALL_PREFIX=./build -DCPACK_PACKAGING_INSTALL_PREFIX=./build -DCMAKE_PREFIX_PATH=$ROCM_PATH
+    make -C ./build -j$(nproc)
+
+    echo Building rocm-rvs...Complete.
 }
 
-test_rocm_examples() {
+test_rocm_rvs() {
     echo ------------------------------------------------------
-    echo Testing rocm-examples...
-    
-    ctest --output-on-failure
-    
-    echo Testing rocm-examples...Complete.
+    echo Testing rocm-rvs...
+
+    $RVS_PATH/rvs -g
+# Commented out RCQT tests, it does not work for our installation
+#    $RVS_PATH/rvs -c $RVS_CONFIG_PATH/rcqt_single.conf
+    $RVS_PATH/rvs -c $RVS_CONFIG_PATH/gst_selfcheck.conf
+    $RVS_PATH/rvs -c $RVS_CONFIG_PATH/gst_single.conf
+
+    echo Testing rocm-rvs...Complete.
 }
 
 ####### Main script ##############################################################
 
 echo ===============================
-echo ROCM-EXAMPLES TESTER
+echo ROCM-RVS TESTER
 echo ===============================
 
 PROG=${0##*/}
+RVS_BUILD=0
 SUDO=$([[ $(id -u) -ne 0 ]] && echo "sudo" ||:)
 echo SUDO: $SUDO
 
@@ -230,9 +217,14 @@ do
         usage
         exit 0
         ;;
+    build)
+        RVS_BUILD=1
+        echo "Perform RVS buid"
+        shift
+        ;;
     rel=*)
-        ROCM_REL="${1#*=}"
-        echo "Using ROCm release : $ROCM_REL"
+        RVS_REL="${1#*=}"
+        echo "Using RVS release : $RVS_REL"
         shift
         ;;
     *)
@@ -247,7 +239,7 @@ ROCM_VER_DIR=$(find / -type f -path '*/rocm-*/.info/version' ! -path '*/rocm-ins
 if [ -n "$ROCM_VER_DIR" ]; then
     echo ------------------------------------------------------
     echo "ROCm Install Directory found at: $ROCM_VER_DIR"
-    
+
     ROCM_DIR=${ROCM_VER_DIR%%.info*}
     echo ROCM_DIR = $ROCM_DIR
 else
@@ -257,11 +249,19 @@ fi
 
 setup_rocm
 
-install_deps
+if [[ $RVS_BUILD == 1 ]]; then
+    install_deps
 
-get_rocm_examples
+    get_rocm_rvs
 
-build_rocm_examples
+    build_rocm_rvs
 
-test_rocm_examples
+    RVS_PATH="./build/bin"
+    RVS_CONFIG_PATH="./rvs/conf"
+else
+    RVS_PATH="$ROCM_DIR/bin"
+    RVS_CONFIG_PATH="$ROCM_DIR/share/rocm-validation-suite/conf"
+fi
+
+test_rocm_rvs
 

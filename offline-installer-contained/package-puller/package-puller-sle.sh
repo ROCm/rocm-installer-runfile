@@ -129,6 +129,9 @@ copy_rpms() {
 }
 
 install_prereqs() {
+    echo ++++++++++++++++++++++++++++++++
+    echo Installing prereqs...
+    
     echo Updating zypper...
     $SUDO zypper install -y zypper
     
@@ -194,6 +197,7 @@ install_prereqs() {
     $SUDO zypper --gpg-auto-import-keys refresh
     
     echo Adding repos..Complete
+    echo Installing prereqs...Complete.
 }
 
 cleanup() {
