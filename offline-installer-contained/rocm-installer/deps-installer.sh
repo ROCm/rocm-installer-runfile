@@ -1096,35 +1096,27 @@ install_repos_el() {
     fi
     
     # Setup for installing EL repos
-    local epel_pkg=
-    local codeready_repo=
-    if [[ $DISTRO_VER == 8* ]]; then
-        epel_pkg="epel-release-latest-8.noarch.rpm"
-        codeready_repo="codeready-builder-for-rhel-8-x86_64-rpms"
-    elif [[ $DISTRO_VER == 9* ]]; then
-        epel_pkg="epel-release-latest-9.noarch.rpm"
-        codeready_repo="codeready-builder-for-rhel-9-x86_64-rpms"
-    elif [[ $DISTRO_VER == 10* ]]; then
-        epel_pkg="epel-release-latest-10.noarch.rpm"
-        codeready_repo="codeready-builder-for-rhel-10-x86_64-rpms"
-    else
-        print_err "Repos/packages for $DISTRO_VER are not supported."
-        exit 1
-    fi
+    local epel_pkg="epel-release-latest-$DISTRO_MAJOR_VER.noarch.rpm"
+    local codeready_repo="codeready-builder-for-rhel-$DISTRO_MAJOR_VER-x86_64-rpms"
     
     # Setup EPEL/crb if required
     if [ -f /etc/yum.repos.d/epel.repo ]; then
         echo "EPEL repo exists."
         
     else
-        echo "EPEL repo setup..."
+        echo "EPEL repo setup for EL $DISTRO_MAJOR_VER."
         
         wget --tries 5 https://dl.fedoraproject.org/pub/epel/$epel_pkg
+        if [ $? -ne 0 ]; then
+            print_err "Unsupported version for EPEL."
+            exit 1
+        fi
         $SUDO rpm -ivh $epel_pkg
-        $SUDO crb enable
         
         echo "EPEL repo setup...Complete."
     fi
+    
+    $SUDO crb enable
     
     # Enable the codeready-builder repo (RHEL only)
     if [[ "$DISTRO_NAME" = "rhel" ]]; then

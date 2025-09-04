@@ -83,6 +83,7 @@ os_release() {
 
         DISTRO_NAME=$ID
         DISTRO_VER=$(awk -F= '/^VERSION_ID=/{print $2}' /etc/os-release | tr -d '"')
+        DISTRO_MAJOR_VER=${DISTRO_VER%.*}
         
         case "$ID" in
         rhel|ol|rocky)
@@ -145,7 +146,13 @@ restore_dnf_conf() {
 }
 
 install_prereqs() {
+    echo ++++++++++++++++++++++++++++++++
+    echo Installing prereqs...
+    
     # Setup EPEL/crb
+    local epel_pkg="epel-release-latest-$DISTRO_MAJOR_VER.noarch.rpm"
+    local codeready_repo="codeready-builder-for-rhel-$DISTRO_MAJOR_VER-x86_64-rpms"
+    
     if [ -f /etc/yum.repos.d/epel.repo ]; then
         echo "EPEL repo exists."
     else
@@ -156,27 +163,38 @@ install_prereqs() {
             echo "Package: wget installed."
         fi
     
-        echo "EPEL repo setup."
-        if [[ $DISTRO_VER == 8* ]]; then
-            wget --tries 5 https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
-            $SUDO rpm -ivh epel-release-latest-8.noarch.rpm
-        elif [[ $DISTRO_VER == 9* ]]; then
-            wget --tries 5 https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
-            $SUDO rpm -ivh epel-release-latest-9.noarch.rpm
-        elif [[ $DISTRO_VER == 10* ]]; then
-            wget --tries 5 https://dl.fedoraproject.org/pub/epel/epel-release-latest-10.noarch.rpm
-            $SUDO rpm -ivh epel-release-latest-10.noarch.rpm
-        else
-            echo "Unsupported version for EPEL."
+        echo "EPEL repo setup for EL $DISTRO_MAJOR_VER."
+        
+        wget --tries 5 https://dl.fedoraproject.org/pub/epel/$epel_pkg
+        if [ $? -ne 0 ]; then
+            print_err "Unsupported version for EPEL."
+            exit 1
         fi
         
-        $SUDO crb enable
+        $SUDO rpm -ivh "$epel_pkg"
     fi
     
     $SUDO dnf install -y dnf-plugin-config-manager
-
+    $SUDO crb enable
+    
+    # Enable the codeready-builder repo (RHEL only)
+    if [[ "$DISTRO_NAME" = "rhel" ]]; then
+        if ! $SUDO dnf repolist all | grep -q "^$codeready_repo"; then
+            print_err "$codeready_repo repo not configured."
+            exit 1
+        fi
+        
+        local repo_status=$(dnf repolist all | grep "^$codeready_repo" | awk '{print $NF}')
+        if [[ "$repo_status" == "disabled" ]]; then
+            echo "Enabling $codeready_repo."
+            $SUDO dnf config-manager --enable "$codeready_repo"
+        fi
+    fi
+    
     # Update the dnf.conf for faster mirrors etc.
     update_dnf_conf
+    
+    echo Installing prereqs...Complete.
 }
 
 cleanup() {
