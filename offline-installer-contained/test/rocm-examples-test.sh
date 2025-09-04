@@ -123,7 +123,7 @@ install_deps() {
         fi
         
     elif [ $DISTRO_PACKAGE_MGR == "zypper" ]; then
-        $SUDO zypper install -y git libglfw-devel gcc-c++
+        $SUDO zypper install -y git libglfw-devel gcc14-c++
         
         if [[ $DISTRO_VER == 15.5 ]]; then
             $SUDO pip install cmake
@@ -176,11 +176,11 @@ get_rocm_examples() {
 
     # Download the rocm-example source (use release if present)
     if [[ -n $ROCM_REL ]]; then
-        git clone https://github.com/ROCm/rocm-examples.git -b "rocm-$ROCM_REL"
+        git clone https://github.com/ROCm/rocm-examples.git -b "release/rocm-rel-$ROCM_REL"
     else
         git clone https://github.com/ROCm/rocm-examples.git --depth=1
     fi
-
+    
     echo Downloading rocm-examples : $ROCM_REL ...Complete
 }
 
