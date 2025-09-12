@@ -61,24 +61,20 @@ os_release() {
 install_deps() {
     echo ++++++++++++++++++++++++++++++++
     echo Installing deps...
-    
+
     # install any dependencies for rocdecode
     if [ $DISTRO_PACKAGE_MGR == "apt" ]; then
         $SUDO apt-get install -y cmake pkg-config
         $SUDO apt-get install -y vainfo
-        
-        if [[ $DISTRO_VER == 22.04 ]]; then
-            python3 -m pip install pandas tabulate
-        else
-            $SUDO apt-get install -y python3-pandas python3-tabulate
-        fi
-        
+
+        $SUDO apt-get install -y python3-pandas python3-tabulate
+
     elif [ $DISTRO_PACKAGE_MGR == "dnf" ]; then
         $SUDO dnf install pkg-config
 
         if [[ $DISTRO_VER == 8* ]]; then
             echo Installing deps for RHEL8...
-            
+
             $SUDO dnf install -y https://download1.rpmfusion.org/free/el/rpmfusion-free-release-8.noarch.rpm
             $SUDO dnf install -y https://download1.rpmfusion.org/nonfree/el/rpmfusion-nonfree-release-8.noarch.rpm
             $SUDO dnf install -y cmake gcc-c++ ffmpeg ffmpeg-devel
@@ -117,7 +113,8 @@ install_deps() {
         python3 -m pip install --user pandas tabulate
         
         echo "$AMDGPU_REPO" | $SUDO tee -a /etc/yum.repos.d/amdgpu-build.repo
-   	    
+        echo "$GRAPHICS_REPO" | $SUDO tee -a /etc/yum.repos.d/amdgpu-graphics.repo
+
     	$SUDO dnf clean all
     	$SUDO rm -rf /var/cache/dnf/*
     
@@ -141,7 +138,8 @@ install_deps() {
        fi
        
        echo "$AMDGPU_REPO" | $SUDO tee -a /etc/zypp/repos.d/amdgpu-build.repo
-       
+       echo "$GRAPHICS_REPO" | $SUDO tee -a /etc/zypp/repos.d/amdgpu-graphics.repo
+
        $SUDO zypper clean
        $SUDO zypper --gpg-auto-import-keys refresh
        
@@ -161,6 +159,7 @@ cleanup() {
     
     if [ $DISTRO_PACKAGE_MGR == "dnf" ]; then
         $SUDO rm /etc/yum.repos.d/amdgpu-build.repo
+        $SUDO rm /etc/yum.repos.d/amdgpu-graphics.repo
         
         # cleanup dnf cache
         $SUDO dnf clean all
@@ -168,6 +167,7 @@ cleanup() {
         
     elif [ $DISTRO_PACKAGE_MGR == "zypper" ]; then
         $SUDO rm /etc/zypp/repos.d/amdgpu-build.repo
+        $SUDO rm /etc/zypp/repos.d/amdgpu-graphics.repo
         $SUDO zypper clean
     fi
 

@@ -95,16 +95,25 @@ install_deps() {
 
     # install any dependencies for rocm-examples
     if [ $DISTRO_PACKAGE_MGR == "apt" ]; then
-        $SUDO apt-get install -y git cmake libglfw3-dev libsuitesparse-dev libtbb-dev glslang-tools glslc
-        
+        if [[ $DISTRO_VER == 22* ]]; then
+            echo Installing deps for ${DISTRO_NAME} 22...
+            $SUDO apt-get install -y git cmake libglfw3-dev libsuitesparse-dev libtbb-dev glslang-tools
+        elif [[ $DISTRO_VER == 24* ]]; then
+            echo Installing deps for ${DISTRO_NAME} 24...
+            $SUDO apt-get install -y git cmake libglfw3-dev libsuitesparse-dev libtbb-dev glslang-tools glslc
+        else
+            echo Installing deps for ${DISTRO_NAME}...
+            $SUDO apt-get install -y git cmake libglfw3-dev libsuitesparse-dev libtbb-dev glslang-tools glslc
+        fi
+
     elif [ $DISTRO_PACKAGE_MGR == "dnf" ]; then
-    
+
         if [[ $DISTRO_VER == 8* ]]; then
             echo Installing deps for ${DISTRO_NAME}8...
             $SUDO dnf install -y gcc-c++ git cmake glfw-devel vulkan-headers vulkan-loader vulkan-validation-layers mesa-libGL-devel
             $SUDO dnf install -y gcc-toolset-11
             install_glslang
-            
+
         elif [[ $DISTRO_VER == 9* ]]; then
             echo Installing deps for ${DISTRO_NAME}9...
             if [ $DISTRO_NAME = "rocky" ]; then
