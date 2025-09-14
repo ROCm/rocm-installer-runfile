@@ -211,13 +211,13 @@ bash rocm-installer.run untar "/home/amd/myrocm"
 
 Once the extraction completes, the **untar** command will generate a setup script called **setup-modules**.  The **setup-modules** script will be specific for the ROCm version based on the runfile build and found in the rocm-x.y.z output directory of extraction.  Users may run the **setup-modules-x.y.z.sh** script to perform a basic ROCm setup using environment modules. 
 
-For example, to set up an untar extraction of ROCm 6.4.2 into output directory  /home/amd/myrocm, run the following command line:
+For example, to set up an untar extraction of ROCm 7.0.1 into output directory  /home/amd/myrocm, run the following command line:
 
 ``` shell
-cd /home/amd/myrocm/rocm-6.4.2
-./setup-modules-6.4.2.sh
+cd /home/amd/myrocm/rocm-7.0.1
+./setup-modules-7.0.1.sh
 source /etc/profile.d/modules.sh
-module load rocm/6.4.2
+module load rocm/7.0.1
 ```
 
 Note, that the setup-modules script will install the environment-modules package as part of the setup process to enable environment modules support.  Also, the setup-modules script will not setup any required ROCm dependencies.  Dependencies must be installed manually or using the Runfile installer dependency installation via the **deps=install-only rocm** command line argument or installation using the Runfile GUI.  In addition to dependencies, manualy setup or installation via the Runfile installer may be required for access to GPU resource for ROCm operation (**gpu-access=all/user**).
@@ -378,12 +378,12 @@ For example, to enable ROCm post-installation configuration for a ROCm installat
 bash rocm-installer.run target="/" rocm postrocm
 ```
 
-In cases where the **postrocm** is not included in the install command for ROCm, the post-install can still be run separately after install.  To run post installation of ROCm from the command-line, use the **postrocm** argument in conjunction with **target=rocm-install-path** where **rocm-install-path** is the location of the version-specific ROCm installation for the used runfile installer.  For example, if the current runfile installer is for ROCm 6.4.1, then the **rocm-install-path** must be the path to a ROCm 6.4.1 runfile installation.
+In cases where the **postrocm** is not included in the install command for ROCm, the post-install can still be run separately after install.  To run post installation of ROCm from the command-line, use the **postrocm** argument in conjunction with **target=rocm-install-path** where **rocm-install-path** is the location of the version-specific ROCm installation for the used runfile installer.  For example, if the current runfile installer is for ROCm 7.0.1, then the **rocm-install-path** must be the path to a ROCm 7.0.1 runfile installation.
 
-To use the **postrocm** argument separately from the initial install of ROCm 6.4.1 to **/home/amd/myrocm** the command-line is as follows:
+To use the **postrocm** argument separately from the initial install of ROCm 7.0.1 to **/home/amd/myrocm** the command-line is as follows:
 
 ``` shell
-bash rocm-installer.run target="/home/amd/myrocm/rocm-6.4.1" postrocm
+bash rocm-installer.run target="/home/amd/myrocm/rocm-7.0.1" postrocm
 ```
 
 ** Note: Adding the postrocm option to the <options> list is highly recommended to guarantee proper functioning of the ROCm components and applications.
