@@ -113,7 +113,9 @@ install_deps() {
         python3 -m pip install --user pandas tabulate
         
         echo "$AMDGPU_REPO" | $SUDO tee -a /etc/yum.repos.d/amdgpu-build.repo
-        echo "$GRAPHICS_REPO" | $SUDO tee -a /etc/yum.repos.d/amdgpu-graphics.repo
+        if [ -n "$GRAPHICS_REPO" ]; then
+            echo "$GRAPHICS_REPO" | $SUDO tee -a /etc/yum.repos.d/amdgpu-graphics.repo
+        fi
 
     	$SUDO dnf clean all
     	$SUDO rm -rf /var/cache/dnf/*
@@ -122,28 +124,30 @@ install_deps() {
     	$SUDO dnf install -y libva-utils
     	
     elif [ $DISTRO_PACKAGE_MGR == "zypper" ]; then
-       $SUDO zypper install cmake ffmpeg-4-libavcodec-devel ffmpeg-4-libavformat-devel ffmpeg-4-libavutil-devel
+        $SUDO zypper install cmake ffmpeg-4-libavcodec-devel ffmpeg-4-libavformat-devel ffmpeg-4-libavutil-devel
        
-       python3 -m pip install pandas tabulate
+        python3 -m pip install pandas tabulate
        
-       if [[ $DISTRO_VER == 15.5 ]]; then
-           source ../package-puller/config/sle/15.5/rocm-$ROCM_VER-sle-15.5.config
-       elif [[ $DISTRO_VER == 15.6 ]]; then
-           source ../package-puller/config/sle/15.6/rocm-$ROCM_VER-sle-15.6.config
-       elif [[ $DISTRO_VER == 15.7 ]]; then
-           source ../package-puller/config/sle/15.6/rocm-$ROCM_VER-sle-15.6.config
-       else
-           echo SLES $DISTRO_VER is not supported.
-           exit 1
-       fi
+        if [[ $DISTRO_VER == 15.5 ]]; then
+            source ../package-puller/config/sle/15.5/rocm-$ROCM_VER-sle-15.5.config
+        elif [[ $DISTRO_VER == 15.6 ]]; then
+            source ../package-puller/config/sle/15.6/rocm-$ROCM_VER-sle-15.6.config
+        elif [[ $DISTRO_VER == 15.7 ]]; then
+            source ../package-puller/config/sle/15.6/rocm-$ROCM_VER-sle-15.6.config
+        else
+            echo SLES $DISTRO_VER is not supported.
+            exit 1
+        fi
        
-       echo "$AMDGPU_REPO" | $SUDO tee -a /etc/zypp/repos.d/amdgpu-build.repo
-       echo "$GRAPHICS_REPO" | $SUDO tee -a /etc/zypp/repos.d/amdgpu-graphics.repo
+        echo "$AMDGPU_REPO" | $SUDO tee -a /etc/zypp/repos.d/amdgpu-build.repo
+        if [ -n "$GRAPHICS_REPO" ]; then
+            echo "$GRAPHICS_REPO" | $SUDO tee -a /etc/zypp/repos.d/amdgpu-graphics.repo
+        fi
 
-       $SUDO zypper clean
-       $SUDO zypper --gpg-auto-import-keys refresh
+        $SUDO zypper clean
+        $SUDO zypper --gpg-auto-import-keys refresh
        
-       $SUDO zypper install -y libva-amdgpu-devel mesa-amdgpu-va-drivers
+        $SUDO zypper install -y libva-amdgpu-devel mesa-amdgpu-va-drivers
        
     else
         echo Unsupported Distro.
@@ -159,7 +163,9 @@ cleanup() {
     
     if [ $DISTRO_PACKAGE_MGR == "dnf" ]; then
         $SUDO rm /etc/yum.repos.d/amdgpu-build.repo
-        $SUDO rm /etc/yum.repos.d/amdgpu-graphics.repo
+        if [ -e /etc/yum.repos.d/amdgpu-graphics.repo ]; then
+            $SUDO rm /etc/yum.repos.d/amdgpu-graphics.repo
+        fi
         
         # cleanup dnf cache
         $SUDO dnf clean all
@@ -167,7 +173,9 @@ cleanup() {
         
     elif [ $DISTRO_PACKAGE_MGR == "zypper" ]; then
         $SUDO rm /etc/zypp/repos.d/amdgpu-build.repo
-        $SUDO rm /etc/zypp/repos.d/amdgpu-graphics.repo
+        if [ -e /etc/zypp/repos.d/amdgpu-graphics.repo ]; then
+            $SUDO rm /etc/zypp/repos.d/amdgpu-graphics.repo
+        fi
         $SUDO zypper clean
     fi
 
