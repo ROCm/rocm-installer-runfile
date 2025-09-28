@@ -175,7 +175,6 @@ install_prereqs() {
     fi
     
     $SUDO dnf install -y dnf-plugin-config-manager
-    $SUDO crb enable
     
     # Enable the codeready-builder repo (RHEL only)
     if [[ "$DISTRO_NAME" = "rhel" ]]; then
@@ -189,6 +188,8 @@ install_prereqs() {
             echo "Enabling $codeready_repo."
             $SUDO dnf config-manager --enable "$codeready_repo"
         fi
+    else
+        $SUDO crb enable
     fi
     
     # Update the dnf.conf for faster mirrors etc.

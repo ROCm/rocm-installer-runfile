@@ -1116,7 +1116,7 @@ install_repos_el() {
         echo "EPEL repo setup...Complete."
     fi
     
-    $SUDO crb enable
+    $SUDO dnf install -y dnf-plugin-config-manager
     
     # Enable the codeready-builder repo (RHEL only)
     if [[ "$DISTRO_NAME" = "rhel" ]]; then
@@ -1130,6 +1130,8 @@ install_repos_el() {
             echo "Enabling $codeready_repo."
             $SUDO dnf config-manager --enable "$codeready_repo"
         fi
+    else
+        $SUDO crb enable
     fi
     
     echo "Setting up Repos...Complete."
