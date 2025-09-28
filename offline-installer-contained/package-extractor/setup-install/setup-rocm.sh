@@ -22,6 +22,7 @@
 # THE SOFTWARE.
 # #############################################################################
 
+ROCM_GDB_SETUP=0
 
 ###### Functions ###############################################################
 os_release() {
@@ -33,6 +34,7 @@ os_release() {
         case "$ID" in
         ubuntu|debian)
             DISTRO_PACKAGE_MGR="apt"
+            ROCM_GDB_SETUP=1
             ;;
         rhel|ol|rocky)
             DISTRO_PACKAGE_MGR="dnf"
@@ -92,12 +94,15 @@ if [[ "$current_dir" =~ ^rocm-[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 
 ROCM_INSTALL_PATH=$ROCM_INSTALL_PATH
 ROCM_VERSION=$ROCM_VERSION
+ROCM_GDB_SETUP=$ROCM_GDB_SETUP
 
 setup_rocm_gdb() {
     echo Setting up rocm-gdb
-    PYTHON_LIB_INSTALLED=\$(find /lib/ -name 'libpython3*.so' | head -n 1)
-    echo "Installing rocm-gdb with \$PYTHON_LIB_INSTALLED."
-    ln -s \$PYTHON_LIB_INSTALLED $ROCM_INSTALL_PATH/lib/amdpythonlib.so
+    if [[ \$ROCM_GDB_SETUP == 1 ]]; then
+        PYTHON_LIB_INSTALLED=\$(find /lib/ -name 'libpython3*.so' | head -n 1)
+        echo "Installing rocm-gdb with \$PYTHON_LIB_INSTALLED."
+        ln -s \$PYTHON_LIB_INSTALLED $ROCM_INSTALL_PATH/lib/amdpythonlib.so
+    fi
     echo Setting up rocm-gdb. Complete.
 }
 
