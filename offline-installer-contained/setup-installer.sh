@@ -22,18 +22,12 @@
 # THE SOFTWARE.
 # #############################################################################
 
-# Package Puller Input Config
-PULLER_CONFIG="${PULLER_CONFIG:-config/deb/22.04/rocm-7.0.2-22.04.config}"
-PULLER_CONFIG_EL="${PULLER_CONFIG_EL:-config/el/9/rocm-7.0.2-el9.config}"
-PULLER_CONFIG_SLE="${PULLER_CONFIG_SLE:-config/sle/15.6/rocm-7.0.2-sle-15.6.config}"
-
 # Package Puller Output directory
 PULLER_OUTPUT="../package-extractor/packages-rocm"
 PULLER_OUTPUT_AMDGPU="../package-extractor/packages-amdgpu"
 
 # Packages list
 PULLER_PACKAGES="${PULLER_PACKAGES:-rocm rocdecode rocdecode-test rocdecode-dev rocm-validation-suite rocm-llvm-dev rocm-language-runtime rocm-opencl-runtime rocprofiler-systems rocprofiler-compute rdc rocjpeg rocjpeg-dev rocjpeg-test}"
-PULLER_PACKAGES_EL="${PULLER_PACKAGES_EL:-rocm rocdecode rocdecode-test rocdecode-devel rocm-validation-suite rocm-llvm-devel rocm-opencl-runtime rocprofiler-systems rocprofiler-compute rdc rocjpeg rocjpeg-devel rocjpeg-test}"
 PULLER_PACKAGES_SLE="${PULLER_PACKAGES_SLE:-rocm rocdecode rocdecode-test rocdecode-devel rocm-validation-suite rocm-llvm-devel rocm-opencl-runtime rocprofiler-systems rocprofiler-compute rdc rocjpeg rocjpeg-devel rocjpeg-test}"
 PULLER_PACKAGES_AMDGPU="amdgpu-dkms"
 
@@ -46,6 +40,7 @@ os_release() {
 
         DISTRO_NAME=$ID
         DISTRO_VER=$(awk -F= '/^VERSION_ID=/{print $2}' /etc/os-release | tr -d '"')
+        DISTRO_MAJOR_VER=${DISTRO_VER%.*}
         
         case "$ID" in
         ubuntu|debian)
@@ -70,6 +65,78 @@ os_release() {
     echo "Setup running on $DISTRO_NAME $DISTRO_VER."
 }
 
+configure_setup() {
+    echo ++++++++++++++++++++++++++++++++
+    
+    if [ $PULL_DISTRO_TYPE == "deb" ]; then
+        echo Configuring for DEB $DISTRO_VER.
+        
+        if [[ $DISTRO_VER == 24.04 ]] || [[ $DISTRO_VER == 13 ]]; then
+            # Ubuntu 24.04 / Debian 13 configuration
+            PULLER_CONFIG="${PULLER_CONFIG:-config/deb/24.04/rocm-7.0.2-24.04.config}"
+            if [[ -n $PULLER_CONFIG_24_04 ]]; then 
+                PULLER_CONFIG=$PULLER_CONFIG_24_04
+            fi
+            
+        elif [[ $DISTRO_VER == 22.04 ]] || [[ $DISTRO_VER == 12 ]]; then
+            # Ubuntu 22.04 / Debian 12 configuration
+            PULLER_CONFIG="${PULLER_CONFIG:-config/deb/22.04/rocm-7.0.2-22.04.config}"
+            if [[ -n $PULLER_CONFIG_22_04 ]]; then 
+                PULLER_CONFIG=$PULLER_CONFIG_22_04
+            fi
+            
+        else
+            echo "Unsupported DEB config for OS"
+            exit 1
+        fi
+        
+    elif [ $PULL_DISTRO_TYPE == "el" ]; then
+        echo Configuring for EL $DISTRO_MAJOR_VER.
+        
+        if [[ $DISTRO_MAJOR_VER == 10 ]]; then
+            # RHEL 10 / OL 10 configuration
+            PULLER_CONFIG_EL="${PULLER_CONFIG_EL:-config/el/10/rocm-7.0.2-el10.config}"
+            PULLER_PACKAGES_EL="${PULLER_PACKAGES_EL:-rocm rocdecode rocm-validation-suite rocm-llvm-devel rocm-opencl-runtime rocprofiler-systems rocprofiler-compute rdc rocjpeg}"
+            if [[ -n $PULLER_CONFIG_EL_10 ]]; then
+                PULLER_CONFIG_EL=$PULLER_CONFIG_EL_10
+            fi
+            
+        elif [[ $DISTRO_MAJOR_VER == 9 ]]; then
+            # RHEL 9 / OL 9 / Rocky 9 configuration
+            PULLER_CONFIG_EL="${PULLER_CONFIG_EL:-config/el/9/rocm-7.0.2-el9.config}"
+            PULLER_PACKAGES_EL="${PULLER_PACKAGES_EL:-rocm rocdecode rocm-validation-suite rocm-llvm-devel rocm-opencl-runtime rocprofiler-systems rocprofiler-compute rdc rocjpeg}"
+            if [[ -n $PULLER_CONFIG_EL_9 ]]; then 
+                PULLER_CONFIG_EL=$PULLER_CONFIG_EL_9
+            fi
+            
+        elif [[ $DISTRO_MAJOR_VER == 8 ]]; then
+            # RHEL 8 / OL 8 configuration
+            PULLER_CONFIG_EL="${PULLER_CONFIG_EL:-config/el/8/rocm-7.0.2-el8.config}"
+            PULLER_PACKAGES_EL="${PULLER_PACKAGES_EL:-rocm rocdecode rocdecode-test rocdecode-devel rocm-validation-suite rocm-llvm-devel rocm-opencl-runtime rocprofiler-systems rocprofiler-compute rdc rocjpeg rocjpeg-devel rocjpeg-test}"
+            if [[ -n $PULLER_CONFIG_EL_8 ]]; then 
+                PULLER_CONFIG_EL=$PULLER_CONFIG_EL_8
+            fi
+            
+        else
+            echo "Unsupported EL config for OS"
+            exit 1
+        fi
+    
+    elif [ $PULL_DISTRO_TYPE == "sle" ]; then
+        echo Configuring for SLE $DISTRO_VER.
+        
+         # SLES 15 configuration
+        PULLER_CONFIG_SLE="${PULLER_CONFIG_SLE:-config/sle/15.6/rocm-7.0.2-sle-15.6.config}"
+        if [[ -n $PULLER_CONFIG_SLE_15 ]]; then 
+            PULLER_CONFIG_SLE=$PULLER_CONFIG_SLE_15 
+        fi
+        
+    else
+        echo Invalid Distro Type: $PULL_DISTRO_TYPE
+        exit 1
+    fi
+}
+
 ####### Main script ###############################################################
 
 echo ============================
@@ -80,6 +147,8 @@ SUDO=$([[ $(id -u) -ne 0 ]] && echo "sudo" ||:)
 echo SUDO: $SUDO
 
 os_release
+
+configure_setup
 
 echo Running Package Puller...
 
