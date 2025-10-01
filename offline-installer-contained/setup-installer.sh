@@ -28,6 +28,7 @@ PULLER_OUTPUT_AMDGPU="../package-extractor/packages-amdgpu"
 
 # Packages list
 PULLER_PACKAGES="${PULLER_PACKAGES:-rocm rocdecode rocdecode-test rocdecode-dev rocm-validation-suite rocm-llvm-dev rocm-language-runtime rocm-opencl-runtime rocprofiler-systems rocprofiler-compute rdc rocjpeg rocjpeg-dev rocjpeg-test}"
+PULLER_PACKAGES_EL="${PULLER_PACKAGES_EL:-rocm rocdecode rocdecode-test rocdecode-devel rocm-validation-suite rocm-llvm-devel rocm-opencl-runtime rocprofiler-systems rocprofiler-compute rdc rocjpeg rocjpeg-devel rocjpeg-test}"
 PULLER_PACKAGES_SLE="${PULLER_PACKAGES_SLE:-rocm rocdecode rocdecode-test rocdecode-devel rocm-validation-suite rocm-llvm-devel rocm-opencl-runtime rocprofiler-systems rocprofiler-compute rdc rocjpeg rocjpeg-devel rocjpeg-test}"
 PULLER_PACKAGES_AMDGPU="amdgpu-dkms"
 
@@ -96,7 +97,6 @@ configure_setup() {
         if [[ $DISTRO_MAJOR_VER == 10 ]]; then
             # RHEL 10 / OL 10 configuration
             PULLER_CONFIG_EL="${PULLER_CONFIG_EL:-config/el/10/rocm-7.0.2-el10.config}"
-            PULLER_PACKAGES_EL="${PULLER_PACKAGES_EL:-rocm rocdecode rocm-validation-suite rocm-llvm-devel rocm-opencl-runtime rocprofiler-systems rocprofiler-compute rdc rocjpeg}"
             if [[ -n $PULLER_CONFIG_EL_10 ]]; then
                 PULLER_CONFIG_EL=$PULLER_CONFIG_EL_10
             fi
@@ -104,7 +104,6 @@ configure_setup() {
         elif [[ $DISTRO_MAJOR_VER == 9 ]]; then
             # RHEL 9 / OL 9 / Rocky 9 configuration
             PULLER_CONFIG_EL="${PULLER_CONFIG_EL:-config/el/9/rocm-7.0.2-el9.config}"
-            PULLER_PACKAGES_EL="${PULLER_PACKAGES_EL:-rocm rocdecode rocm-validation-suite rocm-llvm-devel rocm-opencl-runtime rocprofiler-systems rocprofiler-compute rdc rocjpeg}"
             if [[ -n $PULLER_CONFIG_EL_9 ]]; then 
                 PULLER_CONFIG_EL=$PULLER_CONFIG_EL_9
             fi
@@ -112,7 +111,6 @@ configure_setup() {
         elif [[ $DISTRO_MAJOR_VER == 8 ]]; then
             # RHEL 8 / OL 8 configuration
             PULLER_CONFIG_EL="${PULLER_CONFIG_EL:-config/el/8/rocm-7.0.2-el8.config}"
-            PULLER_PACKAGES_EL="${PULLER_PACKAGES_EL:-rocm rocdecode rocdecode-test rocdecode-devel rocm-validation-suite rocm-llvm-devel rocm-opencl-runtime rocprofiler-systems rocprofiler-compute rdc rocjpeg rocjpeg-devel rocjpeg-test}"
             if [[ -n $PULLER_CONFIG_EL_8 ]]; then 
                 PULLER_CONFIG_EL=$PULLER_CONFIG_EL_8
             fi
