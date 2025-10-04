@@ -266,10 +266,17 @@ get_version() {
     VERSION_BUILD=${DISTRO_BUILD_VERSION%%.*}
     VERSION_INSTALL=${DISTRO_VER%%.*}
     
-    if [[ $DISTRO_NAME == "debian" ]] && [[ $DISTRO_VER == 12 ]]; then
-        if [[ $VERSION_BUILD == 22 ]]; then
-            echo Using 22.04 build for debian.
-            VERSION_BUILD=12
+    if [[ $DISTRO_NAME == "debian" ]]; then
+        if [[ $DISTRO_VER == 12 ]]; then
+            if [[ $VERSION_BUILD == 22 ]]; then
+                echo Using 22.04 build for debian.
+                VERSION_BUILD=12
+            fi
+        elif [[ $DISTRO_VER == 13 ]]; then
+            if [[ $VERSION_BUILD == 24 ]]; then
+                echo Using 24.04 build for debian.
+                VERSION_BUILD=13
+            fi
         fi
     fi
     
