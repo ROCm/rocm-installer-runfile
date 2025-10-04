@@ -21,8 +21,8 @@ If all required dependencies are met, the ROCm Runfile installer can be used to 
 The ROCm Runfile installer is designed to support the follow list of Linux Distros:
 
 * Ubuntu        : `22.04, 24.04`
-* RHEL          : `8.10, 9.4, 9.6, 10`
-* Oracle Linux  : `8.10, 9.6, 10`
+* RHEL          : `8.10, 9.4, 9.6, 10.0`
+* Oracle Linux  : `8.10, 9.6, 10.0`
 * Rocky Linux   : `9.6`
 * SLES          : `15.7`
 * Debian        : `12, 13`
@@ -33,17 +33,17 @@ The ROCm Runfile installer is designed to support the follow list of Linux Distr
 
 The following packages require installation prior to building the ROCm Runfile installer.
 
-#### Ubuntu
+#### Ubuntu / Debian
 
 ``` shell
     sudo apt install -y binutils xz-utils zstd wget curl sudo rsync cmake
 ```
 
-#### RHEL
+#### RHEL / OL
 
 Install the RHEL version-specific prerequisites:
 
-Install the following for RHEL 8.x:
+Install the following for RHEL 8.x / OL 8.x:
 
 ``` shell
     sudo dnf install wget
@@ -52,12 +52,21 @@ Install the following for RHEL 8.x:
     sudo crb enable
 ```
 
-Install the following for RHEL 9.x:
+Install the following for RHEL 9.x / OL 9.x:
 
 ``` shell
     sudo dnf install wget
     wget https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
     sudo rpm -ivh epel-release-latest-9.noarch.rpm
+    sudo crb enable
+```
+
+Install the following for RHEL 10.x / OL 10.x:
+
+``` shell
+    sudo dnf install wget
+    wget https://dl.fedoraproject.org/pub/epel/epel-release-latest-10.noarch.rpm
+    sudo rpm -ivh epel-release-latest-10.noarch.rpm
     sudo crb enable
 ```
 
@@ -69,10 +78,10 @@ Install the generic RHEL x.x prerequisites
 
 #### SLES
 
-Install the following for SLES 15.6:
+Install the following for SLES 15.7:
 
 ``` shell
-    sudo SUSEConnect -p PackageHub/15.6/x86_64
+    sudo SUSEConnect -p PackageHub/15.7/x86_64
     sudo zypper install awk cmake gcc gcc-c++ sudo wget rsync
 ```
 
