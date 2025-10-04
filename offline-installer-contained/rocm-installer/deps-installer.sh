@@ -279,6 +279,18 @@ is_pkg_installable() {
     return $install_result
 }
 
+is_pkg_deb_installed() {
+    local dep="$1"
+    local install_result=0
+    
+    local status=$(dpkg-query -W -f'${Package} ${Status}\n' "$dep" 2>/dev/null  | awk '{print $4}')
+    if [[ $status != "installed" ]]; then
+        install_result=1
+    fi
+    
+    return $install_result
+}
+
 check_dep_installable() {
     echo --------------------------------------------------------------
     local testdep="$1"
@@ -423,7 +435,7 @@ check_dep_version_installed() {
         
         # first query if the dep is installed
         if [ $PACKAGE_TYPE == "deb" ]; then
-            dpkg-query -W $dep_name > /dev/null 2>&1
+            is_pkg_deb_installed "$dep_name"
         else
             # check what package provides the dep on the system
             rpm -q --whatprovides $dep_name > /dev/null 2>&1
@@ -431,7 +443,7 @@ check_dep_version_installed() {
         dep_status=$?
         
         if [ $dep_status -eq 0 ]; then
-            # the dep is currently install, get the version
+            # the dep is currently installed, get the version
             if [ $PACKAGE_TYPE == "deb" ]; then
                 current_version=$(dpkg-query -W "$dep_name" | awk '{print $2}' | cut -d '-' -f 1)
             else
@@ -480,7 +492,7 @@ check_dep_version_installed() {
         # check if non-version dep installed
         if [[ -n $dep ]]; then
             if [ $PACKAGE_TYPE == "deb" ]; then
-                dpkg-query -W $dep > /dev/null 2>&1
+                is_pkg_deb_installed "$dep"
             else
                 rpm -q --whatprovides $dep > /dev/null 2>&1
                 if [[ $? -ne 0 ]]; then
