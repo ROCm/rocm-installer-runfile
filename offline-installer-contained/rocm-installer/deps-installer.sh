@@ -548,27 +548,17 @@ check_installed_dep_packages() {
         DEPS_COUNT=$((DEPS_COUNT+1))
         DEPS+="$pkg "
         
-        # check if the dep has multiple deps separated by "|"
-        if echo "$pkg" | grep -q '|'; then
-        
-            dep1=$(echo "$pkg" | cut -d '|' -f 1 | sed 's/^ *//;s/ *$//')
-            dep2=$(echo "$pkg" | cut -d '|' -f 2 | sed 's/^ *//;s/ *$//')
-            dep3=$(echo "$pkg" | cut -d '|' -f 3 | sed 's/^ *//;s/ *$//')
-
-            check_dep_version_installed "$dep1"
-            status1=$?
-            
-            check_dep_version_installed "$dep2"
-            status2=$?
-            
-            check_dep_version_installed "$dep3"
-            status3=$?
-            
-            if [[ $status1 -eq 0 || $status2 -eq 0|| $status3 -eq 0 ]]; then
-                status=0
-            else
-                status=1
-            fi
+        if [[ "$pkg" == *'|'* ]]; then
+            status=1
+            IFS='|' read -ra deps <<< "$pkg"
+            for dep in "${deps[@]}"; do
+                dep_trimmed=$(echo "$dep" | sed 's/^ *//;s/ *$//')
+                check_dep_version_installed "$dep_trimmed"
+                if [[ $? -eq 0 ]]; then
+                    status=0
+                    break
+                fi
+            done
             
         else
             # check a single dep
