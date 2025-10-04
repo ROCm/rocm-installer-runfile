@@ -52,7 +52,7 @@ Install the following for RHEL 8.x / OL 8.x:
     sudo crb enable
 ```
 
-Install the following for RHEL 9.x / OL 9.x:
+Install the following for RHEL 9.x / OL 9.x / Rocky 9.x:
 
 ``` shell
     sudo dnf install wget
