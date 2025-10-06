@@ -15,4 +15,13 @@ pipeline {
             }
         }
     }
+    post {
+        failure {
+            script {
+                if (env.BRANCH_NAME == "develop") {
+                    emailext body: "Job failure on build URL: ${env.JOB_URL}${env.BUILD_NUMBER}", subject: "[Runfile CI/CD]: Job Failure on ${env.JOB_NAME} #${env.BUILD_NUMBER}", from: 'noreply@amd.com', to: "parag.bhandari@amd.com,david.bielecki@amd.com,lsudarsh@amd.com,ocherkay@amd.com"
+                }
+            }
+        }
+    }
 }
