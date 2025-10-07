@@ -119,10 +119,21 @@ install_deps() {
 
     	$SUDO dnf clean all
     	$SUDO rm -rf /var/cache/dnf/*
-    
-    	$SUDO dnf install -y libva-amdgpu-devel mesa-amdgpu-va-drivers
-    	$SUDO dnf install -y libva-utils
     	
+    	$SUDO dnf install -y mesa-amdgpu-va-drivers
+    	
+        # check if the libva-amdgpu-devel package is available and install it
+        dnf info libva-amdgpu-devel >/dev/null 2>&1
+        if [[ $? -eq 0 ]]; then
+            $SUDO dnf install -y libva-amdgpu-devel
+    	fi
+    	
+    	# check if the libva-utils package is available and install it
+    	dnf info libva-utils >/dev/null 2>&1
+        if [[ $? -eq 0 ]]; then
+            $SUDO dnf install -y libva-utils
+        fi
+        
     elif [ $DISTRO_PACKAGE_MGR == "zypper" ]; then
         $SUDO zypper install cmake ffmpeg-4-libavcodec-devel ffmpeg-4-libavformat-devel ffmpeg-4-libavutil-devel
        
