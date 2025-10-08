@@ -77,9 +77,7 @@ install_deps() {
 
             $SUDO dnf install -y https://download1.rpmfusion.org/free/el/rpmfusion-free-release-8.noarch.rpm
             $SUDO dnf install -y https://download1.rpmfusion.org/nonfree/el/rpmfusion-nonfree-release-8.noarch.rpm
-            $SUDO dnf install -y cmake gcc-c++ ffmpeg ffmpeg-devel
-            $SUDO dnf install -y mpg123-libs
-            
+            $SUDO dnf install -y cmake gcc-c++ ffmpeg ffmpeg-devel mpg123-libs libva-utils
             $SUDO dnf install -y gcc-toolset-11
             
             source ../package-puller/config/el/8/rocm-$ROCM_VER-el8.config
@@ -89,8 +87,7 @@ install_deps() {
 	        
             $SUDO dnf install -y https://download1.rpmfusion.org/free/el/rpmfusion-free-release-9.noarch.rpm
             $SUDO dnf install -y https://download1.rpmfusion.org/nonfree/el/rpmfusion-nonfree-release-9.noarch.rpm
-            $SUDO dnf install -y cmake gcc-c++ ffmpeg ffmpeg-devel
-            $SUDO dnf install -y mpg123-libs
+            $SUDO dnf install -y cmake gcc-c++ ffmpeg ffmpeg-devel mpg123-libs libva-utils
 
             source ../package-puller/config/el/9/rocm-$ROCM_VER-el9.config
 	        
@@ -99,8 +96,7 @@ install_deps() {
 	        
             $SUDO dnf install -y https://download1.rpmfusion.org/free/el/rpmfusion-free-release-10.noarch.rpm
             $SUDO dnf install -y https://download1.rpmfusion.org/nonfree/el/rpmfusion-nonfree-release-10.noarch.rpm
-            $SUDO dnf install -y cmake gcc-c++ ffmpeg ffmpeg-devel
-            $SUDO dnf install -y mpg123-libs
+            $SUDO dnf install -y cmake gcc-c++ ffmpeg ffmpeg-devel mpg123-libs
 
             source ../package-puller/config/el/10/rocm-$ROCM_VER-el10.config
 	    
@@ -119,18 +115,21 @@ install_deps() {
 
     	$SUDO dnf clean all
     	$SUDO rm -rf /var/cache/dnf/*
-    
-    	$SUDO dnf install -y libva-amdgpu-devel mesa-amdgpu-va-drivers
-    	$SUDO dnf install -y libva-utils
     	
+    	$SUDO dnf install -y mesa-amdgpu-va-drivers
+    	
+        # check if the libva-amdgpu-devel package is available and install it
+        dnf info libva-amdgpu-devel >/dev/null 2>&1
+        if [[ $? -eq 0 ]]; then
+            $SUDO dnf install -y libva-amdgpu-devel
+    	fi
+        
     elif [ $DISTRO_PACKAGE_MGR == "zypper" ]; then
-        $SUDO zypper install cmake ffmpeg-4-libavcodec-devel ffmpeg-4-libavformat-devel ffmpeg-4-libavutil-devel
+        $SUDO zypper install -y cmake ffmpeg-4-libavcodec-devel ffmpeg-4-libavformat-devel ffmpeg-4-libavutil-devel libva-utils
        
         python3 -m pip install pandas tabulate
        
-        if [[ $DISTRO_VER == 15.5 ]]; then
-            source ../package-puller/config/sle/15.5/rocm-$ROCM_VER-sle-15.5.config
-        elif [[ $DISTRO_VER == 15.6 ]]; then
+        if [[ $DISTRO_VER == 15.6 ]]; then
             source ../package-puller/config/sle/15.6/rocm-$ROCM_VER-sle-15.6.config
         elif [[ $DISTRO_VER == 15.7 ]]; then
             source ../package-puller/config/sle/15.6/rocm-$ROCM_VER-sle-15.6.config
@@ -146,8 +145,17 @@ install_deps() {
 
         $SUDO zypper clean
         $SUDO zypper --gpg-auto-import-keys refresh
-       
-        $SUDO zypper install -y libva-amdgpu-devel mesa-amdgpu-va-drivers
+        
+        $SUDO zypper install -y mesa-amdgpu-va-drivers
+        
+        # install libva-amdgpu-devel for rocm 7.0.1 or eariler
+        if [[ $ROCM_VER_MAJOR -lt 7 ]]; then
+            $SUDO zypper install libva-amdgpu-devel
+        elif [[ $ROCM_VER_MAJOR -eq 7 ]] && [[ $ROCM_VER_MINOR -eq 0 ]] && [[ $ROCM_VER_PATCH -lt 2 ]]; then
+            $SUDO zypper install libva-amdgpu-devel
+        else
+            echo Not installing libva-amdgpu-devel.
+        fi
        
     else
         echo Unsupported Distro.
@@ -202,12 +210,12 @@ setup_rocm() {
     local rocm_ver_name=$(basename "$ROCM_DIR")
     ROCM_VER=${rocm_ver_name#rocm-}
     
-    local VER_MAJ=${ROCM_VER:0:1}
-    local VER_MIN=${ROCM_VER:2:1}
-    local VER_MIN_MIN=${ROCM_VER:4:1}
+    ROCM_VER_MAJOR=${ROCM_VER:0:1}
+    ROCM_VER_MINOR=${ROCM_VER:2:1}
+    ROCM_VER_PATCH=${ROCM_VER:4:1}
 
-    if [[ "$VER_MIN_MIN" == "0" || "$VER_MIN_MIN" == "00" ]]; then
-        ROCM_VER=$VER_MAJ.$VER_MIN
+    if [[ "$ROCM_VER_PATCH" == "0" || "$ROCM_VER_PATCH" == "00" ]]; then
+        ROCM_VER=$ROCM_VER_MAJOR.$ROCM_VER_MINOR
     fi
     
     echo "ROCM_VER = $ROCM_VER"
@@ -230,7 +238,7 @@ test_va() {
     echo ------------------------------------------------------
     
     # libva info
-    vainfo
+    vainfo --display drm
 }
 
 test_samples() {
