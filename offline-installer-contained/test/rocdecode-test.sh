@@ -125,7 +125,7 @@ install_deps() {
     	fi
         
     elif [ $DISTRO_PACKAGE_MGR == "zypper" ]; then
-        $SUDO zypper install -y cmake ffmpeg-4-libavcodec-devel ffmpeg-4-libavformat-devel ffmpeg-4-libavutil-devel libva-utils
+        $SUDO zypper install -y cmake ffmpeg-4-libavcodec-devel ffmpeg-4-libavformat-devel ffmpeg-4-libavutil-devel libva-utils libstdc++-devel
        
         python3 -m pip install pandas tabulate
        
