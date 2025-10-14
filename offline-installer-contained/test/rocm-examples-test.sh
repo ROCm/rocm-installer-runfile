@@ -162,8 +162,8 @@ install_deps() {
         fi
         
     elif [ $DISTRO_PACKAGE_MGR == "zypper" ]; then
-        $SUDO zypper install -y git libglfw-devel gcc14-c++
-        
+        $SUDO zypper install -y git libglfw-devel gcc14-c++ vulkan-tools vulkan-devel vulkan-validationlayers shaderc
+        install_glslang
         if [[ $DISTRO_VER == 15.5 ]]; then
             $SUDO pip install cmake
         else
