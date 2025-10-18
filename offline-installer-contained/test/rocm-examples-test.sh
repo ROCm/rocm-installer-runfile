@@ -73,11 +73,11 @@ os_release() {
 install_glslang() {
     echo ------------------------------------------------------
     echo Install glslang...
-    
+
     if [ -d glslang ]; then
         $SUDO rm -r glslang
     fi
-    
+
     # glslang is not available from repos, build from source
     git clone https://github.com/KhronosGroup/glslang.git
     cd glslang
@@ -85,8 +85,37 @@ install_glslang() {
     cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$(pwd)/install"
     cd build
     make -j$(nproc) install
-    
+
+    cd ..
+    export PATH="$PATH:$(pwd)/install/bin"
+    cd ..
+
     echo Install glslang...Complete.
+}
+
+install_shaderc() {
+    echo ------------------------------------------------------
+    echo Install shaderc...
+
+    if [ -d shaderc ]; then
+        $SUDO rm -r shaderc
+    fi
+
+    # shaderc is not available from repos, build from source
+    git clone https://github.com/google/shaderc
+    cd shaderc
+    ./utils/git-sync-deps
+    mkdir build
+    cd build
+    # workaround for gcc 8 in rhel 8.10
+    cmake -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD_LIBRARIES="-lstdc++fs" .. 
+    ninja
+
+    cd ..
+    export PATH="$PATH:$(pwd)/build/glslc"
+    cd ..
+
+    echo Install shaderc...Complete.
 }
 
 install_deps() {
@@ -110,9 +139,10 @@ install_deps() {
 
         if [[ $DISTRO_VER == 8* ]]; then
             echo Installing deps for ${DISTRO_NAME}8...
-            $SUDO dnf install -y gcc-c++ git cmake glfw-devel vulkan-headers vulkan-loader vulkan-validation-layers mesa-libGL-devel
-            $SUDO dnf install -y gcc-toolset-11
+            $SUDO dnf install -y gcc-c++ git cmake glfw-devel vulkan-headers vulkan-loader-devel vulkan-validation-layers mesa-libGL-devel
+            $SUDO dnf install -y gcc-toolset-11 ninja-build
             install_glslang
+            install_shaderc
 
         elif [[ $DISTRO_VER == 9* ]]; then
             echo Installing deps for ${DISTRO_NAME}9...
@@ -132,8 +162,8 @@ install_deps() {
         fi
         
     elif [ $DISTRO_PACKAGE_MGR == "zypper" ]; then
-        $SUDO zypper install -y git libglfw-devel gcc14-c++
-        
+        $SUDO zypper install -y git libglfw-devel gcc14-c++ vulkan-tools vulkan-devel vulkan-validationlayers shaderc
+        install_glslang
         if [[ $DISTRO_VER == 15.5 ]]; then
             $SUDO pip install cmake
         else
