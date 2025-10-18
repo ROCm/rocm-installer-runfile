@@ -387,9 +387,9 @@ For example, to enable ROCm post-installation configuration for a ROCm installat
 bash rocm-installer.run target="/" rocm postrocm
 ```
 
-In cases where the **postrocm** is not included in the install command for ROCm, the post-install can still be run separately after install.  To run post installation of ROCm from the command-line, use the **postrocm** argument in conjunction with **target=rocm-install-path** where **rocm-install-path** is the location of the version-specific ROCm installation for the used runfile installer.  For example, if the current runfile installer is for ROCm 7.1, then the **rocm-install-path** must be the path to a ROCm 7.1 runfile installation.
+In cases where the **postrocm** is not included in the install command for ROCm, the post-install can still be run separately after install.  To run post installation of ROCm from the command-line, use the **postrocm** argument in conjunction with **target=rocm-install-path** where **rocm-install-path** is the location of the version-specific ROCm installation for the used runfile installer.  For example, if the current runfile installer is for ROCm 7.1.0, then the **rocm-install-path** must be the path to a ROCm 7.1.0 runfile installation.
 
-To use the **postrocm** argument separately from the initial install of ROCm 7.1 to **/home/amd/myrocm** the command-line is as follows:
+To use the **postrocm** argument separately from the initial install of ROCm 7.1.0 to **/home/amd/myrocm** the command-line is as follows:
 
 ``` shell
 bash rocm-installer.run target="/home/amd/myrocm/rocm-7.1.0" postrocm
