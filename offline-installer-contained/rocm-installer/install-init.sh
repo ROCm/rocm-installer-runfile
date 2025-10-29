@@ -54,22 +54,26 @@ os_release() {
         . /etc/os-release
 
         DISTRO_NAME=$ID
-        DISTRO_VER=$(awk -F= '/^VERSION_ID=/{print $2}' /etc/os-release | tr -d '"')
 
         case "$ID" in
         ubuntu)
+            DISTRO_VER=$(awk -F= '/^VERSION_ID=/{print $2}' /etc/os-release | tr -d '"')
             echo "Installer running on Ubuntu $DISTRO_VER."
             ;;
         debian)
+            DISTRO_VER=$(awk -F= '/^VERSION_ID=/{print $2}' /etc/os-release | tr -d '"')
             echo "Installer running on Debian $DISTRO_VER."
             ;;
         rhel)
+            DISTRO_VER=$(awk -F= '/^VERSION_ID=/{print $2}' /etc/os-release | tr -d '"')
             echo "Installer running on RHEL $DISTRO_VER."
             ;;
         ol)
+            DISTRO_VER=$(awk -F= '/^VERSION_ID=/{print $2}' /etc/os-release | tr -d '"')
             echo "Installer running on Oracle Linux $DISTRO_VER."
             ;;
         rocky)
+            DISTRO_VER=$(awk -F= '/^VERSION_ID=/{print $2}' /etc/os-release | tr -d '"')
             echo "Installer running on Rocky Linux $DISTRO_VER."
             
             # Rocky 9 support only
@@ -80,7 +84,14 @@ os_release() {
             
             ;;
         sles)
+            if rpm -qa | grep -q "awk"; then
+                DISTRO_VER=$(awk -F= '/^VERSION_ID=/{print $2}' /etc/os-release | tr -d '"')
+            else
+                DISTRO_VER=$(grep '^VERSION_ID=' /etc/os-release | cut -d'=' -f2 | tr -d '"')
+            fi
+
             echo "Installer running on SLES $DISTRO_VER."
+
             ;;
         *)
             echo "$ID is not a supported OS"
