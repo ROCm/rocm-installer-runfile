@@ -228,7 +228,7 @@ is_pkg_installable_deb() {
     install_result=$?
     
     # if the dep is a virtual package - check for the virtual package
-    if [[ install_result -eq 0 ]]; then
+    if [[ $install_result -eq 0 ]]; then
         print_str "Checking for virtual package."
         
         if ! $DISTRO_CACHE_CHK $dep 2>&1 | grep -q "Package"; then
@@ -236,6 +236,11 @@ is_pkg_installable_deb() {
             check_virtual_package_deb "$dep"
             install_result=$?
         fi
+    fi
+    
+    # get the version of the installable package
+    if [[ $install_result -eq 0 ]]; then
+        INSTALL_VER=$(apt-cache show $dep 2>/dev/null | grep -m1 "^Version:" | awk '{print $2}' | cut -d'-' -f1)
     fi
     
     return $install_result
@@ -249,13 +254,22 @@ is_pkg_installable_rpm() {
     install_result=$?
     
     # if the dep is a virtual package - check for the virtual package
-    if [[ install_result -ne 0 ]]; then
+    if [[ $install_result -ne 0 ]]; then
         if [[ -n $DISTRO_VIRTUAL_CHK ]]; then
             print_str "Base package not found.  Checking for virtual package."
             print_str "$DISTRO_VIRTUAL_CHK: $dep" 1
             
             eval "$DISTRO_VIRTUAL_CHK $dep $NO_CMD_OUTPUT"
             install_result=$?
+        fi
+    fi
+    
+    # get the version of the installable package
+    if [[ $install_result -eq 0 ]]; then
+        if [ $DISTRO_PACKAGE_MGR == "dnf" ]; then
+            INSTALL_VER=0 #$($DISTRO_CACHE_CHK $dep | grep -m1 "^Version" | awk '{print $3}')
+        else
+            INSTALL_VER=$(zypper info $dep 2>/dev/null | grep -m1 "^Version" | awk '{print $3}')
         fi
     fi
     
@@ -283,10 +297,40 @@ is_pkg_deb_installed() {
     local dep="$1"
     local install_result=0
     
-    local status=$(dpkg-query -W -f'${Package} ${Status}\n' "$dep" 2>/dev/null  | awk '{print $4}')
+    print_str "is_pkg_deb_installed: dep = $dep" 4
+    
+    local status=$(dpkg-query -W -f'${Package}:${Architecture} ${Status}\n' "$dep" 2>/dev/null | grep -E ':amd64|:all' | awk '{print $4}')
     if [[ $status != "installed" ]]; then
-        install_result=1
+    
+        # if the package is not installed, check if it's installed via a virtual package
+        dpkg-query -W -f='${Package} ${Provides}\n' '*' | grep $dep | grep -v "^$dep " > /dev/null 2>&1
+        install_result=$?
+        
+        if [[ $install_result -eq 0 ]]; then
+           echo "Virtual packages may be installed for $dep."
+           
+           check_virtual_package_deb "$dep"
+           install_result=$?
+        fi
+        
     fi
+    
+    return $install_result
+}
+
+is_pkg_rpm_installed() {
+    local dep="$1"
+    local install_result=0
+    
+    print_str "is_pkg_rpm_installed : dep = $dep" 4
+    
+    rpm -q --whatprovides $dep > /dev/null 2>&1
+    if [[ $? -ne 0 ]]; then
+       print_str "check by package name: $dep" 4
+       # check if the dep is installed by package name
+       rpm -q $dep > /dev/null 2>&1
+    fi
+    install_result=$?
     
     return $install_result
 }
@@ -296,6 +340,8 @@ check_dep_installable() {
     local testdep="$1"
     
     local installable=""
+    local dep=""
+    local dep_version=""
     local result=1
     
     # remove any leading space
@@ -320,17 +366,19 @@ check_dep_installable() {
                 
                 # remove versioning
                 if [ $PACKAGE_TYPE == "deb" ]; then
-                    local dep=$(echo $pkg | sed -E 's/\([><!=]*[0-9.]*\)//g')
+                    dep=$(echo $pkg | sed -E 's/\([><!=]*[0-9.]*\)//g')
+                    dep_version=$(echo "$pkg" | grep -oE '[0-9.]+')
                 else
-                    local dep=$(echo $pkg | sed -E 's/[><=!]=?[0-9.]+//g')
+                    dep=$(echo $pkg | sed -E 's/[><=!]=?[0-9.]+//g')
+                    dep_version=$(echo "$pkg" | grep -oE '[0-9.]+')
                 fi
-                print_str "removed version: $dep"
+                print_str "Name/Ver: $dep | $dep_version"
                 
                 is_pkg_installable "$dep"
                 result=$?
                 
-                if [[ result -eq 0 ]]; then
-                    echo -e "\e[32m$pkg installable\e[0m"
+                if [[ $result -eq 0 ]]; then
+                    echo -e "\e[32m$pkg installable : $INSTALL_VER\e[0m"
                     installable="$dep"
                     break;    # may want to select an amd package if available over any other
                 else
@@ -348,8 +396,8 @@ check_dep_installable() {
             is_pkg_installable "$dep"
             result=$?
             
-            if [[ result -eq 0 ]]; then
-                echo -e "\e[32m$dep installable\e[0m"
+            if [[ $result -eq 0 ]]; then
+                echo -e "\e[32m$dep installable : $INSTALL_VER\e[0m"
                 installable="$dep"
             else
                 echo $pkg cannot be installed.
@@ -357,7 +405,7 @@ check_dep_installable() {
         fi
         
         # if any dependency is not installable, fail since the package will not be resolved
-        if [[ result -ne 0 ]]; then
+        if [[ $result -ne 0 ]]; then
             print_err "Dependency list cannot be installed."
             cleanup
             exit 1
@@ -438,21 +486,21 @@ check_dep_version_installed() {
             is_pkg_deb_installed "$dep_name"
         else
             # check what package provides the dep on the system
-            rpm -q --whatprovides $dep_name > /dev/null 2>&1
+            is_pkg_rpm_installed "$dep_name"
         fi
         dep_status=$?
         
         if [ $dep_status -eq 0 ]; then
             # the dep is currently installed, get the version
             if [ $PACKAGE_TYPE == "deb" ]; then
-                current_version=$(dpkg-query -W "$dep_name" | awk '{print $2}' | cut -d '-' -f 1)
+                current_version=$(dpkg-query -W "$dep_name" | head -1 | awk '{print $2}' | cut -d '-' -f 1 | sed 's/[.+][^.+]*$//')
             else
                 current_version=$(rpm -q --queryformat '%{VERSION}' "$dep_name")
             fi
             dep_status=$?
             
             # check for an error on rpm -q : an error may be due a virtual package
-            if [[ dep_status -ne 0 ]] && [[ $PACKAGE_TYPE == "rpm" ]]; then
+            if [[ $dep_status -ne 0 ]] && [[ $PACKAGE_TYPE == "rpm" ]]; then
                 dep_name_v=$(rpm -q --whatprovides $dep_name)
                 echo "$dep_name -> $dep_name_v <v>"
                 
@@ -494,12 +542,7 @@ check_dep_version_installed() {
             if [ $PACKAGE_TYPE == "deb" ]; then
                 is_pkg_deb_installed "$dep"
             else
-                rpm -q --whatprovides $dep > /dev/null 2>&1
-                if [[ $? -ne 0 ]]; then
-                   print_str "check by package name" 4
-                   # check if the dep is installed by package name
-                   rpm -q $dep > /dev/null 2>&1
-                fi
+                is_pkg_rpm_installed "$dep"
             fi
             dep_status=$?
             
