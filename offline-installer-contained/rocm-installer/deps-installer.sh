@@ -40,6 +40,8 @@ DEPS_LIST_ONLY=0
 PROMPT_USER=0
 VERBOSE=0
 
+INSTALLABLE_PKG_CACHE=
+
 NO_CMD_OUTPUT="> /dev/null 2>&1"
 
 GCC_TOOLSET_PACKAGES_OL=(gcc-toolset-11-gcc gcc-toolset-11-gcc-c++ gcc-toolset-11-gcc-gfortran gcc-toolset-11-libquadmath-devel gcc-toolset-11-libstdc++-devel gcc-toolset-11-gcc-gdb-plugin)
@@ -246,11 +248,110 @@ is_pkg_installable_deb() {
     return $install_result
 }
 
+get_dep_from_cache() {
+    local dep="$1"
+    
+    if [[ -z "$dep" ]]; then
+        return 1
+    fi
+    
+    local entry=$(echo "$INSTALLABLE_PKG_CACHE" | grep "^$dep,")
+    
+    if [[ -n "$entry" ]]; then
+        DEPS_INTS_NAME=$(echo "$entry" | cut -d',' -f1)
+        DEPS_INST_VER=$(echo "$entry" | cut -d',' -f2)
+        return 0
+    else
+        DEPS_INTS_NAME=""
+        DEPS_INST_VER=""
+        return 1
+    fi
+}
+
+check_pkg_cache() {
+    print_str "Checking: package cache for $1" 1
+    
+    local pkg=$1
+    local pkg_cached=1
+    
+    if [[ -z $INSTALLABLE_PKG_CACHE ]]; then
+        # No cache available
+        return 1
+    fi
+    
+    get_dep_from_cache "$pkg"
+    if [[ $? -eq 0 ]]; then
+        print_str "Package : $DEPS_INTS_NAME | $DEPS_INST_VER (cache)" 2
+        pkg_cached=0
+    else
+        print_str "Package : $pkg not found in cache."
+    fi
+    
+    return $pkg_cached
+}
+
+build_installable_pkg_cache_dnf() {
+    echo "------------------------------------"
+    echo "Building dnf installable cache..."
+    
+    PACKAGE_DEP_LIST=""
+    
+    if [[ -n $MISSING_DEPS ]]; then
+        # Build a list of all the potential deps that are missing, removing all versioning/multiple deps etc.
+        IFS=',' read -ra package_array <<< "$MISSING_DEPS"
+        
+        for pkg in "${package_array[@]}"; do
+           testdep=$(echo "$pkg" | sed 's/^ *//')
+           
+           # check for a multi-option dependency
+            if echo "$testdep" | grep -q '|'; then
+            
+                # build the list of packages removing all spaces and replacing "|" with spaces
+                deplist=$(echo "$testdep" | tr -d ' ' | tr '|' ' ')
+                
+                for pkg in $deplist; do
+                    print_str "+++++++++++++++++++++"
+                    print_str "Checking: $pkg"
+                    
+                    # remove versioning
+                    if [ $PACKAGE_TYPE == "deb" ]; then
+                        dep=$(echo $pkg | sed -E 's/\([><!=]*[0-9.]*\)//g')
+                        dep_version=$(echo "$pkg" | grep -oE '[0-9.]+')
+                    else
+                        dep=$(echo $pkg | sed -E 's/[><=!]=?[0-9.]+//g')
+                        dep_version=$(echo "$pkg" | grep -oE '[0-9.]+')
+                    fi
+                    print_str "Name/Ver: $dep | $dep_version"
+                    PACKAGE_DEP_LIST+="$dep "
+                done
+                
+            else
+                print_str "Processing single-option dep..."
+                VIRTUAL_PACKAGE=""
+            
+                # single dependency check
+                dep=$(echo "$testdep" | awk '{print $1}')
+                PACKAGE_DEP_LIST+="$dep "
+            fi
+        done
+        
+        # query the dnf cache for the list of packages available for install using the full missing deps list
+        INSTALLABLE_PKG_CACHE=$($DISTRO_CACHE_CHK $PACKAGE_DEP_LIST | grep -E "^(Name|Version)" | sed 'N;s/Name *: *\(.*\)\nVersion *: *\(.*\)/\1,\2/' | sort -u)
+         
+        echo ----------------------
+        echo $INSTALLABLE_PKG_CACHE
+        echo ----------------------
+    fi
+    
+    echo "Building dnf installable cache...Complete."
+}
+
 is_pkg_installable_rpm() {
     local dep="$1"
     local install_result=0
     
-    eval "$DISTRO_CACHE_CHK $dep $NO_CMD_OUTPUT"
+    # first check for the dep in the installable package cache
+    check_pkg_cache $dep
     install_result=$?
     
     # if the dep is a virtual package - check for the virtual package
@@ -267,7 +368,7 @@ is_pkg_installable_rpm() {
     # get the version of the installable package
     if [[ $install_result -eq 0 ]]; then
         if [ $DISTRO_PACKAGE_MGR == "dnf" ]; then
-            INSTALL_VER=0 #$($DISTRO_CACHE_CHK $dep | grep -m1 "^Version" | awk '{print $3}')
+            INSTALL_VER=$DEPS_INST_VER
         else
             INSTALL_VER=$(zypper info $dep 2>/dev/null | grep -m1 "^Version" | awk '{print $3}')
         fi
@@ -279,8 +380,6 @@ is_pkg_installable_rpm() {
 is_pkg_installable() {
     local dep="$1"
     local install_result=0
-    
-    print_str "$DISTRO_CACHE_CHK: $dep" 1
     
     if [ $DISTRO_PACKAGE_MGR == "apt" ]; then
         is_pkg_installable_deb "$dep"
@@ -529,7 +628,7 @@ check_dep_version_installed() {
             elif [[ $comparison_result -eq 1 ]]; then
                 print_str "    current_version $current_version is greater"
             else
-                print_str "    current_version $current_version is less"
+                 echo -e "\e[31m$dep_name current_version $current_version is less\e[0m"
                 dep_status=1
             fi
         else
@@ -1224,6 +1323,9 @@ install_dependencies() {
     
     INSTALL_LIST=
     
+    # remove trailing space
+    MISSING_DEPS="${MISSING_DEPS% }"
+    
     if [ $DISTRO_PACKAGE_MGR == "apt" ]; then
         echo Updating apt cache.
         $SUDO apt-get update > /dev/null 2>&1
@@ -1240,6 +1342,9 @@ install_dependencies() {
         echo Updating dnf cache.
         $SUDO dnf makecache > /dev/null 2>&1
         
+        # build a cache of installable packages based on the missing deps
+        build_installable_pkg_cache_dnf
+        
     else
         # add the required repos for sles
         install_repos_sle
@@ -1247,9 +1352,6 @@ install_dependencies() {
         echo Updating zypper cache.
         $SUDO zypper refresh > /dev/null 2>&1
     fi
-    
-    # remove trailing space
-    MISSING_DEPS="${MISSING_DEPS% }"
     
     # test if each dependency is available for install 
     IFS=',' read -ra package_array <<< "$MISSING_DEPS"
