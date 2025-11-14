@@ -205,6 +205,7 @@ os_release() {
             INSTALL_SCRIPTLET_ARG="configure"
             UNINSTALL_SCRIPTLET_ARG="remove"
             PKG_INSTALLED_CMD="apt list --installed"
+            UPDATE_INITRAMFS_CMD="update-initramfs -u -k all"
             ;;
         rhel|ol|rocky)
             DISTRO_VER=$(awk -F= '/^VERSION_ID=/{print $2}' /etc/os-release | tr -d '"')
@@ -217,6 +218,7 @@ os_release() {
             INSTALL_SCRIPTLET_ARG="1"
             UNINSTALL_SCRIPTLET_ARG="0"
             PKG_INSTALLED_CMD="rpm -qa"
+            UPDATE_INITRAMFS_CMD="dracut -f --regenerate-all"
             	    
             if ! rpm -qa | grep -qE "ncurses-[0-9]"; then
                 NCURSES_BAR=0
@@ -233,6 +235,7 @@ os_release() {
             INSTALL_SCRIPTLET_ARG="1"
             UNINSTALL_SCRIPTLET_ARG="0"
             PKG_INSTALLED_CMD="rpm -qa"
+            UPDATE_INITRAMFS_CMD="dracut -f --regenerate-all"
             ;;
         *)
             echo "$ID is not a supported OS"
@@ -1332,10 +1335,9 @@ preinstall_amdgpu() {
         query_prev_driver_version
 
         if [ ! $INSTALLED_AMDGPU_DKMS_BUILD_NUM = 0 ] ; then
-            print_err "amdgpu driver installed, version $INSTALLED_AMDGPU_DKMS_BUILD_NUM"
-            echo "Please uninstall previous version of amdgpu using the Runfile installer."
+            print_warning "The amdgpu driver installed, version $INSTALLED_AMDGPU_DKMS_BUILD_NUM"
+            echo "Consider uninstalling previous versions of amdgpu using the Runfile installer."
             echo "Usage: bash $PROG uninstall-amdgpu"
-            exit 1
         fi
     else
         print_err "dkms package not installed."
@@ -1504,6 +1506,9 @@ uninstall_amdgpu() {
 
         uninstall_postrm_scriptlet $compo
     done
+
+    # Update initramfs for all kernels
+    $SUDO $UPDATE_INITRAMFS_CMD
 
     echo "PRERM_COUNT  = $PRERM_COUNT"
     echo "POSTRM_COUNT = $POSTRM_COUNT"

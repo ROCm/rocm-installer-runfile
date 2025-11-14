@@ -944,7 +944,7 @@ get_kernel_packages_rocky() {
 
 get_kernel_packages_el() {
     echo EL kernel packages...
-    
+
     if [[ $DEPS_LIST_ONLY == 0 ]]; then
         dnf list "kernel-headers-$KERNEL_VER" &> /dev/null
         if [ $? -eq 0 ]; then
@@ -976,18 +976,25 @@ get_kernel_packages_el() {
     REMOVE_PACKAGES="kernel-headers"
 }
 
+get_kernel_type_ol() {
+    local kernel_version=$(uname -r)
+
+    if [[ $kernel_version == *"uek"* ]]; then
+        echo "UEK"
+    elif [[ $kernel_version == *"el8"* || $kernel_version == *"el9"* || $kernel_version == *"el10"* ]]; then
+        echo "RHCK"
+    else
+        echo "UNKNOWN"
+    fi
+}
+
 get_kernel_packages_ol() {
     echo OL kernel packages...
 
-    # RHCK kernels
-    local rhck_kernels=$(rpm -q kernel | sed 's/kernel-//g')
-    
-    echo "uek kernel : $KERNEL_VER"
-    for kernel_version in $rhck_kernels; do
-        echo "rhck kernel: $kernel_version"
-    done
-    
-    if [[ $DEPS_LIST_ONLY == 0 ]]; then
+    kernel_type=$(get_kernel_type_ol)
+    echo "Current kernel type: $kernel_type"
+
+    if [[ $kernel_type == "UEK" ]]; then
 
         # check for the uek kernel packages
         dnf list "kernel-uek-devel-$KERNEL_VER" &> /dev/null
@@ -997,38 +1004,25 @@ get_kernel_packages_ol() {
         else
             echo -e "\e[93mKernel Packages for UEK not available in the repositories.  Using defaults.\e[0m"
         fi
-
+    elif [[ $kernel_type == "RHCK" ]]; then
         # check for the rhck kernel packages
-        for kernel_version in $rhck_kernels; do
-            dnf list "kernel-headers-$kernel_version" &> /dev/null
-            if [[ $? -eq 0 ]]; then
-                echo "Kernel Packages for RHCK $kernel_version are available in the repositories."
-                KERNEL_PACKAGES+="kernel-headers-$kernel_version kernel-devel-$kernel_version "
-                if [[ $DISTRO_VER == 9* ]]; then
-                    echo Adding EL9 amdgpu packages
-                    KERNEL_PACKAGES+="kernel-devel-matched-$kernel_version "
-                elif [[ $DISTRO_VER == 10* ]]; then
-                    echo Adding EL10 amdgpu packages
-                    KERNEL_PACKAGES+="kernel-devel-matched-$kernel_version "
-                fi
-            else
-                echo -e "\e[93mKernel Packages for RHCK not available in the repositories.  Using defaults.\e[0m"
-            fi
-        done
-
-    else
-        KERNEL_PACKAGES+="kernel-uek-devel-$KERNEL_VER "
-
-        for kernel_version in $rhck_kernels; do
-            KERNEL_PACKAGES+="kernel-headers-$kernel_version kernel-devel-$kernel_version "
+        dnf list "kernel-headers-$KERNEL_VER" &> /dev/null
+        if [[ $? -eq 0 ]]; then
+            echo "Kernel Packages for RHCK $KERNEL_VER are available in the repositories."
+            KERNEL_PACKAGES+="kernel-headers-$KERNEL_VER kernel-devel-$KERNEL_VER "
             if [[ $DISTRO_VER == 9* ]]; then
                 echo Adding EL9 amdgpu packages
-                KERNEL_PACKAGES+="kernel-devel-matched-$kernel_version "
+                KERNEL_PACKAGES+="kernel-devel-matched-$KERNEL_VER "
             elif [[ $DISTRO_VER == 10* ]]; then
                 echo Adding EL10 amdgpu packages
-                KERNEL_PACKAGES+="kernel-devel-matched-$kernel_version "
+                KERNEL_PACKAGES+="kernel-devel-matched-$KERNEL_VER "
             fi
-        done
+        else
+            echo -e "\e[93mKernel Packages for RHCK not available in the repositories.  Using defaults.\e[0m"
+        fi
+    else
+            echo -e "\e[93mUnknown kernel type. Using defaults.\e[0m"
+            KERNEL_PACKAGES+="kernel-uek-devel-$KERNEL_VER "
     fi
     
     FILTER_PACKAGES="kernel-devel"
@@ -1078,17 +1072,20 @@ get_kernel_package_for_kernel_version() {
 
 get_kernel_packages() {
     echo "------------------------------------"
-    
+
     # set the kernel headers
     KERNEL_VER=$(uname -r)
     echo "Kernel: ${KERNEL_VER}"
-    
+
+    echo "Availaible kernels:"
+    ls -1 /boot/vmlinuz*
+
     # set the kernel packages
     if [ $DISTRO_PACKAGE_MGR == "apt" ]; then
         KERNEL_PACKAGES="linux-headers-$KERNEL_VER "
-        
+
     elif [ $DISTRO_PACKAGE_MGR == "dnf" ]; then
-    
+
         if [[ "$DISTRO_NAME" = "rhel" || "$DISTRO_NAME" = "rocky" ]]; then
             get_kernel_packages_el
         elif [ "$DISTRO_NAME" = "ol" ]; then
@@ -1096,7 +1093,7 @@ get_kernel_packages() {
         else
             get_kernel_packages_el
         fi
-        
+
     elif [ $DISTRO_PACKAGE_MGR == "zypper" ]; then
         if [[ $DEPS_LIST_ONLY == 0 ]]; then
             KERNEL_PACKAGE_VER="$(uname -r | sed "s/-default//") "
@@ -1114,14 +1111,14 @@ get_kernel_packages() {
         else
             KERNEL_PACKAGES="kernel-default-devel"
         fi
-        
+
         FILTER_PACKAGES="kernel-devel"
-        
+
     else
         print_err "Unsupported OS."
         exit 1
     fi
-    
+
     echo "KERNEL_PACKAGES = $KERNEL_PACKAGES"
 }
 
@@ -1380,7 +1377,7 @@ install_dependencies() {
         elif [ $DISTRO_PACKAGE_MGR == "dnf" ]; then
             $SUDO dnf install $installopt $INSTALL_LIST
         else
-            $SUDO zypper install "$installopt" $INSTALL_LIST
+            $SUDO zypper install --oldpackage "$installopt" $INSTALL_LIST
         fi
     fi
     
