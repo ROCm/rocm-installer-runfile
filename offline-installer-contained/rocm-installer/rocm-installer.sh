@@ -1335,8 +1335,8 @@ preinstall_amdgpu() {
         query_prev_driver_version
 
         if [ ! $INSTALLED_AMDGPU_DKMS_BUILD_NUM = 0 ] ; then
-            print_err "Warning: amdgpu driver installed, version $INSTALLED_AMDGPU_DKMS_BUILD_NUM"
-            echo "Consider to uninstall previous version of amdgpu using the Runfile installer."
+            print_warning "The amdgpu driver installed, version $INSTALLED_AMDGPU_DKMS_BUILD_NUM"
+            echo "Consider uninstalling previous versions of amdgpu using the Runfile installer."
             echo "Usage: bash $PROG uninstall-amdgpu"
         fi
     else
