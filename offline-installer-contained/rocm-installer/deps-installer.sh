@@ -326,7 +326,6 @@ build_installable_pkg_cache_dnf() {
                 done
                 
             else
-                print_str "Processing single-option dep..."
                 VIRTUAL_PACKAGE=""
             
                 # single dependency check
@@ -353,6 +352,12 @@ is_pkg_installable_rpm() {
     # first check for the dep in the installable package cache
     check_pkg_cache $dep
     install_result=$?
+    
+    # if not in the installable package cache, check the for dep directly again
+    if [[ $install_result -ne 0 ]]; then
+        eval "$DISTRO_CACHE_CHK $dep $NO_CMD_OUTPUT"
+        install_result=$?
+    fi
     
     # if the dep is a virtual package - check for the virtual package
     if [[ $install_result -ne 0 ]]; then
@@ -486,7 +491,6 @@ check_dep_installable() {
             done
             
         else
-            print_str "Processing single-option dep..."
             VIRTUAL_PACKAGE=""
         
             # single dependency check

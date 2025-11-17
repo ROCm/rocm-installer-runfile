@@ -245,6 +245,37 @@ config_create() {
     echo Create Configure...Complete.
 }
 
+setup_repo_priorities() {
+    echo Setting up repo priorities...
+    
+    # Set EPEL to exclude ROCm and HIP packages and lower priority
+    if [ -f /etc/yum.repos.d/epel.repo ]; then
+        if ! grep -q "excludepkgs=rocm" /etc/yum.repos.d/epel.repo; then
+            echo "Excluding ROCm and HIP packages from EPEL..."
+            $SUDO sed -i '/\[epel\]/a excludepkgs=rocm* hip*' /etc/yum.repos.d/epel.repo
+        fi
+        
+        if ! grep -q "priority=" /etc/yum.repos.d/epel.repo; then
+            echo "Setting EPEL priority to 10..."
+            $SUDO sed -i '/excludepkgs=rocm*/a priority=10' /etc/yum.repos.d/epel.repo
+        fi
+    fi
+    
+    # Set ROCm repo to higher priority and include ROCm and HIP packages
+    if [ -f /etc/yum.repos.d/rocm-build.repo ]; then
+        if ! grep -q "includepkgs=rocm" /etc/yum.repos.d/rocm-build.repo; then
+            echo "Including ROCm and HIP packages in rocm repo..."
+            $SUDO sed -i '/priority=1/a includepkgs=rocm* hip*' /etc/yum.repos.d/rocm-build.repo
+        fi
+    fi
+    
+    # Clear cache to apply changes
+    $SUDO dnf clean all
+    $SUDO dnf makecache > /dev/null 2>&1
+    
+    echo Setting up repo priorities...Complete.
+}
+
 setup_rocm_repo() {
     echo ++++++++++++++++++++++++++++++++
     echo Setting up ROCm repo...
@@ -256,6 +287,11 @@ setup_rocm_repo() {
     fi
     
     echo "$ROCM_REPO" | $SUDO tee -a /etc/yum.repos.d/rocm-build.repo
+    
+    # Setup repo priorities if required
+    if [[ $DISTRO_MAJOR_VER -ge 10 ]]; then
+        setup_repo_priorities
+    fi
     
      # cleanup the dnf cache
     $SUDO dnf clean all
