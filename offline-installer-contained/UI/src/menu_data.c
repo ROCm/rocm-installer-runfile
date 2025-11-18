@@ -177,6 +177,49 @@ bool is_menu_item_done_item_index(MENU_DATA *pMenuData, int listIndex, ITEM *ite
     return pMenuData->itemList[listIndex].doneItemIndex == item_index(item);
 }
 
+// Used when user selects item in menu via spacebar or enter.
+void menu_item_select(MENU_DATA *pMenuData, ITEM *pCurrentItem)
+{
+    MENU *pMenu = pMenuData->pMenu;
+
+    // Clears warning messages at the very bottom of the window.
+    clear_menu_msg(pMenuData);
+
+    // Deselect all other items if multiselection is disabled and the 
+    // new item is not currently selected.
+    if ( (!pMenuData->enableMultiSelection) && ((item_value(pCurrentItem) == FALSE)) )
+    {
+        ITEM **items = menu_items(pMenu);
+        
+        for (int i = 0; i < item_count(pMenu); i++) 
+        {
+            if (item_value(items[i]) == TRUE) 
+            {
+                set_item_value(items[i], false);
+            }
+
+            delete_menu_item_selection_mark(pMenuData, items[i]);
+        }
+
+        pMenuData->itemSelections = 0;
+    }           
+
+    // update the item selection bitfield
+    TOGGLE_BIT( (pMenuData->itemSelections), (item_index(pCurrentItem)) );
+    pMenuData->curItemSelection = (item_index(pCurrentItem));
+
+    menu_driver(pMenu, REQ_TOGGLE_ITEM);
+
+    if (item_value(pCurrentItem))
+    {
+        add_menu_item_selection_mark(pMenuData, pCurrentItem);
+    }
+    else
+    {
+        delete_menu_item_selection_mark(pMenuData, pCurrentItem);
+    }
+}
+
 void menu_loop(MENU_DATA *pMenuData)
 {
     int c;
@@ -273,42 +316,7 @@ void menu_loop(MENU_DATA *pMenuData)
                     continue;   
                 }
 
-                // Clears warning messages at the very bottom of the window.
-                clear_menu_msg(pMenuData);
-
-                // Deselect all other items if multiselection is disabled and the 
-                // new item is not currently selected.
-                if ( (!pMenuData->enableMultiSelection) && ((item_value(pCurrentItem) == FALSE)) )
-                {
-                    ITEM **items = menu_items(pMenu);
-                    
-                    for (int i = 0; i < item_count(pMenu); i++) 
-                    {
-                        if (item_value(items[i]) == TRUE) 
-                        {
-                            set_item_value(items[i], false);
-                        }
-
-                        delete_menu_item_selection_mark(pMenuData, items[i]);
-                    }
-
-                    pMenuData->itemSelections = 0;
-                }           
-
-                // update the item selection bitfield
-                TOGGLE_BIT( (pMenuData->itemSelections), (item_index(pCurrentItem)) );
-                pMenuData->curItemSelection = (item_index(pCurrentItem));
-
-                menu_driver(pMenu, REQ_TOGGLE_ITEM);
-
-                if (item_value(pCurrentItem))
-                {
-                    add_menu_item_selection_mark(pMenuData, pCurrentItem);
-                }
-                else
-                {
-                    delete_menu_item_selection_mark(pMenuData, pCurrentItem);
-                }
+                menu_item_select(pMenuData, pCurrentItem);
 
                 p = menu_userptr(pMenu);
                 if (NULL != p)
@@ -333,6 +341,12 @@ void menu_loop(MENU_DATA *pMenuData)
                             unpost_menu(pMenu); 
                             do_help_menu(helpMenu);
                         }
+                    }
+                    else if (pMenuData->isMenuItemsSelectable && // rocm usecases or rocm versions menu
+                            !is_menu_item_done_item_index(pMenuData, listIndex, pCurrentItem) &&
+                            item_opts(pCurrentItem) == O_SELECTABLE ) { 
+
+                            menu_item_select(pMenuData, pCurrentItem);
                     }
 
                     // call the menu data processor

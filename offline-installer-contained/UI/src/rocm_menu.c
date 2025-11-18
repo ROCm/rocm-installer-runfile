@@ -777,7 +777,7 @@ void create_rocm_uninstall_window(WINDOW *pMenuWindow, OFFLINE_INSTALL_CONFIG *p
 
         rocmPathsProps = (MENU_PROP) {
             .pMenuTitle = "ROCm Uninstall",
-            .pMenuControlMsg = "<DONE> to exit : Space key to select/unselect uninstall location",
+            .pMenuControlMsg = "<DONE> to exit : Space/Enter key to select/unselect uninstall location",
             .numLines = numItems - 1,
             .numCols = MAX_MENU_ITEM_COLS,
             .starty = ROCM_MENU_ITEM_START_Y,
