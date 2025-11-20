@@ -119,6 +119,9 @@ setup_rocm_llvm() {
     if [[ -L "$ROCM_INSTALL_PATH/lib/llvm/bin/amdflang-classic" ]]; then
         ln -s "$ROCM_INSTALL_PATH/lib/llvm/bin/amdflang-classic" "$ROCM_INSTALL_PATH/bin/amdflang-classic"
     fi
+    if [[ -f "$ROCM_INSTALL_PATH/lib/llvm/bin/offload-arch" ]]; then
+        ln -s "$ROCM_INSTALL_PATH/lib/llvm/bin/offload-arch" "$ROCM_INSTALL_PATH/bin/offload-arch"
+    fi
     ln -s "$ROCM_INSTALL_PATH/lib/llvm/bin/amdlld" "$ROCM_INSTALL_PATH/bin/amdlld"
     echo Setting up rocm-llvm. Complete.
 }

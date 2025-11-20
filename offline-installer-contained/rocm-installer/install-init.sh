@@ -110,6 +110,20 @@ validate_version() {
     
         local version_build=${DISTRO_BUILD_VERSION%%.*}
         local version_install=${DISTRO_VER%%.*}
+        
+        if [[ $DISTRO_NAME == "debian" ]]; then
+            if [[ $DISTRO_VER == 12 ]]; then
+                if [[ $version_build == 22 ]]; then
+                    echo Using 22.04 build for debian.
+                    version_build=12
+                fi
+            elif [[ $DISTRO_VER == 13 ]]; then
+                if [[ $version_build == 24 ]]; then
+                    echo Using 24.04 build for debian.
+                    version_build=13
+                fi
+            fi
+        fi
     
         if [ $version_build != $version_install ]; then
             echo -e "\e[31m++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\e[0m"
