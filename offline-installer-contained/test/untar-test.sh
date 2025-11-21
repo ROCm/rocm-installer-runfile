@@ -122,6 +122,9 @@ do
     esac
 done
 
+script_name=rocm-examples-test.sh
+scripts_dir="$( cd "$( dirname "$0" )" && pwd )"
+
 # Search for the runfile installer
 find_rocm_installer
 if [ $? -ne 0 ]; then
@@ -149,20 +152,10 @@ bash $RUNFILE gpu-access=all
 
 amd-smi
 
-# download rocm-examples
-sudo rm -rf rocm-examples
-if [[ -n $ROCM_REL ]]; then
-    git clone https://github.com/ROCm/rocm-examples.git -b "release/rocm-rel-$ROCM_REL"
-else
-    git clone https://github.com/ROCm/rocm-examples.git --depth=1
+if [[ ! -f $scripts_dir/$script_name ]]; then
+    echo "$scripts_dir/$script_name script not found, exiting."
+    exit 1
 fi
 
-# build and test rocm-examples
-cd rocm-examples/
-
-cmake -S . -B build -DROCM_ROOT=$ROCM_PATH -Wno-dev
-cmake --build build -j
-
-cd build/
-ctest --output-on-failure
+bash $scripts_dir/$script_name "rel=$ROCM_REL"
 
