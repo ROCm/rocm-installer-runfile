@@ -129,7 +129,7 @@ install_deps() {
             $SUDO apt-get install -y git cmake libglfw3-dev libsuitesparse-dev libtbb-dev glslang-tools
         elif [[ $DISTRO_VER == 24* ]]; then
             echo Installing deps for ${DISTRO_NAME} 24...
-            $SUDO apt-get install -y git cmake libglfw3-dev libsuitesparse-dev libtbb-dev glslang-tools glslc
+            $SUDO apt-get install -y git cmake libglfw3-dev libsuitesparse-dev libtbb-dev glslang-tools glslc libdw-dev
         else
             echo Installing deps for ${DISTRO_NAME}...
             $SUDO apt-get install -y git cmake libglfw3-dev libsuitesparse-dev libtbb-dev glslang-tools glslc
@@ -154,7 +154,7 @@ install_deps() {
             
         elif [[ $DISTRO_VER == 10* ]]; then
             echo Installing deps for ${DISTRO_NAME}10...
-            $SUDO dnf install -y gcc-c++ git cmake glfw-devel glslang-devel vulkan-loader-devel libshaderc-devel glslc
+            $SUDO dnf install -y gcc-c++ git cmake glfw-devel glslang-devel vulkan-loader-devel libshaderc-devel glslc elfutils-devel
             
         else
             echo "Unsupported version for EL."
