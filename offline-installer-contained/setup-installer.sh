@@ -137,8 +137,8 @@ configure_setup() {
         echo Configuring for Amazon Linux $DISTRO_VER.
         
         # Amazon configuration
-        PULLER_CONFIG_AMZN="${PULLER_CONFIG_AMZN:-config/sle/15.6/rocm-7.2-sle-15.6.config}"
-        if [[ -n $PULLER_CONFIG_AL2023 ]]; then 
+        PULLER_CONFIG_AMZN="${PULLER_CONFIG_AMZN:-config/amzn/23/rocm-7.2-al2023.config}"
+        if [[ -n $PULLER_CONFIG_AL2023 ]]; then
             PULLER_CONFIG_AMZN=$PULLER_CONFIG_AL2023 
         fi
         
