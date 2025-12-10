@@ -93,6 +93,13 @@ install_glslang() {
     echo Install glslang...Complete.
 }
 
+# Needed for test rocprofv3-advanced in amd-mainline
+install_pyyaml() {
+    echo ------------------------------------------------------
+    echo "Installing YAML (pyyaml) for python3"
+    python3 -m pip install pyyaml
+}
+
 install_shaderc() {
     echo ------------------------------------------------------
     echo Install shaderc...
@@ -124,10 +131,13 @@ install_deps() {
 
     # install any dependencies for rocm-examples
     if [ $DISTRO_PACKAGE_MGR == "apt" ]; then
-        if [[ $DISTRO_VER == 22* ]]; then
+        # Ubuntu 22 or Debian 12
+        if [[ $DISTRO_VER == 22* ]] || [[ $DISTRO_VER == 12* ]]; then
             echo Installing deps for ${DISTRO_NAME} 22...
-            $SUDO apt-get install -y git cmake libglfw3-dev libsuitesparse-dev libtbb-dev glslang-tools
-        elif [[ $DISTRO_VER == 24* ]]; then
+            $SUDO apt-get install -y git cmake libglfw3-dev libsuitesparse-dev libtbb-dev glslang-tools libdw-dev
+            install_pyyaml
+        # Ubuntu 24 or Debian 13
+        elif [[ $DISTRO_VER == 24* ]] || [[ $DISTRO_NAME == 13* ]]; then
             echo Installing deps for ${DISTRO_NAME} 24...
             $SUDO apt-get install -y git cmake libglfw3-dev libsuitesparse-dev libtbb-dev glslang-tools glslc libdw-dev
         else
@@ -161,15 +171,11 @@ install_deps() {
             exit 1
         fi
         
-    elif [ $DISTRO_PACKAGE_MGR == "zypper" ]; then
-        $SUDO zypper install -y git libglfw-devel gcc14-c++ vulkan-tools vulkan-devel vulkan-validationlayers shaderc
-        install_glslang
-        if [[ $DISTRO_VER == 15.5 ]]; then
-            $SUDO pip install cmake
-        else
-            $SUDO zypper install -y cmake
-        fi
+    elif [ $DISTRO_PACKAGE_MGR == "zypper" ]; then			
+		$SUDO zypper install -y git cmake gcc14-c++ vulkan-tools vulkan-devel vulkan-validationlayers shaderc libdw-devel
         
+        install_glslang
+        install_pyyaml
     else
         echo Unsupported Distro.
         exit 1
@@ -216,11 +222,31 @@ get_rocm_examples() {
     # Download the rocm-example source (use release if present)
     if [[ -n $ROCM_REL ]]; then
         git clone https://github.com/ROCm/rocm-examples.git -b "release/rocm-rel-$ROCM_REL"
+    elif [[ $IS_MAINLINE -eq 1 ]]; then
+        git clone https://github.com/ROCm/rocm-examples.git -b "amd-mainline"
     else
         git clone https://github.com/ROCm/rocm-examples.git --depth=1
     fi
     
     echo Downloading rocm-examples : $ROCM_REL ...Complete
+}
+
+# Users must disable SELinux before running rocm systems profiler
+# https://rocm.docs.amd.com/projects/rocprofiler-systems/en/latest/install/install.html#post-installation-troubleshooting
+disable_SELinux() {
+    if [[ $DISTRO_PACKAGE_MGR == "dnf" ]]; then
+        echo ------------------------------------------------------
+        echo Disabling SELinux which is required by rocm systems profiler on OL/RHEL/Rocky
+        sudo setenforce 0
+    fi
+}
+
+enable_SELinux() {
+    if [[ $DISTRO_PACKAGE_MGR == "dnf" ]]; then
+        echo ------------------------------------------------------
+        echo Re-enable SELinux after tests have finished running.
+        sudo setenforce 1
+    fi
 }
 
 build_rocm_examples() {
@@ -255,6 +281,7 @@ echo ===============================
 echo ROCM-EXAMPLES TESTER
 echo ===============================
 
+IS_MAINLINE=0
 PROG=${0##*/}
 SUDO=$([[ $(id -u) -ne 0 ]] && echo "sudo" ||:)
 echo SUDO: $SUDO
@@ -274,11 +301,21 @@ do
         echo "Using ROCm release : $ROCM_REL"
         shift
         ;;
+    mainline)
+        IS_MAINLINE=1
+        echo "Using amd-mainline branch"
+        shift
+        ;;
     *)
         shift
         ;;
     esac
 done
+
+if [[ $IS_MAINLINE -eq 1 ]] && [[ -n $ROCM_REL ]]; then
+    echo "You can't choose both amd-mainline and release branch $ROCM_REL!"
+    exit 1
+fi
 
 # Look for the rocm directory
 ROCM_VER_DIR=$(find / -type f -path '*/rocm-*/.info/version' ! -path '*/rocm-installer/component-rocm/*' -print -quit 2>/dev/null)
@@ -298,9 +335,12 @@ setup_rocm
 
 install_deps
 
+disable_SELinux
+
 get_rocm_examples
 
 build_rocm_examples
 
 test_rocm_examples
 
+enable_SELinux

@@ -123,6 +123,10 @@ os_release() {
             echo "Extracting for SUSE $DISTRO_VER."
             EXTRACT_DISTRO_TYPE=sle
             ;;
+        amzn)
+            echo "Extracting for Amazon $DISTRO_VER."
+            EXTRACT_DISTRO_TYPE=el
+            ;;
         *)
             echo "$ID is not a supported OS"
             exit 1

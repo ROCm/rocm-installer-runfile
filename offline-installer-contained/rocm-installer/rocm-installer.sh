@@ -207,7 +207,7 @@ os_release() {
             PKG_INSTALLED_CMD="apt list --installed"
             UPDATE_INITRAMFS_CMD="update-initramfs -u -k all"
             ;;
-        rhel|ol|rocky)
+        rhel|ol|rocky|amzn)
             DISTRO_VER=$(awk -F= '/^VERSION_ID=/{print $2}' /etc/os-release | tr -d '"')
             
             if [[ $DISTRO_VER != 9* ]] && [[ "$DISTRO_NAME" = "rocky" ]]; then

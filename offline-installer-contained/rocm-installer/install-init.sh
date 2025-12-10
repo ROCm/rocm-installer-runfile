@@ -93,6 +93,10 @@ os_release() {
             echo "Installer running on SLES $DISTRO_VER."
 
             ;;
+        amzn)
+            DISTRO_VER=$(awk -F= '/^VERSION_ID=/{print $2}' /etc/os-release | tr -d '"')
+            echo "Installer running on Amazon Linux $DISTRO_VER."
+            ;;
         *)
             echo "$ID is not a supported OS"
             exit 1

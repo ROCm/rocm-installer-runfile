@@ -30,6 +30,7 @@ PULLER_OUTPUT_AMDGPU="../package-extractor/packages-amdgpu"
 PULLER_PACKAGES="${PULLER_PACKAGES:-rocm rocdecode rocdecode-test rocdecode-dev rocm-validation-suite rocm-llvm-dev rocm-language-runtime rocm-opencl-runtime rocprofiler-systems rocprofiler-compute rdc rocjpeg rocjpeg-dev rocjpeg-test}"
 PULLER_PACKAGES_EL="${PULLER_PACKAGES_EL:-rocm rocdecode rocdecode-test rocdecode-devel rocm-validation-suite rocm-llvm-devel rocm-opencl-runtime rocprofiler-systems rocprofiler-compute rdc rocjpeg rocjpeg-devel rocjpeg-test}"
 PULLER_PACKAGES_SLE="${PULLER_PACKAGES_SLE:-rocm rocdecode rocdecode-test rocdecode-devel rocm-validation-suite rocm-llvm-devel rocm-opencl-runtime rocprofiler-systems rocprofiler-compute rdc rocjpeg rocjpeg-devel rocjpeg-test}"
+PULLER_PACKAGES_AMZN="${PULLER_PACKAGES_AMZN:-rocm rocdecode rocdecode-test rocdecode-devel rocm-validation-suite rocm-llvm-devel rocm-opencl-runtime rocprofiler-systems rocprofiler-compute rdc rocjpeg rocjpeg-devel rocjpeg-test}"
 PULLER_PACKAGES_AMDGPU="amdgpu-dkms"
 
 
@@ -52,6 +53,9 @@ os_release() {
             ;;
         sles)
             PULL_DISTRO_TYPE=sle
+            ;;
+        amzn)
+            PULL_DISTRO_TYPE=amzn
             ;;
         *)
             echo "$ID is not a supported OS"
@@ -129,6 +133,15 @@ configure_setup() {
             PULLER_CONFIG_SLE=$PULLER_CONFIG_SLE_15 
         fi
         
+    elif [ $PULL_DISTRO_TYPE == "amzn" ]; then
+        echo Configuring for Amazon Linux $DISTRO_VER.
+        
+        # Amazon configuration
+        PULLER_CONFIG_AMZN="${PULLER_CONFIG_AMZN:-config/sle/15.6/rocm-7.2-sle-15.6.config}"
+        if [[ -n $PULLER_CONFIG_AL2023 ]]; then 
+            PULLER_CONFIG_AMZN=$PULLER_CONFIG_AL2023 
+        fi
+        
     else
         echo Invalid Distro Type: $PULL_DISTRO_TYPE
         exit 1
@@ -171,6 +184,11 @@ setup_rocm() {
             echo "Setting up for SLES RPM."
             ./package-puller-sle.sh amd config="$PULLER_CONFIG_SLE" pkg="$PULLER_PACKAGES_SLE"
             
+        elif [ $PULL_DISTRO_TYPE == "amzn" ]; then
+        
+            echo "Setting up for Amazon RPM."
+            ./package-puller-el.sh amd config="$PULLER_CONFIG_AMZN" pkg="$PULLER_PACKAGES_AMZN"
+            
         else
             echo Invalid Distro Type: $PULL_DISTRO_TYPE
             exit 1
@@ -212,6 +230,11 @@ setup_amdgpu() {
         
              echo "Setting up for RPM AMDGPU builds."
             ./package-puller-sle.sh amd config="$PULLER_CONFIG_SLE" pkg="$PULLER_PACKAGES_AMDGPU"
+            
+        elif [ $PULL_DISTRO_TYPE == "amzn" ]; then
+        
+             echo "Setting up for RPM AMDGPU builds."
+            ./package-puller-el.sh amd config="$PULLER_CONFIG_AMZN" pkg="$PULLER_PACKAGES_AMDGPU"
             
         else
             echo Invalid Distro Type: $PULL_DISTRO_TYPE

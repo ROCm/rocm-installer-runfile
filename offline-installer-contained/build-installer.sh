@@ -92,6 +92,10 @@ os_release() {
             BUILD_DISTRO_TYPE=sle
             BUILD_OS=sles${DISTRO_VER//./}
             ;;
+        amzn)
+            BUILD_DISTRO_TYPE=el
+            BUILD_OS=amzn2023	    
+            ;;
         *)
             echo "$ID is not a supported OS"
             exit 1
@@ -217,7 +221,7 @@ install_makeself() {
     echo "Adding makeself to PATH..."
     $SUDO ln -sf "$PWD/makeself-$makeself_ver/makeself.sh" /usr/local/bin/makeself
 
-     echo Installing makeself...Complete
+    echo Installing makeself...Complete
 }
 
 install_tools_el(){
@@ -228,8 +232,12 @@ install_tools_el(){
     $SUDO dnf install -y gcc gcc-c++
     $SUDO dnf install -y ncurses-devel
     
+    if [[ $DISTRO_NAME == "amzn" ]]; then
+        $SUDO dnf install -y tar bzip2
+    fi
+    
     # Install makself for .run creation either from repos or directly from github
-    $SUDO dnf install -y makeself
+    $SUDO dnf install -y makeself > /dev/null 2>&1
     if [[ $? -ne 0 ]]; then
         install_makeself
     fi

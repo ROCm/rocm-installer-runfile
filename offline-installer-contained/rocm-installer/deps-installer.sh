@@ -46,6 +46,7 @@ NO_CMD_OUTPUT="> /dev/null 2>&1"
 
 GCC_TOOLSET_PACKAGES_OL=(gcc-toolset-11-gcc gcc-toolset-11-gcc-c++ gcc-toolset-11-gcc-gfortran gcc-toolset-11-libquadmath-devel gcc-toolset-11-libstdc++-devel gcc-toolset-11-gcc-gdb-plugin)
 
+EPEL_SETUP=1
 
 ###### Functions ###############################################################
 
@@ -87,11 +88,17 @@ os_release() {
             DISTRO_VIRTUAL_CHK="apt-cache showpkg"
             PACKAGE_TYPE="deb"
             ;;
-        rhel|ol|rocky)
+        rhel|ol|rocky|amzn)
             DISTRO_PACKAGE_MGR="dnf"
             DISTRO_CACHE_CHK="$SUDO dnf --cacheonly info"
             DISTRO_VIRTUAL_CHK="dnf provides"
             PACKAGE_TYPE="rpm"
+            
+            if [[ "$DISTRO_NAME" = "amzn" ]]; then
+                echo "Disable EPEL/CRB for Amazon."
+                EPEL_SETUP=0
+            fi
+            
             ;;
         sles)
             DISTRO_PACKAGE_MGR="zypper"
@@ -1056,6 +1063,34 @@ get_kernel_packages_ol() {
     fi
 }
 
+get_kernel_packages_amzn() {
+    echo Amazon kernel packages...
+    
+    # Extract version major.minor version (x.y)
+    KERNEL_MAJ_MIN=$(echo "$KERNEL_VER" | cut -d'.' -f1,2)
+    
+    # Extract version up to .x86_64
+    KERNEL_VER_AMZN=$(echo "$KERNEL_VER" | sed 's/\.x86_64$//')
+    
+    echo "KERNEL_MAJ_MIN : $KERNEL_MAJ_MIN"
+    echo "KERNEL_VER_AMZN: $KERNEL_VER_AMZN"
+
+    if [[ $DEPS_LIST_ONLY == 0 ]]; then
+        dnf list "kernel$KERNEL_MAJ_MIN-headers-$KERNEL_VER_AMZN"
+        if [ $? -eq 0 ]; then
+            echo "Kernel Packages for $KERNEL_VER_AMZN are available in the repositories."
+        else
+            print_err "Kernel Packages not available in the repositories."
+            exit 1
+        fi
+    fi
+    
+    KERNEL_PACKAGES="kernel$KERNEL_MAJ_MIN-headers-$KERNEL_VER_AMZN kernel$KERNEL_MAJ_MIN-devel-$KERNEL_VER_AMZN "
+    
+    FILTER_PACKAGES="kernel-devel"
+    REMOVE_PACKAGES="kernel-headers"
+}
+
 get_kernel_package_for_kernel_version() {
     print_str "--------------------------------"
     print_str "Find kernel package $1 for kernel version $KERNEL_PACKAGE_VER..."
@@ -1094,6 +1129,8 @@ get_kernel_packages() {
             get_kernel_packages_el
         elif [ "$DISTRO_NAME" = "ol" ]; then
             get_kernel_packages_ol
+        elif [ "$DISTRO_NAME" = "amzn" ]; then
+            get_kernel_packages_amzn
         else
             get_kernel_packages_el
         fi
@@ -1222,25 +1259,8 @@ build_dependencies_list() {
     print_deps
 }
 
-install_repos_el() {
-    echo "------------------------------------"
-    echo "Setting up Repos..."
-    
-    # Install wget if required
-    if ! rpm -q "wget" > /dev/null 2>&1; then
-        echo "Package: wget Installing..."
-        $SUDO dnf install -y wget > /dev/null 2>&1
-        echo "Package: wget installed."
-    fi
-    
-    # Install dnf-plugin-config-manager if required
-    if ! rpm -q "dnf-plugins-core" > /dev/null 2>&1; then
-        echo "Package: dnf-plugins-core Installing..."
-        $SUDO dnf install -y dnf-plugins-core > /dev/null 2>&1
-        echo "Package: dnf-plugins-core installed."
-    fi
-    
-    # Setup for installing EL repos
+setup_epel_crb() {
+   # Setup for installing EL repos
     local epel_pkg="epel-release-latest-$DISTRO_MAJOR_VER.noarch.rpm"
     local codeready_repo="codeready-builder-for-rhel-$DISTRO_MAJOR_VER-x86_64-rpms"
     
@@ -1261,8 +1281,6 @@ install_repos_el() {
         echo "EPEL repo setup...Complete."
     fi
     
-    $SUDO dnf install -y dnf-plugin-config-manager
-    
     # Enable the codeready-builder repo (RHEL only)
     if [[ "$DISTRO_NAME" = "rhel" ]]; then
         if ! $SUDO dnf repolist all | grep -q "^$codeready_repo"; then
@@ -1277,6 +1295,31 @@ install_repos_el() {
         fi
     else
         $SUDO crb enable
+    fi
+}
+
+install_repos_el() {
+    echo "------------------------------------"
+    echo "Setting up Repos..."
+    
+    # Install wget if required
+    if ! rpm -q "wget" > /dev/null 2>&1; then
+        echo "Package: wget Installing..."
+        $SUDO dnf install -y wget > /dev/null 2>&1
+        echo "Package: wget installed."
+    fi
+    
+    # Install dnf-plugins-core if required
+    if ! rpm -q "dnf-plugins-core" > /dev/null 2>&1; then
+        echo "Package: dnf-plugins-core Installing..."
+        $SUDO dnf install -y dnf-plugins-core > /dev/null 2>&1
+        echo "Package: dnf-plugins-core installed."
+    fi
+    
+    $SUDO dnf install -y dnf-plugin-config-manager
+    
+    if [[ EPEL_SETUP == 1 ]]; then
+        setup_epel_crb
     fi
     
     echo "Setting up Repos...Complete."

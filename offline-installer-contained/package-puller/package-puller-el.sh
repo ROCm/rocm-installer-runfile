@@ -46,6 +46,8 @@ PROMPT_USER=0
 DUMP_AMD_PKGS=0
 DUMP_NON_AMD_PKGS=0
 
+EPEL_SETUP=1
+
 ###### Functions ###############################################################
 
 usage() {
@@ -88,6 +90,11 @@ os_release() {
         case "$ID" in
         rhel|ol|rocky)
             echo "Pulling packages for EL $DISTRO_VER."
+            ;;
+        amzn)
+            echo "Pulling packages for Amazon $DISTRO_VER."
+            echo "Disable EPEL/CRB for Amazon."
+            EPEL_SETUP=0
             ;;
         *)
             echo "$ID is not a supported OS"
@@ -145,10 +152,7 @@ restore_dnf_conf() {
     fi
 }
 
-install_prereqs() {
-    echo ++++++++++++++++++++++++++++++++
-    echo Installing prereqs...
-    
+setup_epel_crb() {
     # Setup EPEL/crb
     local epel_pkg="epel-release-latest-$DISTRO_MAJOR_VER.noarch.rpm"
     local codeready_repo="codeready-builder-for-rhel-$DISTRO_MAJOR_VER-x86_64-rpms"
@@ -174,8 +178,6 @@ install_prereqs() {
         $SUDO rpm -ivh "$epel_pkg"
     fi
     
-    $SUDO dnf install -y dnf-plugin-config-manager
-    
     # Enable the codeready-builder repo (RHEL only)
     if [[ "$DISTRO_NAME" = "rhel" ]]; then
         if ! $SUDO dnf repolist all | grep -q "^$codeready_repo"; then
@@ -190,6 +192,17 @@ install_prereqs() {
         fi
     else
         $SUDO crb enable
+    fi
+}
+
+install_prereqs() {
+    echo ++++++++++++++++++++++++++++++++
+    echo Installing prereqs...
+    
+    $SUDO dnf install -y dnf-plugin-config-manager
+    
+    if [[ EPEL_SETUP == 1 ]]; then
+        setup_epel_crb
     fi
     
     # Update the dnf.conf for faster mirrors etc.
