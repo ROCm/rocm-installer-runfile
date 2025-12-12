@@ -34,6 +34,9 @@ Usage: $PROG [options]
     
     rel=<release number> 
         Set the ROCm release sourced for the rocm-examples test ie.rel=6.3.1
+        
+    mainline
+        Set rocm-examples sourced from amd-mainline branch.
 END_USAGE
 }
 
@@ -49,7 +52,7 @@ os_release() {
 	    DISTRO_PACKAGE_MGR="apt"
 	    PACKAGE_TYPE="deb"
 	    ;;
-	rhel|ol|rocky)
+	rhel|ol|rocky|amzn)
 	    DISTRO_PACKAGE_MGR="dnf"
 	    PACKAGE_TYPE="rpm"
             ;;
@@ -165,6 +168,10 @@ install_deps() {
         elif [[ $DISTRO_VER == 10* ]]; then
             echo Installing deps for ${DISTRO_NAME}10...
             $SUDO dnf install -y gcc-c++ git cmake glfw-devel glslang-devel vulkan-loader-devel libshaderc-devel glslc elfutils-devel
+        
+        elif [[ $DISTRO_VER == 2023 ]] && [[ $DISTRO_NAME = "amzn" ]] ; then
+            echo Installing deps for $DISTRO_NAME $DISTRO_VER...
+            $SUDO dnf install -y gcc-c++ git cmake glslang-devel vulkan-loader-devel libshaderc-devel glslc
             
         else
             echo "Unsupported version for EL."
@@ -172,7 +179,7 @@ install_deps() {
         fi
         
     elif [ $DISTRO_PACKAGE_MGR == "zypper" ]; then			
-		$SUDO zypper install -y git cmake gcc14-c++ vulkan-tools vulkan-devel vulkan-validationlayers shaderc libdw-devel
+        $SUDO zypper install -y git cmake gcc14-c++ vulkan-tools vulkan-devel vulkan-validationlayers shaderc libdw-devel
         
         install_glslang
         install_pyyaml
