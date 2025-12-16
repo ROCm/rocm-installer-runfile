@@ -201,7 +201,7 @@ install_prereqs() {
     
     $SUDO dnf install -y dnf-plugin-config-manager
     
-    if [[ EPEL_SETUP == 1 ]]; then
+    if [[ $EPEL_SETUP == 1 ]]; then
         setup_epel_crb
     fi
     

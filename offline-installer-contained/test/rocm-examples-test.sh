@@ -262,6 +262,11 @@ build_rocm_examples() {
     
     cd rocm-examples
     
+    echo --------------------------
+    git branch --show-current
+    git rev-parse HEAD
+    echo --------------------------
+    
     # Build rocm-examples
     mkdir build && cd build
 
