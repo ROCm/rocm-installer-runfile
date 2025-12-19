@@ -22,6 +22,10 @@
 # THE SOFTWARE.
 # #############################################################################
 
+# Logs
+ROCM_EXAMPLES_LOGS_DIR="$PWD/logs"
+ROCM_EXAMPLES_CURRENT_LOG="$ROCM_EXAMPLES_LOGS_DIR/rocm-examples_$(date +%s).log"
+
 
 ###### Functions ###############################################################
 
@@ -140,7 +144,7 @@ install_deps() {
             $SUDO apt-get install -y git cmake libglfw3-dev libsuitesparse-dev libtbb-dev glslang-tools libdw-dev
             install_pyyaml
         # Ubuntu 24 or Debian 13
-        elif [[ $DISTRO_VER == 24* ]] || [[ $DISTRO_NAME == 13* ]]; then
+        elif [[ $DISTRO_VER == 24* ]] || [[ $DISTRO_VER == 13* ]]; then
             echo Installing deps for ${DISTRO_NAME} 24...
             $SUDO apt-get install -y git cmake libglfw3-dev libsuitesparse-dev libtbb-dev glslang-tools glslc libdw-dev
         else
@@ -289,6 +293,13 @@ test_rocm_examples() {
 
 ####### Main script ##############################################################
 
+# Create the extraction log directory
+if [ ! -d $ROCM_EXAMPLES_LOGS_DIR ]; then
+    mkdir -p $ROCM_EXAMPLES_LOGS_DIR
+fi
+
+exec > >(tee -a "$ROCM_EXAMPLES_CURRENT_LOG") 2>&1
+
 echo ===============================
 echo ROCM-EXAMPLES TESTER
 echo ===============================
@@ -356,3 +367,8 @@ build_rocm_examples
 test_rocm_examples
 
 enable_SELinux
+
+if [[ -n $ROCM_EXAMPLES_CURRENT_LOG ]]; then
+    echo -e "\e[32mrocm-examples log stored in: $ROCM_EXAMPLES_CURRENT_LOG\e[0m"
+fi
+

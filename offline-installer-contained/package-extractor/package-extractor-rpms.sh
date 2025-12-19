@@ -48,6 +48,8 @@ EXTRACT_GLOBAL_DEPS_FILE="global_deps.txt"        # list all extracted dependenc
 
 # Extra/Installer dependencies
 EXTRA_DEPS=(python3-setuptools python3-wheel)
+EXTRA_DEPS_EL=(libatomic)
+EXTRA_DEPS_SLE=(libatomic1)
 INSTALLER_DEPS=(rsync wget)
 
 # Logs
@@ -667,6 +669,21 @@ add_extra_deps() {
         echo "    $pkg"
         GLOBAL_DEPS+=", $pkg"
     done
+    
+    # Add any distro-specific extra deps
+    if [ $EXTRACT_DISTRO_TYPE == "el" ]; then
+        echo "Adding Extra EL Dependencies."
+        for pkg in "${EXTRA_DEPS_EL[@]}"; do
+            echo "    $pkg"
+            GLOBAL_DEPS+=", $pkg"
+        done
+    elif [ $EXTRACT_DISTRO_TYPE == "sle" ]; then
+        echo "Adding Extra SLE Dependencies."
+        for pkg in "${EXTRA_DEPS_SLE[@]}"; do
+            echo "    $pkg"
+            GLOBAL_DEPS+=", $pkg"
+        done
+    fi
     
     echo "Adding Installer Dependencies."
     for pkg in "${INSTALLER_DEPS[@]}"; do
