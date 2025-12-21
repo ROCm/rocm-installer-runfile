@@ -164,9 +164,9 @@ install_deps() {
         elif [[ $DISTRO_VER == 9* ]]; then
             echo Installing deps for ${DISTRO_NAME}9...
             if [ $DISTRO_NAME = "rocky" ]; then
-                $SUDO dnf install -y gcc-c++ git cmake glfw-devel glslang-devel vulkan-loader-devel libshaderc-devel glslc
+                $SUDO dnf install -y gcc-c++ git cmake glfw-devel glslang-devel vulkan-loader-devel libshaderc-devel glslc elfutils-devel
             else
-                $SUDO dnf install -y gcc-c++ git cmake glfw-devel glslang-devel vulkan-loader-devel libshaderc-devel glslc
+                $SUDO dnf install -y gcc-c++ git cmake glfw-devel glslang-devel vulkan-loader-devel libshaderc-devel glslc elfutils-devel
             fi
             
         elif [[ $DISTRO_VER == 10* ]]; then
