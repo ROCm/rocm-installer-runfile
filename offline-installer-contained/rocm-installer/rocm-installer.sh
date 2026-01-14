@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # #############################################################################
-# Copyright (C) 2024-2025 Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (C) 2024-2026 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -1048,7 +1048,12 @@ set_rocm_target() {
     if [[ $TARGET_DIR == "/" ]]; then
         TARGET_DIR=/opt
     fi
-    
+
+    # Remove any trailing slash from TARGET_DIR (except for root /)
+    if [[ $TARGET_DIR != "/" ]]; then
+        TARGET_DIR="${TARGET_DIR%/}"
+    fi
+
     echo "EXTRACT_DIR: $EXTRACT_DIR"
     echo "TARGET_DIR : $TARGET_DIR"
 }
@@ -1202,9 +1207,22 @@ uninstall_rocm() {
     
         # Update the target for scriptlet hanndling
         if [[ "$TARGET_DIR" == *"rocm"* ]]; then
-            TARGET_DIR="${TARGET_ROCM_DIR%/\rocm*}"
-            echo "TARGET_DIR : $TARGET_DIR"
+            if [[ "$TARGET_DIR" == *"rocm-installer"* ]]; then
+                echo rocm-installer directory detected.
+                
+                # Extract everything up to and including rocm-installer/
+                TARGET_DIR=$(echo "$TARGET_DIR" | sed 's|\(.*rocm-installer/\).*|\1|')
+            elif [[ "$TARGET_DIR" == *"/rocm-"* ]] || [[ "$TARGET_DIR" == *"/rocm/"* ]]; then
+                echo rocm directory detected.
+
+                # Handle paths with /rocm- or /rocm/ (but not rocm-installer)
+                TARGET_DIR="${TARGET_ROCM_DIR%/\rocm*}"
+            fi
         fi
+
+        # Remove any trailing slash from TARGET_DIR
+        TARGET_DIR="${TARGET_DIR%/}"
+        echo "TARGET_DIR : $TARGET_DIR"
 
         # Check the list of rocm installs for the current target
         IFS=',' read -ra rocm_install <<< "$ROCM_INSTALLS"
@@ -1625,6 +1643,11 @@ install_post_rocm() {
         configure_rocm_install    
     fi
     
+    # Ensure TARGET_DIR has no trailing slash before running scriptlets
+    if [[ $TARGET_DIR != "/" ]]; then
+        TARGET_DIR="${TARGET_DIR%/}"
+    fi
+
     echo "rocm_ver_dir: $rocm_ver_dir"
     echo "TARGET_DIR  : $TARGET_DIR"
     
