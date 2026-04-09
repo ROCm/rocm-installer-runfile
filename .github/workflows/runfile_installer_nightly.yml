@@ -40,7 +40,7 @@ on:
 permissions:
   contents: read
 
-run-name: Nightly Runfile (${{ inputs.pull_tag || format('scheduled #{0}', github.run_number) }})
+run-name: Nightly Runfile (${{ inputs.pull_tag || format('scheduled \#{0}', github.run_number) }})
 
 jobs:
   setup:
