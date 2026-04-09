@@ -15,7 +15,7 @@ Command-line arguments:
     --pull-pkg: Base package name
 
 Outputs written to GITHUB_OUTPUT:
-    * rocm_version: The ROCm version
+    * rocm_version: The ROCm version of the nightly build of ROCm packages.
     * gfx_archs: GFX architectures (comma-separated)
     * pull_amdgpu: AMDGPU version
     * pull_pkg: Package name
@@ -249,7 +249,6 @@ def main():
     args = parser.parse_args()
 
     # Read from command-line arguments
-    rocm_version = args.rocm_version
     gfx_archs = args.gfx_archs
     pull_amdgpu = args.pull_amdgpu
     pull_tag = args.pull_tag
