@@ -1,0 +1,33 @@
+#AMD Must Fix 1.0 queries
+- query: Likely Bugs/Arithmetic/BadAdditionOverflowCheck.ql 
+- query: Likely Bugs/Memory Management/PointerOverflow.ql
+- query: Likely Bugs/Underspecified Functions/TooFewArguments.ql
+- query: Security/CWE/CWE-190/ComparisonWithWiderType.ql
+- query: Security/CWE/CWE-253/HResultBooleanConversion.ql
+- query: Security/CWE/CWE-704/WcharCharConversion.ql
+#AMD Must Fix 2.0 queries
+- query: Critical/OverflowCalculated.ql
+- query: Critical/OverflowStatic.ql
+- query: Critical/SizeCheck.ql
+- query: Security/CWE/CWE-311/CleartextFileWrite.ql
+- query: Security/CWE/CWE-327/OpenSslHeartbleed.ql
+#AMD Must Fix 3.0 queries
+#	23	CWE-400	Uncontrolled Resource Consumption
+#- query: Best Practices/Exceptions/LeakyCatch.ql
+- query: Critical/DescriptorMayNotBeClosed.ql
+- query: Critical/DescriptorNeverClosed.ql
+- query: Critical/FileMayNotBeClosed.ql
+- query: Critical/FileNeverClosed.ql
+- query: Critical/MemoryMayNotBeFreed.ql
+- query: Critical/MemoryNeverFreed.ql
+- query: Critical/NewFreeMismatch.ql
+- query: Likely Bugs/Memory Management/AllocaInLoop.ql
+- query: Security/CWE/CWE-190/TaintedAllocationSize.ql
+- query: experimental/Security/CWE/CWE-401/MemoryLeakOnFailedCallToRealloc.ql
+#	11	CWE-476	NULL Pointer Dereference
+- query: Critical/InconsistentNullnessTesting.ql
+- query: Critical/MissingNullTest.ql
+- query: Likely Bugs/InconsistentCheckReturnNull.ql
+#- query: experimental/Likely Bugs/RedundantNullCheckParam.ql
+- query: Likely Bugs/RedundantNullCheckSimple.ql
+#- query: experimental/Security/CWE/CWE-476/DangerousUseOfExceptionBlocks.ql
