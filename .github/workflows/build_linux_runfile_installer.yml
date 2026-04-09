@@ -1,0 +1,201 @@
+name: Build Linux Runfile Installer
+
+on:
+  workflow_call:
+    inputs:
+      rocm_version:
+        description: ROCm version used to build runfile installer (eg. 7.12.0)
+        required: true
+        type: string
+      release_type:
+        description: The type of release to build ("dev" or "nightly"). All developer-triggered jobs should use "dev"!
+        required: true
+        type: string
+        default: "dev"
+      gfx_archs:
+        description: gfx architectures to build (eg "gfx90x", "gfx94x", "gfx950", "gfx110x", "gfx1150", "gfx1151", "gfx1152", "gfx120x")
+        required: false
+        type: string
+        default: "gfx110x"
+      pull_amdgpu:
+        description: Version of amdgpu to be packaged into runfile installer. To see valid values for parameter, run command "bash build-runfile-installer.sh help"
+        required: true
+        type: string
+        default: "release,30.30.1"
+      pull_type:
+        description: Specify where you want to pull packages from ("dev", "nightly", "prereleases" or "release") which pull from rocm.devreleases.amd.com, rocm.nightlies.amd.com, rocm.prereleases.amd.com or repo.amd.com
+        required: true
+        type: string
+        default: "nightly"
+      pull_tag:
+        description: Set build date in the format (YYYYMMDD) to specify nightly build to build runfile installer off of if pull_type = nightly. Set to rc[BUILD_NUM] if pull_type = prerelease.
+        required: true
+        type: string
+      pull_run_id:
+        description: Workflow run id of deb and rpm packages used to build runfile installer off of. If building nightly, go to this link https://rocm.nightlies.amd.com/rpm/ or https://rocm.nightlies.amd.com/deb/ and you will see the names of the folder in the format YYYYMMDD-[GITHUB_RUN_ID] which is the equivalent of [pull_tag]-[pull_run_id]. If building prelrease, go to https://rocm.prereleases.amd.com/packages/debian12/pool/main/index.html and the packages will be in the format amdrocm-[PACKAGE_NAME][ROCM_VERSION]~rc[NUMBER]-[GITHUB_RUN_ID] which is the equivalent to amdrocm-[PACKAGE_NAME][rocm_version]~rc[pull_tag]-[pull_run_id].
+        required: true
+        type: string
+      pull_pkg:
+        description: Set base package name with optional type prefix. Can set it to base:amdrocm-amdsmi to quickly test your code. Otherwise, leave empty. To see what values are valid, run command "bash build-runfile-installer.sh help"
+        required: false
+        type: string
+        default: "amdrocm-core-sdk"
+      runfile_config:
+        description: Runfile config file to use (leave empty to use default based on release_type). Options are dev.config, nightly.config, prerelease.config and release.config
+        required: false
+        type: string
+  workflow_dispatch:
+    inputs:
+      rocm_version:
+        description: ROCm version used to build runfile installer (7.12.0~20260218 for nightly, 7.11.0~rc2 for 7.11 prerelease RC2 or 7.12.0 if you're triggering the job manually).
+        required: true
+        type: string
+      release_type:
+        description: The type of release to build. All developer-triggered jobs should use "dev"!
+        type: choice
+        options:
+          - dev
+          - nightly
+        default: "dev"
+      gfx_archs:
+        description: gfx architectures to build (eg "gfx90x", "gfx94x", "gfx950", "gfx110x", "gfx1150", "gfx1151", "gfx1152", "gfx120x")
+        required: true
+        type: string
+        default: "gfx110x"
+      pull_amdgpu:
+        description: Version of amdgpu to be packaged into runfile installer.
+        required: true
+        type: string
+        default: "release,30.30.1"
+      pull_type:
+        description: Specify where you want to pull packages from, which pull rocm.devreleases.amd.com,rocm.nightlies.amd.com, rocm.prereleases.amd.com or repo.amd.com for dev, nightly, prerelease and release respectively.
+        type: choice
+        options:
+          - dev
+          - nightly
+          - prerelease
+          - release
+        default: "nightly"
+      pull_tag:
+        description: Set build date in the format (YYYYMMDD) to specify nightly build to build runfile installer off of if pull_type = nightly. Set to rc[BUILD_NUM] if pull_type = prerelease.
+        required: true
+        type: string
+      pull_run_id:
+        description: Workflow run id of deb and rpm packages used to build runfile installer off of. If building nightly, go to this link https://rocm.nightlies.amd.com/rpm/ or https://rocm.nightlies.amd.com/deb/ and you will see the names of the folder in the format YYYYMMDD-[GITHUB_RUN_ID] which is the equivalent of [pull_tag]-[pull_run_id].
+        required: true
+        type: string
+      pull_pkg:
+        description: Set base package name with optional type prefix. Can set it to base:amdrocm-amdsmi to quickly test your code. Otherwise, leave empty. To see what values are valid, run command "bash build-runfile-installer.sh help"
+        required: true
+        type: string
+        default: "amdrocm-core-sdk"
+      runfile_config:
+        description: Runfile config file to use (leave empty to use default based on release_type)
+        required: false
+        type: choice
+        options:
+          - ""
+          - dev.config
+          - nightly.config
+          - prerelease.config
+          - release.config
+        default: ""
+permissions:
+  id-token: write
+  contents: read
+
+run-name: Build Linux Runfile Installer Test job (${{ inputs.rocm_version }}, ${{ inputs.release_type }}, ${{ inputs.pull_type }}, ${{ inputs.pull_tag }}, ${{ inputs.gfx_archs }}, ${{ inputs.pull_run_id }})
+
+jobs:
+  build_linux_runfile_installer:
+    name: Build and Release Linux Runfile Installer
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: ${{ github.workspace }}/runfile-installer
+    env:
+      BUILD_IMAGE: ghcr.io/rocm/therock_build_manylinux_x86_64@sha256:d6ae5712a9c7e8b88281d021e907b312cd8a26295b95690baef3e8dde4805858
+      BUILD_RUNID: ${{ github.run_id }}
+      OUTPUT_DIR: ${{ github.workspace }}/build
+      RUNFILE_BUILD_DIR: ${{ github.workspace }}/build
+      ROCM_VERSION: ${{ inputs.rocm_version }}
+      RELEASE_TYPE: ${{ inputs.release_type }}
+      PULL_TAG: ${{ inputs.pull_tag }}
+      PULL_RUN_ID: ${{ inputs.pull_run_id }}
+      PULL_TYPE: ${{ inputs.pull_type }}
+      PULL_PKG: ${{ inputs.pull_pkg }}
+      BUILD_TAG: ${{ inputs.pull_tag }}
+      GFX_ARCHS: ${{ inputs.gfx_archs }}
+      PULL_AMDGPU: ${{ inputs.pull_amdgpu }}
+      # If users enters dev.config for runfile_config, then this becomes
+      # config/dev.config
+
+      # If user leaves runfile_config empty and sets release_type to be nightly, then this becomes
+      # config/nightly.config
+      RUNFILE_CONFIG: ${{ inputs.runfile_config && format('config/{0}', inputs.runfile_config) || format('config/{0}.config', inputs.release_type) }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Delete huge unnecessary tools folder
+        run: |
+          echo "Space before running command"
+          df -h
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache
+          echo "Space after deleting unused folders"
+          df -h
+          sudo swapoff -a
+          sudo rm -f /swapfile
+          echo "Space after deleting swapfile"
+          df -h
+          sudo apt-get clean
+          # docker rmi $(docker image ls -aq)
+          echo "Pruning docker images"
+          sudo docker image prune --all --force
+          echo "Pruning docker build cache"
+          sudo docker builder prune -a | tee /dev/stderr
+          echo "Space after running command"
+          df -h
+
+      - name: Set BUILD_TAG for dev branch
+        if: ${{ env.RELEASE_TYPE == 'dev' }}
+        run: |
+          BUILD_TAG="dev-$(git rev-parse --short HEAD)"
+          echo "Set value of BUILD_TAG = '$BUILD_TAG'"
+          echo "BUILD_TAG=$BUILD_TAG" >> $GITHUB_ENV
+
+      - name: Build args
+        run: |
+          args=""
+          if [[ -n "$GFX_ARCHS" ]]; then
+            args="$args rocm-archs=$GFX_ARCHS"
+          fi
+          if [[ -n "$PULL_AMDGPU" ]]; then
+            args="$args pullamdgpu=$PULL_AMDGPU"
+          fi
+          echo "ARGS=$args" >> $GITHUB_ENV
+
+      - name: Run build-runfile-installer.sh
+        run: |
+          echo "### Runfile Build Options" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "\`bash build-runfile-installer.sh config=$RUNFILE_CONFIG rocm amdgpu pull=$PULL_TYPE pulltag=$PULL_TAG pullrunid=$PULL_RUN_ID pullrocmver=$ROCM_VERSION pullpkg=$PULL_PKG buildtag=$BUILD_TAG buildrunid=$BUILD_RUNID $ARGS\`" >> $GITHUB_STEP_SUMMARY
+
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace/runfile-installer \
+            -e RUNFILE_CONFIG=${{ env.RUNFILE_CONFIG }} \
+            -e PULL_TYPE=${{ env.PULL_TYPE }} \
+            -e PULL_TAG=${{ env.PULL_TAG }} \
+            -e PULL_RUN_ID=${{ env.PULL_RUN_ID }} \
+            -e ROCM_VERSION=${{ env.ROCM_VERSION }} \
+            -e PULL_PKG=${{ env.PULL_PKG }} \
+            -e BUILD_TAG=${{ env.BUILD_TAG }} \
+            -e BUILD_RUNID=${{ env.BUILD_RUNID }} \
+            -e GFX_ARCHS=${{ env.GFX_ARCHS }} \
+            -e PULL_AMDGPU=${{ env.PULL_AMDGPU }} \
+            -e ARGS="${{ env.ARGS }}" \
+            ${{ env.BUILD_IMAGE }} \
+            bash build-runfile-installer.sh config=$RUNFILE_CONFIG rocm amdgpu pull=$PULL_TYPE pulltag=$PULL_TAG pullrunid=$PULL_RUN_ID pullrocmver=$ROCM_VERSION pullpkg=$PULL_PKG buildtag=$BUILD_TAG buildrunid=$BUILD_RUNID $ARGS
+
+      - name: Show .run file
+        run: find . -name "*.run" -type f -exec ls -lctrh {} \;
