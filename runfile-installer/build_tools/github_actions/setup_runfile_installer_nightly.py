@@ -112,6 +112,8 @@ def fetch_nightly_run_id(pull_tag: str) -> tuple[str, str]:
     rpm_html = fetch_index(url=f"{NIGHTLY_BASE_URL}/rpm/")
     deb_html = fetch_index(url=f"{NIGHTLY_BASE_URL}/deb/")
 
+    print(f"deb_html:\n{deb_html}")
+
     rpm_folders = extract_folders(html=rpm_html, date_prefix=pull_tag)
     deb_folders = extract_folders(html=deb_html, date_prefix=pull_tag)
 
