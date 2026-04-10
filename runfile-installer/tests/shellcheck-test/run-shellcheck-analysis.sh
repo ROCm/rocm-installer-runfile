@@ -28,9 +28,6 @@
 
 set -e  # Exit on error
 
-# Get the script directory (where this script lives)
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
 # Configuration defaults
 SOURCE_DIR=""
 WORK_DIR="$(pwd)"
@@ -109,6 +106,12 @@ EOF
     exit 0
 }
 
+SUDO=""
+[[ $(id -u) -ne 0 ]] && SUDO="sudo"
+
+# Save original arguments before first pass
+ORIGINAL_ARGS=("$@")
+
 # Parse arguments first to check for config file
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -138,6 +141,9 @@ if [[ -n "$CONFIG_FILE" ]]; then
     # shellcheck source=/dev/null
     source "$CONFIG_FILE"
 fi
+
+# Restore arguments for second pass
+set -- "${ORIGINAL_ARGS[@]}"
 
 # Re-parse arguments to override config values
 OPTIND=1
@@ -259,15 +265,15 @@ else
         case $PKG_MGR in
             apt)
                 print_step "Installing ShellCheck via apt..."
-                sudo apt-get update -qq && sudo apt-get install -y shellcheck
+                $SUDO apt-get update -qq && $SUDO apt-get install -y shellcheck
                 ;;
             dnf)
                 print_step "Installing ShellCheck via dnf..."
-                sudo dnf install -y ShellCheck
+                $SUDO dnf install -y ShellCheck
                 ;;
             zypper)
                 print_step "Installing ShellCheck via zypper..."
-                sudo zypper install -y ShellCheck
+                $SUDO zypper install -y ShellCheck
                 ;;
             *)
                 print_error "Could not detect package manager."
@@ -307,15 +313,15 @@ if ! command -v jq &> /dev/null; then
         case $PKG_MGR in
             apt)
                 print_step "Installing jq via apt..."
-                sudo apt-get update -qq && sudo apt-get install -y jq
+                $SUDO apt-get update -qq && $SUDO apt-get install -y jq
                 ;;
             dnf)
                 print_step "Installing jq via dnf..."
-                sudo dnf install -y jq
+                $SUDO dnf install -y jq
                 ;;
             zypper)
                 print_step "Installing jq via zypper..."
-                sudo zypper install -y jq
+                $SUDO zypper install -y jq
                 ;;
             *)
                 print_warning "Could not detect package manager. CSV generation will be skipped."
@@ -374,7 +380,7 @@ fi
 print_info "Found ${#SCRIPT_LIST[@]} bash scripts to analyze:"
 for script in "${SCRIPT_LIST[@]}"; do
     # Show relative path from source directory
-    rel_path="${script#$SOURCE_DIR/}"
+    rel_path="${script#"$SOURCE_DIR"/}"
     echo "  - $rel_path"
 done
 
@@ -395,7 +401,7 @@ print_step "Running ShellCheck analysis (text format)..."
 
     total_issues=0
     for script in "${SCRIPT_LIST[@]}"; do
-        rel_path="${script#$SOURCE_DIR/}"
+        rel_path="${script#"$SOURCE_DIR"/}"
         echo "Analyzing: $rel_path"
         echo "-------------------------------------------------------------------"
 
@@ -425,7 +431,7 @@ print_step "Running ShellCheck analysis (JSON format)..."
         fi
         first=false
 
-        rel_path="${script#$SOURCE_DIR/}"
+        rel_path="${script#"$SOURCE_DIR"/}"
         echo "  {"
         echo "    \"file\": \"$rel_path\","
         echo "    \"results\": "
@@ -444,7 +450,7 @@ if command -v jq &> /dev/null; then
     {
         echo "\"File\",\"Line\",\"Column\",\"Severity\",\"Code\",\"Message\""
         for script in "${SCRIPT_LIST[@]}"; do
-            rel_path="${script#$SOURCE_DIR/}"
+            rel_path="${script#"$SOURCE_DIR"/}"
             $SHELLCHECK -f json "$script" 2>/dev/null | \
                 jq -r --arg file "$rel_path" '.[] | [$file, .line, .column, .level, .code, .message] | @csv' 2>/dev/null || true
         done
