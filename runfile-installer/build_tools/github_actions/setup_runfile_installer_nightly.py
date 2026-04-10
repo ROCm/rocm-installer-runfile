@@ -39,7 +39,7 @@ from urllib.request import urlopen
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
 
-from github_actions_utils import gha_set_output
+from github_actions_utils import gha_set_output, gha_append_step_summary
 
 NIGHTLY_BASE_URL = "https://rocm.nightlies.amd.com"
 
@@ -258,33 +258,50 @@ def main():
     pull_pkg = args.pull_pkg
 
     outputs = {}
+    sources = {}
 
+    # Track provided values
     print(f"Using PULL_PKG={pull_pkg}")
+    sources["pull_pkg"] = "provided"
 
     # Auto-detect pull_run_id and pull_tag if needed
     if pull_run_id and pull_tag:
         print(f"Using provided PULL_RUN_ID={pull_run_id}")
         print(f"Using provided PULL_TAG={pull_tag}")
+        sources["pull_run_id"] = "provided"
+        sources["pull_tag"] = "provided"
     else:
         # Use provided pull_tag or default to today
         if not pull_tag:
             pull_tag = datetime.now(timezone.utc).strftime("%Y%m%d")
-            # pull_tag = "20260406"
+            print(f"Using today's date as PULL_TAG={pull_tag}")
+            sources["pull_tag"] = "today's date"
+        else:
+            sources["pull_tag"] = "provided"
         pull_run_id, pull_tag = fetch_nightly_run_id(pull_tag=pull_tag)
+        print(f"Auto-detected PULL_RUN_ID={pull_run_id}, PULL_TAG={pull_tag}")
+        sources["pull_run_id"] = "auto-detected"
 
     # Handle gfx_archs
     if gfx_archs == "all":
         gfx_archs = fetch_gfx_archs(pull_tag=pull_tag, pull_run_id=pull_run_id)
+        sources["gfx_archs"] = "auto-detected"
     else:
         print(f"Using provided GFX_ARCHS={gfx_archs}")
+        sources["gfx_archs"] = "provided"
 
     rocm_version = fetch_rocm_version(pull_tag=pull_tag, pull_run_id=pull_run_id)
-    
+    print(f"Auto-detected ROCM_VERSION={rocm_version}")
+    sources["rocm_version"] = "auto-detected"
+
     # If set to 'latest', then we get the version number of latest released version of amdgpu
     if pull_amdgpu == "latest":
         pull_amdgpu = get_amdgpu_driver_version()
+        print(f"Auto-detected PULL_AMDGPU={pull_amdgpu}")
+        sources["pull_amdgpu"] = "auto-detected"
     else:
         print(f"Using provided PULL_AMDGPU={pull_amdgpu}")
+        sources["pull_amdgpu"] = "provided"
 
     outputs["gfx_archs"] = gfx_archs
     outputs["pull_run_id"] = pull_run_id
@@ -295,6 +312,25 @@ def main():
 
     # Write all outputs
     gha_set_output(outputs)
+
+    # Write prettified summary
+    summary = f"""## ✅ Runfile Installer Setup Complete
+
+<details>
+<summary>Build Parameters</summary>
+
+| Parameter | Value | Source |
+|-----------|-------|--------|
+| ROCM_VERSION | `{rocm_version}` | {sources["rocm_version"]} |
+| PULL_TAG | `{pull_tag}` | {sources["pull_tag"]} |
+| PULL_RUN_ID | `{pull_run_id}` | {sources["pull_run_id"]} |
+| GFX_ARCHS | `{gfx_archs}` | {sources["gfx_archs"]} |
+| PULL_AMDGPU | `{pull_amdgpu}` | {sources["pull_amdgpu"]} |
+| PULL_PKG | `{pull_pkg}` | {sources["pull_pkg"]} |
+
+</details>
+"""
+    gha_append_step_summary(summary)
 
 
 if __name__ == "__main__":
