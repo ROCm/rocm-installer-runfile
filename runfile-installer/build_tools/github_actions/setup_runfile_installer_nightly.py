@@ -151,11 +151,11 @@ def fetch_rocm_version(pull_tag: str, pull_run_id: str) -> str:
     except (HTTPError, URLError) as e:
         print(f"ERROR: Failed to fetch package index: {e}")
         sys.exit(1)
-    
+
     # Match pattern: _X.Y.Z~[PULL_TAG]-[RUNID]_ where PULL_TAG and RUNID matches the provided pull_tag and pull_run_id respectively.
     # Example: amdrocm-core-sdk-gfx950_7.13.0~20260406-24019412486_amd64.deb
     # Pattern: 7.13.0~20260406-24019412486_
-    pattern = rf'_(\d+\.\d+\.\d+)~{pull_tag}-{pull_run_id}_'
+    pattern = rf"_(\d+\.\d+\.\d+)~{pull_tag}-{pull_run_id}_"
     match = re.search(pattern=pattern, string=html)
 
     if not match:
