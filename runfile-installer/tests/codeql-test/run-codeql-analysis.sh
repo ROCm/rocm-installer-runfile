@@ -111,6 +111,9 @@ EOF
     exit 0
 }
 
+# Save original arguments before first pass
+ORIGINAL_ARGS=("$@")
+
 # Parse arguments first to check for config file
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -140,6 +143,9 @@ if [[ -n "$CONFIG_FILE" ]]; then
     # shellcheck source=/dev/null
     source "$CONFIG_FILE"
 fi
+
+# Restore arguments for second pass
+set -- "${ORIGINAL_ARGS[@]}"
 
 # Re-parse arguments to override config values
 OPTIND=1
@@ -464,17 +470,26 @@ EOF
 if [[ -f "$RESULTS_DIR/security-and-quality.csv" ]]; then
     grep -c '"error"' "$RESULTS_DIR/security-and-quality.csv" >> "$RESULTS_DIR/SUMMARY.txt" 2>/dev/null || echo "0" >> "$RESULTS_DIR/SUMMARY.txt"
 
-    echo "" >> "$RESULTS_DIR/SUMMARY.txt"
-    echo "Warnings:" >> "$RESULTS_DIR/SUMMARY.txt"
+    {
+        echo ""
+        echo "Warnings:" 
+    } >> "$RESULTS_DIR/SUMMARY.txt"
+    
     grep -c '"warning"' "$RESULTS_DIR/security-and-quality.csv" >> "$RESULTS_DIR/SUMMARY.txt" 2>/dev/null || echo "0" >> "$RESULTS_DIR/SUMMARY.txt"
 
-    echo "" >> "$RESULTS_DIR/SUMMARY.txt"
-    echo "Recommendations:" >> "$RESULTS_DIR/SUMMARY.txt"
+    {
+        echo "" 
+        echo "Recommendations:"
+    } >> "$RESULTS_DIR/SUMMARY.txt"
+    
     grep -c '"recommendation"' "$RESULTS_DIR/security-and-quality.csv" >> "$RESULTS_DIR/SUMMARY.txt" 2>/dev/null || echo "0" >> "$RESULTS_DIR/SUMMARY.txt"
 
-    echo "" >> "$RESULTS_DIR/SUMMARY.txt"
-    echo "Top Issues:" >> "$RESULTS_DIR/SUMMARY.txt"
-    echo "------------" >> "$RESULTS_DIR/SUMMARY.txt"
+    {
+        echo ""
+        echo "Top Issues:"
+        echo "------------"
+    } >> "$RESULTS_DIR/SUMMARY.txt"
+   
     grep -E '"warning"|"error"' "$RESULTS_DIR/security-and-quality.csv" | \
         cut -d',' -f1 | sort | uniq -c | sort -rn | head -10 >> "$RESULTS_DIR/SUMMARY.txt" 2>/dev/null || true
 fi
