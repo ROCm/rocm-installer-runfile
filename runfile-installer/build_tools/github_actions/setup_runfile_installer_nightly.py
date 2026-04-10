@@ -314,7 +314,7 @@ def main():
     gha_set_output(outputs)
 
     # Write prettified summary
-    summary = f"""## ✅ Runfile Installer Setup Complete
+    summary = f"""## Runfile Installer Setup Complete
 
 <details>
 <summary>Build Parameters</summary>
