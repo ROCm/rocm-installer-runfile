@@ -2,14 +2,14 @@ name: CodeQL Analysis
 
 on:
   pull_request:
-    paths:
-      - 'runfile-installer/UI/src/**'
+    # paths:
+    #   - 'runfile-installer/UI/src/**'
   push:
     branches:
       - main
       - release/therock-*
-    paths:
-      - 'runfile-installer/UI/src/**'
+    # paths:
+    #   - 'runfile-installer/UI/src/**'
   schedule:
     - cron: '0 6 * * 1'  # Weekly on Monday
 

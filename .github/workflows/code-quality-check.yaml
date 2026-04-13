@@ -1,12 +1,13 @@
+# Runs pre-commit with the argument --all-files
+
 name: Code Quality Check
 
 on:
-  # pull_request:
+  pull_request:
   push:
     branches: 
       - main
       - release/therock-*
-      - users/pbhandar/pre_commit
 
 permissions:
   contents: read
