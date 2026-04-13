@@ -2,16 +2,16 @@ name: CodeQL Analysis
 
 on:
   pull_request:
-    # paths:
-    #   - 'runfile-installer/UI/src/**'
+    paths:
+      - 'runfile-installer/UI/src/**'
   push:
     branches:
       - main
       - release/therock-*
-    # paths:
-    #   - 'runfile-installer/UI/src/**'
+    paths:
+      - 'runfile-installer/UI/src/**'
   schedule:
-    - cron: '0 6 * * 1'  # Weekly on Monday
+    - cron: '0 6 * * 0'  # Weekly on Sunday
 
 permissions:
   contents: read
@@ -27,17 +27,3 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # 6.0.2
       - name: Perform CodeQL Analysis
         run: bash run-codeql-analysis.sh --config ./configs/rocm-ui.conf
-      
-      # - name: Initialize CodeQL
-      #   uses: github/codeql-action/init@v3
-      #   with:
-      #     languages: cpp
-          
-      # - name: Build
-      #   run: |
-      #     cd runfile-installer/UI
-      #     mkdir -p build && cd build
-      #     cmake .. && make
-          
-      # - name: Perform CodeQL Analysis
-      #   uses: github/codeql-action/analyze@v3
