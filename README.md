@@ -383,3 +383,27 @@ ctest --test-dir build --output-on-failure
 ```
 
 After the initial configure step, only the build and test commands are needed for subsequent runs.
+
+
+### Formatting using pre-commit hokos
+
+We enforce formatting for certain languages using
+[_pre-commit_](https://pre-commit.com/) with hooks defined in
+[`.pre-commit-config.yaml`](/.pre-commit-config.yaml).
+
+To get started with pre-commit:
+
+```bash
+# Download.
+pip install pre-commit
+
+# Run locally on staged files.
+pre-commit run
+
+# Run locally on all files.
+pre-commit run --all-files
+
+# (Optional but recommended)
+# Install git hook. Now pre-commit runs on every git commit.
+pre-commit install
+```
