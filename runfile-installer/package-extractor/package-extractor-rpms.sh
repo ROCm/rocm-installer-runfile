@@ -35,6 +35,11 @@ PACKAGE_AMDGPU_DIR="${PACKAGE_AMDGPU_DIR:-$PWD/packages-amdgpu-${EXTRACT_FORMAT}
 EXTRACT_ROCM_DIR="$PWD/component-rocm-${EXTRACT_FORMAT}"
 EXTRACT_AMDGPU_DIR="$PWD/component-amdgpu-${EXTRACT_FORMAT}"
 
+# Top-level extraction directories for new structure (Phase 1 optimization)
+EXTRACT_CONTENT_DIR=""     # Will be set to component-rocm/content
+EXTRACT_DEPS_DIR=""        # Will be set to component-rocm/deps
+EXTRACT_SCRIPTLETS_DIR=""  # Will be set to component-rocm/scriptlets
+
 # Extraction Files
 EXTRACT_ROCM_PKG_CONFIG_FILE="rocm-packages.config"
 EXTRACT_AMDGPU_PKG_CONFIG_FILE="amdgpu-packages.config"
@@ -316,13 +321,6 @@ scriptlet_stats() {
     echo "$SCRIPTLET_OPT" | tr ' ' '\n' | sed 's/^[ \t]*//;s/[ \t]*$//' | sort -u
 }
 
-write_out_list() {
-    local list=$1
-    local file=$2
-    
-    echo "$list" | tr ' ' '\n' > "$file"
-}
-
 move_opt_contents() {
     local content_dir="$1"
     local dir="$2"
@@ -402,11 +400,18 @@ extract_data() {
     echo --------------------------------
     echo Extracting all data/content
     echo --------------------------------
-    
-    local package_dir_content="$PACKAGE_DIR/content"
+
+    # Use top-level content directory with component type subdirectory
+    # For AMDGPU, COMP_TYPE is already the package name, so don't add PACKAGE_DIR_NAME again
+    local package_dir_content
+    if [[ "$COMP_TYPE" == "$PACKAGE_DIR_NAME" ]]; then
+        package_dir_content="$EXTRACT_CONTENT_DIR/$COMP_TYPE/content"
+    else
+        package_dir_content="$EXTRACT_CONTENT_DIR/$COMP_TYPE/$PACKAGE_DIR_NAME"
+    fi
 
     echo Creating content directory: "$package_dir_content"
-    mkdir "$package_dir_content"
+    mkdir -p "$package_dir_content"
     
     echo "Extracting Data..."
     
@@ -468,22 +473,23 @@ extract_info() {
     rpm -qi --nosignature "$PACKAGE"
 
     VERSION_INFO=$(rpm -qi --nosignature "$PACKAGE" | grep -E 'Version' | awk '{print $3}')
-    
+
+    # Write metadata files to deps/{comp_type}/ directory
     # Check for amdgpu-based packages pulled with rocm packages
     if echo "$PACKAGE_DIR_NAME" | grep -q 'amdgpu'; then
         # write out the package/component version
-        echo "$PACKAGE_DIR_NAME" >> "$EXTRACT_DIR/$EXTRACT_AMDGPU_PKG_CONFIG_FILE"
+        echo "$PACKAGE_DIR_NAME" >> "$metadata_dir/$EXTRACT_AMDGPU_PKG_CONFIG_FILE"
     else
-        echo "$PACKAGE_DIR_NAME" >> "$EXTRACT_DIR/$EXTRACT_ROCM_PKG_CONFIG_FILE"
-        
+        echo "$PACKAGE_DIR_NAME" >> "$metadata_dir/$EXTRACT_ROCM_PKG_CONFIG_FILE"
+
         # write out the package/component version
-        printf "%-25s = %s\n" "$PACKAGE_DIR_NAME" "$VERSION_INFO" >> "$EXTRACT_DIR/$EXTRACT_COMPO_LIST_FILE"
+        printf "%-25s = %s\n" "$PACKAGE_DIR_NAME" "$VERSION_INFO" >> "$metadata_dir/$EXTRACT_COMPO_LIST_FILE"
         printf "%-25s = %s\n" "$PACKAGE_DIR_NAME" "$VERSION_INFO"
     fi
-    
+
     echo "VERSION_INFO = $VERSION_INFO"
     echo "PACKAGE      = $PACKAGE_DIR_NAME"
-    
+
     extract_version "$PACKAGE"
 }
 
@@ -772,7 +778,14 @@ extract_deps() {
     echo Extracting all dependencies
     echo --------------------------------
 
-    local package_dir_deps="$PACKAGE_DIR/deps"
+    # Use top-level deps directory with component type subdirectory
+    # For AMDGPU, COMP_TYPE is already the package name, so don't add PACKAGE_DIR_NAME again
+    local package_dir_deps
+    if [[ "$COMP_TYPE" == "$PACKAGE_DIR_NAME" ]]; then
+        package_dir_deps="$EXTRACT_DEPS_DIR/$COMP_TYPE/deps"
+    else
+        package_dir_deps="$EXTRACT_DEPS_DIR/$COMP_TYPE/$PACKAGE_DIR_NAME"
+    fi
 
     echo "Extracting Dependencies...: $PACKAGE to $package_dir_deps"
 
@@ -832,9 +845,16 @@ extract_scriptlets() {
     echo --------------------------------
     echo Extracting all scriptlets
     echo --------------------------------
-    
-    local package_dir_scriptlet="$PACKAGE_DIR/scriptlets"
-    
+
+    # Use top-level scriptlets directory with component type subdirectory
+    # For AMDGPU, COMP_TYPE is already the package name, so don't add PACKAGE_DIR_NAME again
+    local package_dir_scriptlet
+    if [[ "$COMP_TYPE" == "$PACKAGE_DIR_NAME" ]]; then
+        package_dir_scriptlet="$EXTRACT_SCRIPTLETS_DIR/$COMP_TYPE/scriptlets"
+    else
+        package_dir_scriptlet="$EXTRACT_SCRIPTLETS_DIR/$COMP_TYPE/$PACKAGE_DIR_NAME"
+    fi
+
     echo "Extracting Scriptlets...: $PACKAGE to $package_dir_scriptlet"
 
     if [ ! -d "$package_dir_scriptlet" ]; then
@@ -938,36 +958,27 @@ extract_package() {
 
     # shellcheck disable=SC2001
     PACKAGE_DIR_NAME=$(echo "$base_name" | sed 's/-[0-9].*$//')
-    PACKAGE_DIR=$EXTRACT_DIR/$PACKAGE_DIR_NAME
-    
-    echo "Package Directory Name    = $PACKAGE_DIR_NAME"
-    echo "Package Extract Directory = $PACKAGE_DIR"
 
-    if [ ! -d "$PACKAGE_DIR" ]; then
-        echo Create directory "$PACKAGE_DIR"
-        mkdir -p "$PACKAGE_DIR"
-    fi
-    
+    echo "Package Directory Name = $PACKAGE_DIR_NAME"
+    echo "Component Type         = $COMP_TYPE"
+
     # Extract the content from data
     if [[ $EXTRACT_CONTENT == 1 ]]; then
         extract_data
     fi
-    
+
     # Extract package info
     extract_info
-    
+
     # Extract the dependencies
     extract_deps
-    
+
     # Extract the scriptlets
     extract_scriptlets
-    
+
     # write the package list
     PACKAGE_LIST+="$PACKAGE_DIR_NAME, "
-    
-    # Dump the file stats on the extraction
-    dump_extract_stats "$PACKAGE_DIR"
-    
+
     echo Extracting Package...Complete.
     echo ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 }
@@ -1028,24 +1039,30 @@ write_package_list() {
     echo PKG_COUNT = "$PKG_COUNT"
     echo --------------------
     echo "$PACKAGE_LIST" | tr ',' '\n' | awk 'NF' | sed 's/^[ \t]*//;s/[ \t]*$//' | sort -u
-    echo "$PACKAGE_LIST" | tr ',' '\n' | awk 'NF' | sed 's/^[ \t]*//;s/[ \t]*$//' | sort -u > "$EXTRACT_DIR/$EXTRACT_PACKAGE_LIST_FILE"
+
+    # Write to deps/{comp_type}/ directory
+    echo "$PACKAGE_LIST" | tr ',' '\n' | awk 'NF' | sed 's/^[ \t]*//;s/[ \t]*$//' | sort -u > "$EXTRACT_DEPS_DIR/$COMP_TYPE/$EXTRACT_PACKAGE_LIST_FILE"
 }
 
 filter_deps_version() {
     echo -----------------------------
     echo Dependency Version Filter...
-    
-    local packages_file="$EXTRACT_DIR/$EXTRACT_PACKAGE_LIST_FILE"
-    local deps_file="$EXTRACT_DIR/$EXTRACT_GLOBAL_DEPS_FILE"
-    
-    local deps_file_filtered="$EXTRACT_DIR/global_deps_filtered.txt"
-    local reqs_file="$EXTRACT_DIR/$EXTRACT_REQUIRED_DEPS_FILE"
-    
+
+    # Read from deps/{comp_type}/ directory
+    local metadata_dir="$EXTRACT_DEPS_DIR/$COMP_TYPE"
+
+    local packages_file="$metadata_dir/$EXTRACT_PACKAGE_LIST_FILE"
+    local deps_file="$metadata_dir/$EXTRACT_GLOBAL_DEPS_FILE"
+
+    local deps_file_filtered="$metadata_dir/global_deps_filtered.txt"
+    local reqs_file="$metadata_dir/$EXTRACT_REQUIRED_DEPS_FILE"
+
     local prev_package=""
     local prev_version=""
     local prev_line=
-    
-    local config_file="$EXTRACT_DIR/$EXTRACT_PKG_CONFIG_FILE"
+
+    # Read config file from metadata_dir
+    local config_file="$metadata_dir/$EXTRACT_PKG_CONFIG_FILE"
     CONFIG_PKGS=$(<"$config_file")
     
     if [ -f "$deps_file_filtered" ]; then
@@ -1141,27 +1158,28 @@ write_global_deps() {
     echo ^^^^^^^^^^^^^^^^^^^^
     echo Global Dependencies:
     echo ^^^^^^^^^^^^^^^^^^^^
-    
+
     echo -------------
     echo Dependencies:
     echo -------------
     echo "$GLOBAL_DEPS" | tr ',' '\n' | awk 'NF' | sed 's/^[ \t]*//;s/[ \t]*$//' | sort -u
-    echo "$GLOBAL_DEPS" | tr ',' '\n' | awk 'NF' | sed 's/^[ \t]*//;s/[ \t]*$//' | sort -u > "$EXTRACT_DIR/$EXTRACT_GLOBAL_DEPS_FILE"
+
+    # Write to deps/{comp_type}/ directory
+    echo "$GLOBAL_DEPS" | tr ',' '\n' | awk 'NF' | sed 's/^[ \t]*//;s/[ \t]*$//' | sort -u > "$EXTRACT_DEPS_DIR/$COMP_TYPE/$EXTRACT_GLOBAL_DEPS_FILE"
 }
 
 extract_rpms() {
     echo ===================================================
     echo Extracting RPMs...
-    
+
     PKG_COUNT=0
 
-    if [ -d "$EXTRACT_DIR" ]; then
-        echo -e "\e[93mExtraction directory exists. Removing: $EXTRACT_DIR\e[0m"
-        $SUDO rm -rf "$EXTRACT_DIR"
+    # COMP_TYPE should already be set by caller (extract_rocm_rpms or extract_amdgpu_rpms)
+    # Directories should already be created by caller
+    if [[ -z "$COMP_TYPE" ]]; then
+        echo "ERROR: COMP_TYPE not set before calling extract_rpms"
+        return 1
     fi
-
-    echo Creating Extraction directory.
-    mkdir -p "$EXTRACT_DIR"
 
     echo Extracting RPM...
 
@@ -1171,16 +1189,16 @@ extract_rpms() {
 
         echo -------------------------------------------------------------------------------
         echo -e "\e[93mpkg $PKG_COUNT = $(basename "$pkg")\e[0m"
-        
+
         PACKAGE=$pkg
-        
+
         check_package_owner
         if [[ $AMDPKG == 1 ]]; then
             extract_package
         fi
-        
+
     done
-    
+
     echo Extracting RPMs...Complete.
 }
 
@@ -1188,12 +1206,15 @@ combine_rocm_deps() {
     echo ===================================================
     echo Combining dependencies from all component-rocm subdirectories...
 
-    # Use the component-rocm directory for combined deps files
-    local deps_dir="../rocm-installer/component-rocm"
-    if [ ! -d "$deps_dir" ]; then
-        echo "ERROR: $deps_dir directory does not exist!"
+    # Use the new deps/ directory structure
+    local deps_root_dir="$EXTRACT_DEPS_DIR"
+    if [ ! -d "$deps_root_dir" ]; then
+        echo "ERROR: $deps_root_dir directory does not exist!"
         return 1
     fi
+
+    # Put the combined deps file in EXTRACT_ROCM_DIR root
+    local deps_dir="$EXTRACT_ROCM_DIR"
 
     local combined_deps_file="$deps_dir/rocm_required_deps_rpm.txt"
     local gfx_deps_file="$deps_dir/rocm_required_deps_rpm_gfx.tmp"
@@ -1205,9 +1226,9 @@ combine_rocm_deps() {
     echo "Removing previous rocm_required_deps_rpm.txt if it exists..."
     rm -f "$combined_deps_file" "$gfx_deps_file" "$gfx_deps_sorted" "$gfx_deps_filtered" "$temp_deps_file"
 
-    # First pass: Process all gfx-specific component-rocm/gfx* subdirectories
+    # First pass: Process all gfx-specific subdirectories inside deps/
     local gfx_component_count=0
-    for component_dir in ../rocm-installer/component-rocm/gfx*; do
+    for component_dir in "${deps_root_dir}"/gfx*; do
         if [ -d "$component_dir" ]; then
             local required_deps_file="$component_dir/$EXTRACT_REQUIRED_DEPS_FILE"
             if [ -f "$required_deps_file" ]; then
@@ -1218,12 +1239,12 @@ combine_rocm_deps() {
         fi
     done
 
-    # Collect all packages.txt files from all subdirectories to create comprehensive filter list
+    # Collect all packages.txt files from all subdirectories in deps/ to create comprehensive filter list
     local all_packages_file="$deps_dir/all_packages.tmp"
     rm -f "$all_packages_file"
 
     echo "Collecting all package names from all subdirectories for filtering..."
-    for component_dir in ../rocm-installer/component-rocm/*/; do
+    for component_dir in "${deps_root_dir}"/*/; do
         if [ -d "$component_dir" ]; then
             local packages_file="$component_dir/$EXTRACT_PACKAGE_LIST_FILE"
             if [ -f "$packages_file" ]; then
@@ -1269,8 +1290,8 @@ combine_rocm_deps() {
         fi
     fi
 
-    # Second pass: Combine with base component-rocm/base subdirectory
-    local base_component_dir="../rocm-installer/component-rocm/base"
+    # Second pass: Combine with base component subdirectory from deps/
+    local base_component_dir="${deps_root_dir}/base"
     if [ -d "$base_component_dir" ]; then
         local required_deps_file="$base_component_dir/$EXTRACT_REQUIRED_DEPS_FILE"
         if [ -f "$required_deps_file" ]; then
@@ -1368,18 +1389,18 @@ extract_meta_package_deps() {
     echo "GFX tag: $gfx_tag"
     echo "=========================================="
 
-    # Determine base directory for this gfx tag
-    local base_dir="../rocm-installer/component-rocm/$gfx_tag"
+    # Determine deps directory for this gfx tag
+    local deps_base_dir="../rocm-installer/component-rocm/deps/$gfx_tag"
 
-    # Check if meta package directory exists
-    local meta_pkg_dir="$base_dir/$meta_package"
+    # Check if meta package deps directory exists
+    local meta_pkg_dir="$deps_base_dir/$meta_package"
     if [ ! -d "$meta_pkg_dir" ]; then
-        echo "ERROR: Meta package directory not found: $meta_pkg_dir"
+        echo "ERROR: Meta package deps directory not found: $meta_pkg_dir"
         return 1
     fi
 
     # Check if deps.txt exists for the meta package
-    local meta_deps_file="$meta_pkg_dir/deps/deps.txt"
+    local meta_deps_file="$meta_pkg_dir/deps.txt"
     if [ ! -f "$meta_deps_file" ]; then
         echo "ERROR: deps.txt not found for meta package: $meta_deps_file"
         return 1
@@ -1436,20 +1457,21 @@ extract_meta_package_deps() {
         echo "Processing dependencies for: $current_pkg"
 
         # Determine which directory to check (base or gfxXYZ)
+        # Updated for new structure where deps are in component-rocm/deps/{gfx_tag}/{pkg}/deps.txt
         local pkg_deps_file=""
 
-        # First check in the current gfx directory
-        if [ -f "$base_dir/$current_pkg/deps/deps.txt" ]; then
-            pkg_deps_file="$base_dir/$current_pkg/deps/deps.txt"
+        # First check in the current gfx/base deps directory
+        if [ -f "$deps_base_dir/$current_pkg/deps.txt" ]; then
+            pkg_deps_file="$deps_base_dir/$current_pkg/deps.txt"
         # Then check in base directory (for packages like amdrocm-base, amdrocm-runtime, etc.)
-        elif [ -f "../rocm-installer/component-rocm/base/$current_pkg/deps/deps.txt" ]; then
-            pkg_deps_file="../rocm-installer/component-rocm/base/$current_pkg/deps/deps.txt"
+        elif [ -f "../rocm-installer/component-rocm/deps/base/$current_pkg/deps.txt" ]; then
+            pkg_deps_file="../rocm-installer/component-rocm/deps/base/$current_pkg/deps.txt"
         else
             # Check in all gfx directories (for gfx-specific packages when processing base meta packages)
             local found_in_gfx=0
-            for gfx_check_dir in ../rocm-installer/component-rocm/gfx*; do
-                if [ -f "$gfx_check_dir/$current_pkg/deps/deps.txt" ]; then
-                    pkg_deps_file="$gfx_check_dir/$current_pkg/deps/deps.txt"
+            for gfx_check_dir in ../rocm-installer/component-rocm/deps/gfx*; do
+                if [ -f "$gfx_check_dir/$current_pkg/deps.txt" ]; then
+                    pkg_deps_file="$gfx_check_dir/$current_pkg/deps.txt"
                     found_in_gfx=1
                     echo "  Found in gfx directory: $(basename "$gfx_check_dir")"
                     break
@@ -1508,15 +1530,15 @@ extract_meta_packages() {
 
     echo "Using ROCM_VER: $ROCM_VER"
 
-    # Create meta directory in component-rocm
-    local meta_dir="../rocm-installer/component-rocm/meta"
+    # Create meta directory under deps/
+    local meta_dir="../rocm-installer/component-rocm/deps/meta"
     if [ ! -d "$meta_dir" ]; then
         echo "Creating meta directory: $meta_dir"
         mkdir -p "$meta_dir"
     fi
 
-    # Process each gfxXYZ directory
-    for gfx_dir in ../rocm-installer/component-rocm/gfx*; do
+    # Process each gfxXYZ directory from content/
+    for gfx_dir in ../rocm-installer/component-rocm/content/gfx*; do
         if [ ! -d "$gfx_dir" ]; then
             continue
         fi
@@ -1547,8 +1569,8 @@ extract_meta_packages() {
         done
     done
 
-    # Process base directory for non-gfx meta packages
-    local base_dir="../rocm-installer/component-rocm/base"
+    # Process base directory for non-gfx meta packages from content/
+    local base_dir="../rocm-installer/component-rocm/content/base"
     if [ -d "$base_dir" ]; then
         echo ""
         echo "Processing base directory for non-gfx meta packages..."
@@ -1583,15 +1605,15 @@ extract_test_packages() {
     echo "Extracting test package configurations..."
     echo "=========================================="
 
-    # Create test directory in component-rocm
-    local test_dir="../rocm-installer/component-rocm/test"
+    # Create test directory under deps/
+    local test_dir="../rocm-installer/component-rocm/deps/test"
     if [ ! -d "$test_dir" ]; then
         echo "Creating test directory: $test_dir"
         mkdir -p "$test_dir"
     fi
 
-    # Process each gfxXYZ directory to find test packages
-    for gfx_dir in ../rocm-installer/component-rocm/gfx*; do
+    # Process each gfxXYZ directory to find test packages from content/
+    for gfx_dir in ../rocm-installer/component-rocm/content/gfx*; do
         if [ ! -d "$gfx_dir" ]; then
             continue
         fi
@@ -1635,12 +1657,15 @@ extract_test_packages() {
                 [[ -n "${processed_deps[$current_pkg]}" ]] && continue
                 processed_deps["$current_pkg"]=1
 
-                # Find deps.txt for this package
+                # Find deps.txt for this package from deps/ structure
+                local gfx_tag
+                gfx_tag=$(basename "$gfx_dir")
+                
                 local deps_file=""
-                if [ -f "$gfx_dir/$current_pkg/deps/deps.txt" ]; then
-                    deps_file="$gfx_dir/$current_pkg/deps/deps.txt"
-                elif [ -f "../rocm-installer/component-rocm/base/$current_pkg/deps/deps.txt" ]; then
-                    deps_file="../rocm-installer/component-rocm/base/$current_pkg/deps/deps.txt"
+                if [ -f "../rocm-installer/component-rocm/deps/$gfx_tag/$current_pkg/deps.txt" ]; then
+                    deps_file="../rocm-installer/component-rocm/deps/$gfx_tag/$current_pkg/deps.txt"
+                elif [ -f "../rocm-installer/component-rocm/deps/base/$current_pkg/deps.txt" ]; then
+                    deps_file="../rocm-installer/component-rocm/deps/base/$current_pkg/deps.txt"
                 fi
 
                 if [ -n "$deps_file" ]; then
@@ -1765,6 +1790,106 @@ combine_rocm_deps_meta() {
     echo "ROCm dependencies metadata combination complete."
 }
 
+generate_package_signatures() {
+    # Helper function to generate signature file for a single package
+    local pkg_content_dir="$1"
+    local signature_file="$2"
+
+    # Clear existing signature file
+    : > "$signature_file"
+
+    local sig_count=0
+    local max_sigs=10
+
+    # Priority 1: Binaries (up to 5)
+    while IFS= read -r file && [ $sig_count -lt $max_sigs ]; do
+        local rel_path="${file#"$pkg_content_dir"/}"
+        echo "$rel_path" >> "$signature_file"
+        sig_count=$((sig_count + 1))
+    done < <(find "$pkg_content_dir" -type f -path "*/bin/*" ! -name "*.txt" ! -name "*.md" 2>/dev/null | head -5)
+
+    # Priority 2: Shared libraries (up to 3 more)
+    while IFS= read -r file && [ $sig_count -lt $max_sigs ]; do
+        local rel_path="${file#"$pkg_content_dir"/}"
+        echo "$rel_path" >> "$signature_file"
+        sig_count=$((sig_count + 1))
+    done < <(find "$pkg_content_dir" -type f -path "*/lib/*" \( -name "*.so*" -o -name "*.a" \) 2>/dev/null | head -3)
+
+    # Priority 3: Headers (up to 2 more)
+    while IFS= read -r file && [ $sig_count -lt $max_sigs ]; do
+        local rel_path="${file#"$pkg_content_dir"/}"
+        echo "$rel_path" >> "$signature_file"
+        sig_count=$((sig_count + 1))
+    done < <(find "$pkg_content_dir" -type f -path "*/include/*" -name "*.h*" 2>/dev/null | head -2)
+
+    # Fill remaining slots with any other files (skip docs)
+    while IFS= read -r file && [ $sig_count -lt $max_sigs ]; do
+        local rel_path="${file#"$pkg_content_dir"/}"
+        if [[ ! "$rel_path" =~ \.(txt|md|rst|html|pdf)$ ]] && [[ ! "$rel_path" =~ /doc/ ]] && [[ ! "$rel_path" =~ /man/ ]]; then
+            echo "$rel_path" >> "$signature_file"
+            sig_count=$((sig_count + 1))
+        fi
+    done < <(find "$pkg_content_dir" -type f 2>/dev/null)
+
+    if [ -s "$signature_file" ]; then
+        local pkg_name
+        pkg_name=$(basename "$(dirname "$signature_file")")
+        echo "  Generated $sig_count signatures for $pkg_name"
+    fi
+}
+
+generate_rocm_signature_files() {
+    # Generate signature files for all ROCm components for uninstall auto-detection
+    # This runs after all packages are extracted
+
+    echo ===================================================
+    echo "Generating signature files for uninstall detection..."
+    echo ===================================================
+
+    local content_base_dir="$EXTRACT_CONTENT_DIR/base"
+    local deps_base_dir="$EXTRACT_DEPS_DIR/base"
+
+    # Process base components
+    if [ -d "$content_base_dir" ]; then
+        for pkg_dir in "$content_base_dir"/*; do
+            if [ -d "$pkg_dir" ]; then
+                local pkg_name
+                pkg_name=$(basename "$pkg_dir")
+                
+                local signature_file="$deps_base_dir/$pkg_name/signature.txt"
+                mkdir -p "$(dirname "$signature_file")"
+
+                generate_package_signatures "$pkg_dir" "$signature_file"
+            fi
+        done
+    fi
+
+    # Process gfx-specific components
+    for gfx_dir in "$EXTRACT_CONTENT_DIR"/gfx*/; do
+        if [ -d "$gfx_dir" ]; then
+            local gfx_tag
+            gfx_tag=$(basename "$gfx_dir")
+            
+            local deps_gfx_dir="$EXTRACT_DEPS_DIR/$gfx_tag"
+
+            for pkg_dir in "$gfx_dir"/*; do
+                if [ -d "$pkg_dir" ]; then
+                    local pkg_name
+                    pkg_name=$(basename "$pkg_dir")
+                    
+                    local signature_file="$deps_gfx_dir/$pkg_name/signature.txt"
+                    mkdir -p "$(dirname "$signature_file")"
+
+                    generate_package_signatures "$pkg_dir" "$signature_file"
+                fi
+            done
+        fi
+    done
+
+    echo "Generating signature files...Complete."
+    echo ===================================================
+}
+
 extract_rocm_rpms() {
     echo ===================================================
     echo Extracting ROCm RPMs...
@@ -1786,12 +1911,17 @@ extract_rocm_rpms() {
     echo "Creating ROCm component directory: $EXTRACT_ROCM_DIR"
     mkdir -p "$EXTRACT_ROCM_DIR"
 
+    # Set up directory variables (directories created per gfx_tag in loop below)
+    EXTRACT_CONTENT_DIR="${EXTRACT_ROCM_DIR}/content"
+    EXTRACT_DEPS_DIR="${EXTRACT_ROCM_DIR}/deps"
+    EXTRACT_SCRIPTLETS_DIR="${EXTRACT_ROCM_DIR}/scriptlets"
+
     echo "Processing packages from: $PACKAGE_DIR"
     echo "Organizing by gfx tag into component-rocm subdirectories..."
     
     PACKAGE_LIST=
 
-    # Collect all package files and group by gfx tag
+    # Collect all package files and group by gfx/base tag
     declare -A GFX_PACKAGES
     GFX_PACKAGES["base"]=""
 
@@ -1810,7 +1940,7 @@ extract_rocm_rpms() {
         fi
     done
 
-    # Process each gfx group
+    # Process each gfx/base group
     for gfx_tag in "${!GFX_PACKAGES[@]}"; do
         pkg_list="${GFX_PACKAGES[$gfx_tag]}"
 
@@ -1824,10 +1954,15 @@ extract_rocm_rpms() {
         echo "Processing $gfx_tag packages"
         echo "=========================================="
 
-        # Set extract directory for this gfx tag
-        EXTRACT_DIR="${EXTRACT_ROCM_DIR}/$gfx_tag"
+        # Set component type and create directory hierarchy
+        COMP_TYPE="$gfx_tag"
 
-        echo "EXTRACT_DIR = $EXTRACT_DIR"
+        echo "COMP_TYPE = $COMP_TYPE"
+        echo "Creating extraction directories for $COMP_TYPE:"
+        echo "  $EXTRACT_CONTENT_DIR/$COMP_TYPE"
+        echo "  $EXTRACT_DEPS_DIR/$COMP_TYPE"
+        echo "  $EXTRACT_SCRIPTLETS_DIR/$COMP_TYPE"
+        mkdir -p "$EXTRACT_CONTENT_DIR/$COMP_TYPE" "$EXTRACT_DEPS_DIR/$COMP_TYPE" "$EXTRACT_SCRIPTLETS_DIR/$COMP_TYPE"
         echo -----------------------------------------
 
         init_stats
@@ -1857,6 +1992,10 @@ extract_rocm_rpms() {
     echo ""
     combine_rocm_deps_meta
 
+    # Generate signature files for uninstall auto-detection
+    echo ""
+    generate_rocm_signature_files
+
     echo ""
     echo Extracting ROCm RPMs...Complete.
 }
@@ -1864,34 +2003,54 @@ extract_rocm_rpms() {
 extract_amdgpu_rpms() {
     echo ===================================================
     echo Extracting AMDGPU RPMs...
-    
-    echo -----------------------------------------
-    echo "PACKAGE_AMDGPU_DIR = $PACKAGE_AMDGPU_DIR"
-    echo "EXTRACT_AMDGPU_DIR = $EXTRACT_AMDGPU_DIR"
-    echo ------------------------------------------
-    
-    PACKAGE_DIR="$PACKAGE_AMDGPU_DIR"
-    EXTRACT_DIR="$EXTRACT_AMDGPU_DIR"
-    
-    EXTRACT_PKG_CONFIG_FILE="$EXTRACT_AMDGPU_PKG_CONFIG_FILE"
-    
-    init_stats
-    
-    echo Getting package list...
-    PACKAGE_LIST=
 
-    if [ ! -d "$PACKAGE_DIR" ]; then
-        print_err "$PACKAGE_DIR does not exist."
-        exit 1
+    PACKAGE_DIR="$PACKAGE_AMDGPU_DIR"
+    EXTRACT_PKG_CONFIG_FILE="$EXTRACT_AMDGPU_PKG_CONFIG_FILE"
+
+    # Check if package directory exists
+    if [[ ! -d "$PACKAGE_DIR" ]]; then
+        echo "ERROR: Package directory not found: $PACKAGE_DIR"
+        return 1
     fi
+
+    # Extract distro name from EXTRACT_AMDGPU_DIR path to use as COMP_TYPE
+    # e.g., ../rocm-installer/component-amdgpu/el9 → COMP_TYPE=el9
+    local amdgpu_base_dir
+    amdgpu_base_dir=$(dirname "$EXTRACT_AMDGPU_DIR")
+    COMP_TYPE=$(basename "$EXTRACT_AMDGPU_DIR")
+
+    # Clean this distro's subdirectory before extraction
+    if [ -d "$EXTRACT_AMDGPU_DIR" ]; then
+        echo -e "\e[93mAMDGPU distro directory exists. Removing: $EXTRACT_AMDGPU_DIR\e[0m"
+        $SUDO rm -rf "$EXTRACT_AMDGPU_DIR"
+    fi
+
+    # Set up directory variables
+    EXTRACT_CONTENT_DIR="${amdgpu_base_dir}/content"
+    EXTRACT_DEPS_DIR="${amdgpu_base_dir}/deps"
+    EXTRACT_SCRIPTLETS_DIR="${amdgpu_base_dir}/scriptlets"
+
+    echo "Processing packages from: $PACKAGE_DIR"
+    echo "Organizing by distro: $COMP_TYPE"
+
+    # Create directory hierarchy for this distro
+    echo "Creating extraction directories for $COMP_TYPE:"
+    echo "  $EXTRACT_CONTENT_DIR/$COMP_TYPE"
+    echo "  $EXTRACT_DEPS_DIR/$COMP_TYPE"
+    echo "  $EXTRACT_SCRIPTLETS_DIR/$COMP_TYPE"
+    mkdir -p "$EXTRACT_CONTENT_DIR/$COMP_TYPE" "$EXTRACT_DEPS_DIR/$COMP_TYPE" "$EXTRACT_SCRIPTLETS_DIR/$COMP_TYPE"
+
+    init_stats
+
+    echo "Getting package list..."
+    PACKAGE_LIST=
 
     for pkg in "$PACKAGE_DIR"/*; do
         if [[ $pkg == *.rpm ]]; then
-            echo "$pkg"
             PACKAGES+="$pkg "
         fi
     done
-    
+
     # Extract the amdgpu rpms
     extract_rpms
     
@@ -1902,7 +2061,8 @@ extract_amdgpu_rpms() {
     echo -e "\e[93m========================================\e[0m"
     
     # extract the amdgpu-dkms build version
-    local amdgpu_dkms_path="$EXTRACT_AMDGPU_DIR/amdgpu-dkms/content/usr/src"
+    # content/{distro}/amdgpu-dkms/usr/src
+    local amdgpu_dkms_path="$EXTRACT_CONTENT_DIR/$COMP_TYPE/amdgpu-dkms/usr/src"
 
     if [ -d "$amdgpu_dkms_path" ]; then
         AMDGPU_DKMS_BUILD_VER=$(ls "$amdgpu_dkms_path")
@@ -1911,7 +2071,7 @@ extract_amdgpu_rpms() {
         echo AMDGPU_DKMS_BUILD_VER = "$AMDGPU_DKMS_BUILD_VER"
 
         # Create root-level amdgpu-dkms-ver.txt with distro suffix removed
-        local root_amdgpu_dkms_file="../rocm-installer/component-amdgpu/$EXTRACT_AMDGPU_DKMS_VER_FILE"
+        local root_amdgpu_dkms_file="$amdgpu_base_dir/$EXTRACT_AMDGPU_DKMS_VER_FILE"
         # Strip distro suffix using sed to match known patterns
         # e.g., 6.16.13-2278356.24.04 -> 6.16.13-2278356
         # e.g., 6.16.13-2278356.el8 -> 6.16.13-2278356
@@ -1923,9 +2083,10 @@ extract_amdgpu_rpms() {
         mkdir -p "$(dirname "$root_amdgpu_dkms_file")"
         echo "$clean_ver" > "$root_amdgpu_dkms_file"
     fi
-    
+
     # reorder the amdgpu package config to ensure the order
-    local config_file="$EXTRACT_DIR/$EXTRACT_AMDGPU_PKG_CONFIG_FILE"
+    # deps/{distro}/amdgpu-packages.config
+    local config_file="$EXTRACT_DEPS_DIR/$COMP_TYPE/$EXTRACT_AMDGPU_PKG_CONFIG_FILE"
 
     local packages
     packages=$(cat "$config_file")
@@ -1953,11 +2114,13 @@ extract_amdgpu_rpms() {
 }
 
 write_extract_info() {
-    dump_extract_stats "$EXTRACT_DIR"
-    
+    # Dump stats for the new structure directories
+    echo "Extraction statistics for: $COMP_TYPE"
+    dump_extract_stats "$EXTRACT_CONTENT_DIR/$COMP_TYPE"
+
     write_global_deps
     write_package_list
-    
+
     scriptlet_stats
 }
 

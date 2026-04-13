@@ -1669,7 +1669,7 @@ build_dependencies_list_for_compo() {
 
         print_str "AMDGPU_DISTRO_TAG = $AMDGPU_DISTRO_TAG"
 
-        DEPS_FILE="$amdgpu_base_dir/$AMDGPU_DISTRO_TAG/required_deps.txt"
+        DEPS_FILE="$amdgpu_base_dir/deps/$AMDGPU_DISTRO_TAG/required_deps.txt"
 
     else
         print_err "Unknown component type: $compo_type"

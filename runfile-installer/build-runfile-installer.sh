@@ -121,13 +121,11 @@ This script performs a complete ROCm runfile installer build:
     buildrunid=<id>       = Set the Runfile build run ID (default: 99999).
     buildtaginfo=<tag>    = Set a tag/name for the builds package pull information (optional, auto-constructed as pulltag-pullrunid if not provided).
     mscomp=<mode>         = Makeself compression (build speed vs file size):
-                            hybrid     = XZ-9 everything (slowest, ~50-55%, embedded xz, universal)
-                            hybridmix  = Pigz+XZ tests (medium, ~73%, embedded xz, universal)
+                            hybrid     = XZ-9 everything (slowest, ~50-55%, embedded xz, universal) [RECOMMENDED]
                             hybriddev  = XZ-3 everything (fast, ~70-75%, embedded xz, universal)
-                            devsmall   = XZ (slowest, ~70%, requires xz-utils)
-                            devmedium  = Pbzip2 (slower, ~80-85%, universal)
                             dev        = Pigz -6 (5-6x faster, ~105%, universal)
                             normal     = Gzip -9 (slow, baseline, universal)
+                            nocomp     = No compression (debugging only, ~2000%)
 
 [Script Options]:
     help                  = Display this help information.
