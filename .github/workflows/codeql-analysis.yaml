@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-24.04
     defaults:
       run:
-        working-dir: runfile-installer/tests/codeql-test
+        working-directory: runfile-installer/tests/codeql-test
     steps:
       - uses: actions/checkout@de0fac2 # 6.0.2
       - name: Perform CodeQL Analysis
