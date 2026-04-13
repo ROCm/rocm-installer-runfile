@@ -26,7 +26,7 @@ ROCM_COMP_DIR=component-rocm
 ROCM_COMP_DEB_DIR=component-rocm-deb
 AMDGPU_COMP_DIR=component-amdgpu
 
-CLEAN_SCRIPT_LIST=(install-init.sh rocm-installer.sh deps-installer.sh cleanup-install.sh)
+CLEAN_SCRIPT_LIST=(install-init.sh rocm-installer.sh amdgpu-installer.sh deps-installer.sh component-extractor.sh cleanup-install.sh)
 
 ###### Functions ###############################################################
 
@@ -79,7 +79,22 @@ cleanup_install() {
     
     # Remove the UI binary
     if [ -f rocm_ui ]; then
+        print_msg "Removing UI binary..."
         $SUDO rm rocm_ui
+    fi
+
+    # Remove UI directory (source files for the UI)
+    if [ -d UI ]; then
+        print_msg "Cleaning up UI directory..."
+        $SUDO rm -rf UI
+        print_msg "Cleaning up UI directory...Complete"
+    fi
+
+    # Remove bin directory (contains xz-static and other utilities)
+    if [ -d bin ]; then
+        print_msg "Cleaning up bin directory..."
+        $SUDO rm -rf bin
+        print_msg "Cleaning up bin directory...Complete"
     fi
 }
 

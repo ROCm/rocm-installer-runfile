@@ -247,13 +247,70 @@ if [ $CLEAN_BUILD -eq 1 ]; then
         fi
     done
 
-    # Remove all component-rocm-gfx* directories
+    # Remove all component-rocm-gfx* directories (old structure)
     for gfx_dir in rocm-installer/component-rocm-gfx*; do
         if [ -d "$gfx_dir" ]; then
             echo -e "\e[93mRemoving: $gfx_dir\e[0m"
             $SUDO rm -r "$gfx_dir"
         fi
     done
+
+    # Remove compressed component archives (new on-demand extraction)
+    echo -e "\e[93mRemoving compressed component archives...\e[0m"
+
+    # Remove archives from component-rocm/ directory (new location)
+    for archive in rocm-installer/component-rocm/content-*.tar.xz rocm-installer/component-rocm/content-*.tar.gz; do
+        if [ -f "$archive" ]; then
+            echo -e "\e[93mRemoving: $archive\e[0m"
+            $SUDO rm "$archive"
+        fi
+    done
+
+    if [ -f "rocm-installer/component-rocm/tests.tar.xz" ]; then
+        echo -e "\e[93mRemoving: rocm-installer/component-rocm/tests.tar.xz\e[0m"
+        $SUDO rm rocm-installer/component-rocm/tests.tar.xz
+    fi
+
+    # Remove archives from root rocm-installer/ directory (legacy locations)
+    for archive in rocm-installer/content-*.tar.xz rocm-installer/content-*.tar.gz; do
+        if [ -f "$archive" ]; then
+            echo -e "\e[93mRemoving: $archive (legacy location)\e[0m"
+            $SUDO rm "$archive"
+        fi
+    done
+
+    # Clean AMDGPU content archive (new location: inside component-amdgpu directory)
+    if [ -f "rocm-installer/component-amdgpu/content-amdgpu.tar.xz" ]; then
+        echo -e "\e[93mRemoving: rocm-installer/component-amdgpu/content-amdgpu.tar.xz\e[0m"
+        $SUDO rm rocm-installer/component-amdgpu/content-amdgpu.tar.xz
+    fi
+
+    # Clean legacy AMDGPU archive location (root level)
+    if [ -f "rocm-installer/component-amdgpu.tar.xz" ]; then
+        echo -e "\e[93mRemoving: rocm-installer/component-amdgpu.tar.xz (legacy location)\e[0m"
+        $SUDO rm rocm-installer/component-amdgpu.tar.xz
+    fi
+
+    if [ -f "rocm-installer/component-rocm-deb.tar.xz" ]; then
+        echo -e "\e[93mRemoving: rocm-installer/component-rocm-deb.tar.xz\e[0m"
+        $SUDO rm rocm-installer/component-rocm-deb.tar.xz
+    fi
+
+    if [ -f "rocm-installer/tests.tar.xz" ]; then
+        echo -e "\e[93mRemoving: rocm-installer/tests.tar.xz (legacy location)\e[0m"
+        $SUDO rm rocm-installer/tests.tar.xz
+    fi
+
+    # Remove xz-static binary
+    if [ -f "rocm-installer/bin/xz-static" ]; then
+        echo -e "\e[93mRemoving: rocm-installer/bin/xz-static\e[0m"
+        $SUDO rm rocm-installer/bin/xz-static
+    fi
+
+    if [ -d "rocm-installer/bin" ] && [ -z "$(ls -A rocm-installer/bin 2>/dev/null)" ]; then
+        echo -e "\e[93mRemoving empty: rocm-installer/bin\e[0m"
+        $SUDO rmdir rocm-installer/bin
+    fi
 
     if [ -d "rocm-installer/logs" ]; then
         echo -e "\e[93mRemoving: rocm-installer/logs\e[0m"
@@ -344,11 +401,26 @@ if [ $CLEAN_BUILD -eq 1 ]; then
         $SUDO rm build-installer/rocm-makeself-header-pre.sh
     fi
 
-    # Reset VERSION file to only contain installer version (first line)
+    # Reset VERSION file based on cleanup mode
+    # - Full clean (CLEAN_SETUP=1): Keep only line 1 (installer version)
+    # - Build clean only: Keep lines 1-2 (installer version + ROCm version from setup)
     if [ -f "build-installer/VERSION" ]; then
-        echo -e "\e[93mResetting: build-installer/VERSION (keeping only installer version)\e[0m"
-        INSTALLER_VERSION=$(head -1 build-installer/VERSION)
-        echo "$INSTALLER_VERSION" > build-installer/VERSION
+        if [ $CLEAN_SETUP -eq 1 ]; then
+            # Full clean - keep only installer version (line 1)
+            echo -e "\e[93mResetting: build-installer/VERSION (keeping only installer version)\e[0m"
+            INSTALLER_VERSION=$(sed -n '1p' build-installer/VERSION)
+            echo "$INSTALLER_VERSION" > build-installer/VERSION
+        else
+            # Build-only clean - keep installer version and ROCm version (lines 1-2)
+            # Lines 3-6 are written by build-installer.sh and should be cleared for rebuild
+            echo -e "\e[93mResetting: build-installer/VERSION (keeping installer version and ROCm version)\e[0m"
+            INSTALLER_VERSION=$(sed -n '1p' build-installer/VERSION)
+            ROCM_VERSION=$(sed -n '2p' build-installer/VERSION)
+            {
+                echo "$INSTALLER_VERSION"
+                echo "$ROCM_VERSION"
+            } > build-installer/VERSION
+        fi
     fi
 
     # Clean hybrid compression artifacts
@@ -362,11 +434,7 @@ if [ $CLEAN_BUILD -eq 1 ]; then
         $SUDO rm build-installer/tools/xz-static-build-note.txt
     fi
 
-    # Remove compressed test archive
-    if [ -f "rocm-installer/tests.tar.xz" ]; then
-        echo -e "\e[93mRemoving: rocm-installer/tests.tar.xz\e[0m"
-        $SUDO rm rocm-installer/tests.tar.xz
-    fi
+    # (tests.tar.xz already removed above in compressed component archives section)
 
     # Remove compressed components archives (both old and new names, both gzip and xz)
     if [ -f "rocm-installer/components.tar.gz" ]; then

@@ -26,6 +26,7 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 BUILD_EXTRACT="yes"
+BUILD_COMPRESS="yes"
 BUILD_INSTALLER="yes"
 BUILD_UI="yes"
 
@@ -88,6 +89,7 @@ Usage: $PROG [options]
     noextractcontentdeb  = Disable DEB package extraction content. (Extract only deps and scriptlets)
     extractcontentdeb    = Enable DEB package extraction content. (Extract deps, scriptlets, and content)
     contentlist          = List all files extracted to content directories during package extraction.
+    nocompress           = Disable component/test compression (skip compression step).
     norunfile            = Disable makeself build of installer runfile.
     nogui                = Disable GUI building.
     noautodeps           = Disable automatic dependency resolution for RPM packages.
@@ -104,27 +106,21 @@ Usage: $PROG [options]
                                                                           Everything xz-9
                                                                           Max compression
 
-                           hybridmix  Medium   ~73%      Universal        Best size + compat
-                                      pigz+xz  ~8.5 GB   (embedded xz)    Tests xz-9
-                                                                          No system deps
-
                            hybriddev  Faster   Medium    Universal        Fast compression
                                       xz-3+xz-3 ~70-75%  (embedded xz)    ~9-10 GB installer
                                                                           Everything xz-3
                                                                           4-6x faster build
-
-                           devsmall   Slowest  Smallest  Standard (xz)    Max compression
-                                      xz       ~70%      Most systems     Smallest file size
-                                                                          Requires system xz
-
-                           devmedium  Slower   ~80-85%   Universal        Balanced production
-                                      pbzip2            (bzip2)           Near-xz compression
 
                            dev        5-6x     Larger    Universal        Development
                                       pigz -6  ~105%     (gzip)           Fast iteration
 
                            normal     Slow     Small     Universal        Standard default
                                       gzip -9  100%      (gzip)           Reliable baseline
+
+                           nocomp     Fastest  Largest   Universal        Debugging only
+                                      none     ~2000%    (no compress)    ~20-25 GB installer
+                                                                          No compression
+                                                                          Fast extraction
 
                            Universal (gzip/bzip2/embedded xz): Works on all Linux including minimal installs
                            Standard (xz): Requires xz-utils on target (may not be in minimal installs)
@@ -200,18 +196,6 @@ format_duration() {
     local minutes=$(((duration % 3600) / 60))
     local seconds=$((duration % 60))
     echo -e "\e[36m${hours}h ${minutes}m ${seconds}s (${duration} seconds)\e[0m"
-}
-
-report_archive_time() {
-    local label=$1
-    local duration=$2
-    echo -e "  \e[36m${label}: $(format_duration "$duration" | sed 's/\x1b\[36m//;s/\x1b\[0m//')\e[0m"
-}
-
-report_size() {
-    local label=$1
-    local size_info=$2
-    echo -e "  \e[95m${label}: ${size_info}\e[0m"
 }
 
 show_compression_progress() {
@@ -393,20 +377,9 @@ generate_component_lists() {
 
 generate_headers() {
     echo -------------------------------------------------------------
-    echo Generating makeself headers with embedded component lists...
+    echo Generating makeself header with embedded component lists...
 
-    # Generate modern header (for non-EL8 distros)
-    if [ -f "rocm-makeself-header.sh.template" ]; then
-        sed -e "s|@@GFX_ARCHS_LIST@@|$GFX_LIST|g" \
-            -e "s|@@COMPONENTS_LIST@@|$COMPO_LIST|g" \
-            rocm-makeself-header.sh.template > rocm-makeself-header.sh
-        echo "Generated: rocm-makeself-header.sh"
-    else
-        echo "ERROR: rocm-makeself-header.sh.template not found!"
-        exit 1
-    fi
-
-    # Generate pre/EL8 header
+    # Generate makeself header (used for all AlmaLinux versions)
     if [ -f "rocm-makeself-header-pre.sh.template" ]; then
         sed -e "s|@@GFX_ARCHS_LIST@@|$GFX_LIST|g" \
             -e "s|@@COMPONENTS_LIST@@|$COMPO_LIST|g" \
@@ -510,93 +483,6 @@ install_pigz() {
     fi
 }
 
-install_xz() {
-    echo ----------------------
-    echo -e "\e[32mInstalling xz (best compression)...\e[0m"
-
-    # Check if xz is already installed
-    if command -v xz &> /dev/null; then
-        echo "xz is already installed: $(xz --version 2>&1 | head -1)"
-        return 0
-    fi
-
-    # Install xz for AlmaLinux (build system)
-    # Note: Creates xz-compressed archives that decompress with standard xz on ANY target system
-    if [[ "$DISTRO_NAME" != "almalinux" ]]; then
-        echo -e "\e[93mWARNING: Build system must be AlmaLinux.\e[0m"
-        echo "Falling back to standard gzip compression"
-        return 1
-    fi
-
-    echo "Installing xz via dnf..."
-    $SUDO dnf install -y xz
-
-    # Verify installation
-    if command -v xz &> /dev/null; then
-        echo "xz installed successfully: $(xz --version 2>&1 | head -1)"
-        echo "Target system requirement: xz (universally available)"
-        return 0
-    else
-        echo -e "\e[93mWARNING: xz installation failed.\e[0m"
-        return 1
-    fi
-}
-
-install_pbzip2() {
-    echo ----------------------
-    echo -e "\e[32mInstalling pbzip2 (parallel bzip2)...\e[0m"
-
-    # Check if pbzip2 is already installed
-    if command -v pbzip2 &> /dev/null; then
-        echo "pbzip2 is already installed: $(pbzip2 --version 2>&1 | head -1)"
-        return 0
-    fi
-
-    # Install pbzip2 for AlmaLinux (build system)
-    # Note: Creates bzip2-compatible archives that decompress with standard bzip2 on ANY target system
-    if [[ "$DISTRO_NAME" != "almalinux" ]]; then
-        echo -e "\e[93mWARNING: Build system must be AlmaLinux.\e[0m"
-        echo "Falling back to standard gzip compression"
-        return 1
-    fi
-
-    echo "Installing pbzip2 via dnf..."
-    $SUDO dnf install -y pbzip2
-
-    # Verify installation
-    if command -v pbzip2 &> /dev/null; then
-        echo "pbzip2 installed successfully: $(pbzip2 --version 2>&1 | head -1)"
-        echo "Target system requirement: bzip2 (universally available)"
-        return 0
-    else
-        echo -e "\e[93mWARNING: pbzip2 installation failed.\e[0m"
-        return 1
-    fi
-}
-
-install_ncurses_deb() {
-    echo Installing ncurses libraries...
-
-    # Check if ncurses development libraries are already installed
-    if dpkg -l libncurses5-dev 2>/dev/null | grep -q "^ii" && \
-       dpkg -l libncurses-dev 2>/dev/null | grep -q "^ii"; then
-        echo "ncurses development libraries already installed"
-    else
-        echo "Installing ncurses development libraries"
-        $SUDO apt-get install -y libncurses5-dev libncurses-dev
-    fi
-
-    # Verify static libraries exist
-    if [ ! -f /usr/lib/x86_64-linux-gnu/libncurses.a ]; then
-        echo "WARNING: Static ncurses library not found. Build will use dynamic linking."
-        echo "Location checked: /usr/lib/x86_64-linux-gnu/libncurses.a"
-    else
-        echo "SUCCESS: Static ncurses library found: /usr/lib/x86_64-linux-gnu/libncurses.a"
-    fi
-
-    echo Installing ncurses libraries...Complete
-}
-
 install_ncurses_el() {
     echo Installing ncurses libraries...
 
@@ -679,59 +565,6 @@ EOF
     echo Installing ncurses libraries...Complete
 }
 
-install_tools_deb() {
-    echo Installing DEB tools...
-
-    # Define required tools to check (command names)
-    local required_cmds=(wget cmake gcc g++ ar)
-
-    # Define packages to install (package names)
-    local required_pkgs=(wget cmake gcc g++ binutils)
-
-    # Check if all required tools are already installed
-    local all_installed=1
-    for cmd in "${required_cmds[@]}"; do
-        if ! command -v "$cmd" &> /dev/null; then
-            all_installed=0
-            break
-        fi
-    done
-
-    if [ $all_installed -eq 1 ]; then
-        echo "All core build tools are already installed"
-    else
-        # One or more tools missing, install all
-        echo "Installing core build tools: ${required_pkgs[*]}"
-        $SUDO apt-get install -y "${required_pkgs[@]}"
-    fi
-
-    # Install ncurses libraries (only if UI build is enabled)
-    if [ "$BUILD_UI" == "yes" ]; then
-        install_ncurses_deb
-    else
-        echo "Skipping ncurses installation (GUI build disabled)"
-    fi
-
-    # Install makeself for .run creation (only if runfile build is enabled)
-    if [ "$BUILD_INSTALLER" == "yes" ]; then
-        install_makeself
-
-        # Check the version of makeself and enable cleanup script support if >= 2.4.2
-        makeself_version_min=2.4.2
-        makeself_version=$(makeself --version)
-        makeself_version=${makeself_version#Makeself version }
-
-        if [[ "$(printf '%s\n' "$makeself_version_min" "$makeself_version" | sort -V | head -n1)" = "$makeself_version_min" ]]; then
-            MAKESELF_OPT_CLEANUP+="--cleanup ../rocm-installer/cleanup-install.sh"
-            echo Enabling cleanup script support.
-        fi
-    else
-        echo "Skipping makeself installation (runfile build disabled)"
-    fi
-
-    echo Installing DEB tools...Complete
-}
-
 install_tools_el(){
     echo Installing EL tools...
 
@@ -795,16 +628,7 @@ install_tools_el(){
 install_tools() {
     echo -------------------------------------------------------------
     echo "Installing tools for $DISTRO_NAME $DISTRO_VER..."
-
-    if [ $BUILD_DISTRO_PACKAGE_TYPE == "deb" ]; then
-        install_tools_deb
-    elif [ $BUILD_DISTRO_PACKAGE_TYPE == "rpm" ]; then
-        install_tools_el
-    else
-        echo "ERROR: Invalid Distro Package Type: $BUILD_DISTRO_PACKAGE_TYPE"
-        exit 1
-    fi
-
+    install_tools_el
     echo Installing tools...Complete
 }
 
@@ -823,14 +647,6 @@ configure_compression() {
             echo "  - Main content: xz-9 compressed (6-8:1 ratio, best compression)"
             echo "  - Test packages: xz-9 compressed (12-15:1 ratio)"
             ;;
-        hybridmix)
-            # Hybrid Mix: tests=xz, main=pigz, embedded xz-static, no double-compression
-            HYBRID_COMPRESSION="yes"
-            MAKESELF_OPT_COMPRESS="--nocomp"
-            echo "Compression: Hybrid Mix (tests=xz, main=pigz, no makeself compression)"
-            echo "  - Main content: pigz-compressed (4:1 ratio, fast)"
-            echo "  - Test packages: xz-compressed (12-15:1 ratio)"
-            ;;
         hybriddev)
             # Hybrid Dev: everything=xz-3, embedded xz-static, fast compression
             HYBRID_COMPRESSION="yes"
@@ -840,28 +656,6 @@ configure_compression() {
             echo "Compression: Hybrid Dev (everything compressed with xz level 3)"
             echo "  - Main content: xz-3 compressed (4-5:1 ratio, 4-6x faster than xz-9)"
             echo "  - Test packages: xz-3 compressed (8-10:1 ratio, 4-6x faster than xz-9)"
-            ;;
-        devsmall)
-            # Install and use xz (best compression, slowest build)
-            # SAFE: xz-compatible, works on most target systems
-            if install_xz; then
-                MAKESELF_OPT_COMPRESS="--xz"
-                echo "Compression: XZ (best compression, standard xz-compatible)"
-            else
-                MAKESELF_OPT_COMPRESS=""
-                echo "Compression: Standard Gzip (xz not available, universal)"
-            fi
-            ;;
-        devmedium)
-            # Install and use pbzip2 (parallel bzip2, better compression than gzip)
-            # SAFE: bzip2-compatible, works on all target systems
-            if install_pbzip2; then
-                MAKESELF_OPT_COMPRESS="--pbzip2"
-                echo "Compression: Pbzip2 (parallel bzip2, near-xz compression, universal)"
-            else
-                MAKESELF_OPT_COMPRESS="--bzip2"
-                echo "Compression: Standard Bzip2 (pbzip2 not available, universal)"
-            fi
             ;;
         dev)
             # Install and use pigz with compression level 6 (balanced)
@@ -879,6 +673,15 @@ configure_compression() {
             # SAFE: Universal compatibility
             MAKESELF_OPT_COMPRESS=""
             echo "Compression: Gzip level 9 (normal, universal)"
+            ;;
+        nocomp)
+            # No compression: fastest extraction, largest file size
+            # For debugging purposes only - not recommended for production
+            # Does NOT set HYBRID_COMPRESSION, so no internal archives are created
+            MAKESELF_OPT_COMPRESS="--nocomp"
+            echo "Compression: None (debugging mode - WARNING: very large installer ~20-25 GB)"
+            echo "  - Makeself: no compression (fastest build and extraction)"
+            echo "  - Internal archives: NOT created (all content left uncompressed)"
             ;;
         "")
             # No argument: standard gzip with level 9 (maximum compression)
@@ -1128,13 +931,37 @@ extract_packages() {
     echo Running Package Extractor...Complete
 }
 
-compress_tests() {
-    echo -------------------------------------------------------------
-    echo "Compressing tests..."
-    echo -------------------------------------------------------------
+compress_directory() {
+    # Wrapper function for component-compressor.sh helper
+    # Usage: compress_directory <source_dir> <output_archive> [compression_type] [xz_level]
+    #
+    # Parameters:
+    #   source_dir       - Directory to compress (relative or absolute path)
+    #   output_archive   - Output archive filename (e.g., "content-base.tar.xz")
+    #   compression_type - Optional: "xz", "pigz", or "auto" (default: auto)
+    #   xz_level         - Optional: XZ compression level 1-9 (default: XZ_COMPRESS_LEVEL)
+    #
+    # Returns: 0 on success, 1 on failure
+
+    local source_dir="$1"
+    local output_archive="$2"
+    local compression_type="${3:-auto}"
+    local xz_level="${4:-$XZ_COMPRESS_LEVEL}"
+
+    # Call component-compressor.sh helper with all parameters including HYBRID_ALL_XZ
+    if "$SCRIPT_DIR/component-compressor.sh" "$source_dir" "$output_archive" "$compression_type" "$xz_level" "$HYBRID_ALL_XZ"; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+compress_setup() {
+    echo "-------------------------------------------------------------"
+    echo "Setting up compression tools..."
+    echo "-------------------------------------------------------------"
 
     local INSTALLER_DIR="../rocm-installer"
-    local TESTS_ARCHIVE="tests.tar.xz"
     local XZ_STATIC_SRC="$SCRIPT_DIR/tools/xz-static"
     local XZ_STATIC_DEST="$INSTALLER_DIR/bin/xz-static"
 
@@ -1198,54 +1025,56 @@ compress_tests() {
         echo -e "\e[93m  WARNING: xz binary may have dynamic dependencies.\e[0m"
     fi
 
+    echo "Compression setup complete."
+    echo ""
+}
+
+compress_tests() {
+    echo "-------------------------------------------------------------"
+    echo "Compressing tests..."
+    echo "-------------------------------------------------------------"
+
+    local INSTALLER_DIR="../rocm-installer"
+    local TESTS_ARCHIVE="component-rocm/tests.tar.xz"
+
     # Change to installer directory
     cd "$INSTALLER_DIR" || exit 1
 
-    # Find all test component directories
-    echo ""
-    echo "Identifying test components..."
+    # Find all test package content directories
+    local test_content_dirs=()
 
-    local test_dirs=()
-    for arch_dir in component-rocm/*/; do
-        if [[ -d "$arch_dir" ]]; then
-            for component in "$arch_dir"*test*/; do
-                if [[ -d "$component" ]]; then
-                    test_dirs+=("${component%/}")
-                fi
-            done
-        fi
-    done
+    # Search for test packages in component-rocm/content/{base,gfx*}/*test*/
+    if [[ -d "component-rocm/content" ]]; then
+        for arch_dir in component-rocm/content/*/; do
+            if [[ -d "$arch_dir" ]]; then
+                for component in "$arch_dir"*test*/; do
+                    if [[ -d "$component" ]]; then
+                        test_content_dirs+=("${component%/}")
+                    fi
+                done
+            fi
+        done
+    fi
 
-    if [[ ${#test_dirs[@]} -eq 0 ]]; then
-        echo "  No test packages found, skipping test compression."
+    if [[ ${#test_content_dirs[@]} -eq 0 ]]; then
+        echo "No test packages found, skipping test compression."
         cd - >/dev/null || exit
         return 0
     fi
 
-    echo "  Found ${#test_dirs[@]} test component(s):"
-    printf '    - %s\n' "${test_dirs[@]}"
-
-    # Calculate uncompressed size
-    echo ""
+    # Calculate total source size
     local test_size_kb
-    local test_size_mb
+    test_size_kb=$(du -sk "${test_content_dirs[@]}" 2>/dev/null | awk '{s+=$1} END {print s}')
 
-    test_size_kb=$(du -sk "${test_dirs[@]}" 2>/dev/null | awk '{s+=$1} END {print s}')
-    test_size_mb=$((test_size_kb / 1024))
-
-    local test_size_gb_int=$((test_size_mb / 1024))
-    local test_size_gb_dec=$(( (test_size_mb * 100 / 1024) % 100 ))
-
-    # Remove any old test archives from previous builds
     echo ""
-    echo "Removing old test archives..."
-    rm -f tests.tar.xz 2>/dev/null
-    echo -e "  \e[93mRemoved old archives.\e[0m"
-
-    # Create xz-compressed tar archive of all test components
+    echo "Compressing test packages (all gfx architectures together)..."
     echo ""
-    echo "Creating xz-compressed test archive (level $XZ_COMPRESS_LEVEL)..."
-    echo "  This may take several minutes..."
+    echo "  Source: ${#test_content_dirs[@]} test package(s) ($(format_size $((test_size_kb * 1024))))"
+    echo "  Target: $TESTS_ARCHIVE"
+    echo "  Method: xz (level: $XZ_COMPRESS_LEVEL)"
+
+    # Remove old archives
+    rm -f "$TESTS_ARCHIVE" 2>/dev/null
 
     local start_time
     start_time=$(date +%s)
@@ -1254,72 +1083,55 @@ compress_tests() {
     show_compression_progress "$TESTS_ARCHIVE" &
     local progress_pid=$!
 
-    # Ensure progress monitor is killed on exit (Ctrl-C, error, or normal exit)
+    # Ensure progress monitor is killed on exit
     trap 'kill $progress_pid 2>/dev/null; wait $progress_pid 2>/dev/null' EXIT INT TERM
 
-    # Use relative paths for tar - compress with xz
-    if tar -cf - "${test_dirs[@]}" 2>/dev/null | \
+    # Compress all test content into single archive
+    local success=0
+    if tar -cf - "${test_content_dirs[@]}" 2>/dev/null | \
        xz "-$XZ_COMPRESS_LEVEL" -T"$(nproc)" --verbose 2>/tmp/xz-compression.log > "$TESTS_ARCHIVE"; then
+        success=1
+    fi
 
-        # Stop progress monitor
-        kill $progress_pid 2>/dev/null
-        wait $progress_pid 2>/dev/null
-        trap - EXIT INT TERM
+    # Stop progress monitor
+    kill $progress_pid 2>/dev/null
+    wait $progress_pid 2>/dev/null
+    trap - EXIT INT TERM
+
+    if [[ $success -eq 0 ]]; then
         echo ""
-        echo -e "  \e[32mCompressed with xz (level $XZ_COMPRESS_LEVEL, $(nproc) threads)\e[0m"
-
-        local end_time
-        end_time=$(date +%s)
-
-        local duration=$((end_time - start_time))
-
-        if [[ ! -f "$TESTS_ARCHIVE" || ! -s "$TESTS_ARCHIVE" ]]; then
-            echo -e "\e[31mERROR: Test archive creation failed or is empty\e[0m"
-            cd - >/dev/null || exit
-            exit 1
-        fi
-
-        report_archive_time "Archive created in" "$duration"
-    else
-        kill $progress_pid 2>/dev/null
-        wait $progress_pid 2>/dev/null
-        trap - EXIT INT TERM
-        echo ""
-        echo -e "\e[31mERROR: Failed to create test archive\e[0m"
+        echo -e "  \e[31mERROR: Failed to compress tests\e[0m"
         cd - >/dev/null || exit
         exit 1
     fi
 
-    # Get archive size and calculate compression ratio
+    # Update with final size to match the summary line
+    local final_size
+    final_size=$(stat -c%s "$TESTS_ARCHIVE" 2>/dev/null || stat -f%z "$TESTS_ARCHIVE" 2>/dev/null || echo 0)
+    printf "\r\033[K  Compressed: %s\n" "$(format_size "$final_size")"
+
+    local end_time
+    end_time=$(date +%s)
+    local duration=$((end_time - start_time))
+
+    # Calculate compression stats
     local archive_size_kb
-    local archive_size_mb
-
     archive_size_kb=$(du -k "$TESTS_ARCHIVE" | awk '{print $1}')
-    archive_size_mb=$((archive_size_kb / 1024))
-
-    local archive_size_gb_int=$((archive_size_mb / 1024))
-    local archive_size_gb_dec=$(( (archive_size_mb * 100 / 1024) % 100 ))
 
     local ratio=$((test_size_kb / archive_size_kb))
     local reduction=$(( 100 - (archive_size_kb * 100 / test_size_kb) ))
 
-    echo ""
-    echo "Compression results:"
-    echo "  Archive: $TESTS_ARCHIVE"
-    report_size "Size" "${test_size_gb_int}.${test_size_gb_dec} GB -> ${archive_size_gb_int}.${archive_size_gb_dec} GB (ratio ${ratio}:1)"
-    echo "  Size reduction: ${reduction}%"
+    echo -e "  \e[32mCompressed: $(format_size $((archive_size_kb * 1024))) (${ratio}:1, ${reduction}%) in $(format_duration "$duration")\e[0m"
 
-    # Remove test directories from component tree
-    echo ""
-    echo "Removing uncompressed test components..."
+    # Remove test content directories
     local removed_count=0
-    for test_dir in "${test_dirs[@]}"; do
+    for test_dir in "${test_content_dirs[@]}"; do
         if [[ -d "$test_dir" ]]; then
             rm -rf "$test_dir"
             ((removed_count++))
         fi
     done
-    echo -e "  \e[93mRemoved $removed_count test component directories.\e[0m"
+    echo -e "  \e[93mRemoved $removed_count uncompressed test content directories\e[0m"
 
     cd - >/dev/null || exit
     echo ""
@@ -1335,183 +1147,94 @@ compress_components() {
     local INSTALLER_DIR="../rocm-installer"
     cd "$INSTALLER_DIR" || exit 1
 
-    # Find all component directories to compress (exclude test components already compressed)
-    local component_dirs=()
-
-    # Add component-rocm if it exists
-    if [[ -d "component-rocm" ]]; then
-        component_dirs+=("component-rocm")
-    fi
-
-    # Add component-amdgpu if it exists
-    if [[ -d "component-amdgpu" ]]; then
-        component_dirs+=("component-amdgpu")
-    fi
-
-    # Add component-rocm-deb if it exists (for cross-distro builds)
-    if [[ -d "component-rocm-deb" ]]; then
-        component_dirs+=("component-rocm-deb")
-    fi
-
-    if [[ ${#component_dirs[@]} -eq 0 ]]; then
-        echo "  No component directories found, skipping main content compression."
-        cd - >/dev/null || exit
-        return 0
-    fi
-
-    # Calculate size of all component directories
-    local main_size_kb
-    local main_size_mb
-
-    main_size_kb=$(du -sk "${component_dirs[@]}" 2>/dev/null | awk '{s+=$1} END {print s}')
-    main_size_mb=$((main_size_kb / 1024))
-
-    local main_size_gb_int=$((main_size_mb / 1024))
-    local main_size_gb_dec=$(( (main_size_mb * 100 / 1024) % 100 ))
-    echo "  Components to compress: ${component_dirs[*]}"
-
     # Remove any old component archives from previous builds
     echo ""
     echo "Removing old component archives..."
-    rm -f components.tar.gz components.tar.xz 2>/dev/null
+    rm -f component-rocm/content-*.tar.* component-amdgpu/content-amdgpu.tar.* 2>/dev/null
     echo -e "  \e[93mRemoved old archives.\e[0m"
+    echo ""
 
-    # Determine compression method and archive name based on mode
-    local MAIN_ARCHIVE
-    local COMPRESSION_TYPE
+    local total_compressed=0
+    local total_errors=0
 
-    if [[ "${HYBRID_ALL_XZ:-no}" == "yes" ]]; then
-        MAIN_ARCHIVE="components.tar.xz"
-        COMPRESSION_TYPE="xz"
-    else
-        MAIN_ARCHIVE="components.tar.gz"
-        COMPRESSION_TYPE="pigz"
+    # Compress ROCm content directories per-gfx architecture
+    if [[ -d "component-rocm/content" ]]; then
+        echo "Compressing ROCm content directories..."
+        echo ""
+
+        for content_dir in component-rocm/content/*; do
+            if [[ -d "$content_dir" ]]; then
+                local gfx_tag
+                gfx_tag=$(basename "$content_dir")
+                
+                local archive_name="component-rocm/content-${gfx_tag}.tar.xz"
+
+                echo "[$((total_compressed + 1))] Compressing ROCm content for: $gfx_tag"
+
+                if compress_directory "$content_dir" "$archive_name"; then
+                    ((total_compressed++))
+                    # Remove the uncompressed content directory after successful compression
+                    rm -rf "$content_dir"
+                    echo -e "  \e[93mRemoved uncompressed: $content_dir\e[0m"
+                else
+                    ((total_errors++))
+                    echo -e "  \e[31mERROR: Failed to compress $content_dir\e[0m"
+                fi
+                echo ""
+            fi
+        done
+
+        # Remove the empty content parent directory if all subdirectories were compressed
+        if [[ -d "component-rocm/content" ]] && [[ -z "$(ls -A component-rocm/content)" ]]; then
+            rmdir component-rocm/content
+            echo -e "  \e[93mRemoved empty content directory\e[0m"
+            echo ""
+        fi
     fi
 
-    # Compress all component directories
-    echo ""
-    local start_time
-    start_time=$(date +%s)
+    # Compress AMDGPU component directory (single archive for all distros)
+    if [[ -d "component-amdgpu" ]]; then
+        echo "Compressing AMDGPU component..."
+        echo ""
 
-    # Start progress monitor in background
-    show_compression_progress "$MAIN_ARCHIVE" &
-    local progress_pid=$!
+        echo "[$((total_compressed + 1))] Compressing component-amdgpu/content"
 
-    # Ensure progress monitor is killed on exit (Ctrl-C, error, or normal exit)
-    trap 'kill $progress_pid 2>/dev/null; wait $progress_pid 2>/dev/null' EXIT INT TERM
-
-    if [[ "$COMPRESSION_TYPE" == "xz" ]]; then
-        echo "Creating xz-compressed components archive (level $XZ_COMPRESS_LEVEL)..."
-        echo "  This may take several minutes..."
-
-        if tar -cf - "${component_dirs[@]}" 2>/dev/null | \
-           xz "-$XZ_COMPRESS_LEVEL" -T"$(nproc)" --verbose 2>/tmp/components-xz.log > "$MAIN_ARCHIVE"; then
-            # Stop progress monitor
-            kill $progress_pid 2>/dev/null
-            wait $progress_pid 2>/dev/null
-            trap - EXIT INT TERM
-            echo ""
-            echo -e "  \e[32mCompressed with xz (level $XZ_COMPRESS_LEVEL, $(nproc) threads)\e[0m"
-        else
-            kill $progress_pid 2>/dev/null
-            wait $progress_pid 2>/dev/null
-            trap - EXIT INT TERM
-            echo ""
-            echo -e "\e[31mERROR: Failed to create components archive with xz\e[0m"
-            cd - >/dev/null || exit
-            exit 1
-        fi
-    else
-        echo "Creating pigz-compressed components archive..."
-        echo "  This may take several minutes..."
-
-        if command -v pigz &> /dev/null; then
-            # Use pigz for parallel compression
-            if tar -cf - "${component_dirs[@]}" 2>/dev/null | \
-               pigz -6 -p "$(nproc)" > "$MAIN_ARCHIVE"; then
-                # Stop progress monitor
-                kill $progress_pid 2>/dev/null
-                wait $progress_pid 2>/dev/null
-                trap - EXIT INT TERM
-                echo ""
-                echo -e "  \e[32mCompressed with pigz (level 6, $(nproc) threads)\e[0m"
+        # Only compress content/ subdirectory, keep deps/ and scriptlets/ uncompressed
+        if [[ -d "component-amdgpu/content" ]]; then
+            if compress_directory "component-amdgpu/content" "component-amdgpu/content-amdgpu.tar.xz"; then
+                ((total_compressed++))
+                # Remove the uncompressed content directory after successful compression
+                rm -rf "component-amdgpu/content"
+                echo -e "  \e[93mRemoved uncompressed: component-amdgpu/content\e[0m"
             else
-                kill $progress_pid 2>/dev/null
-                wait $progress_pid 2>/dev/null
-                trap - EXIT INT TERM
-                echo ""
-                echo -e "\e[31mERROR: Failed to create components archive with pigz\e[0m"
-                cd - >/dev/null || exit
-                exit 1
+                ((total_errors++))
+                echo -e "  \e[31mERROR: Failed to compress component-amdgpu/content\e[0m"
             fi
         else
-            # Fallback to gzip
-            if tar -czf "$MAIN_ARCHIVE" "${component_dirs[@]}" 2>/dev/null; then
-                # Stop progress monitor
-                kill $progress_pid 2>/dev/null
-                wait $progress_pid 2>/dev/null
-                trap - EXIT INT TERM
-                echo ""
-                echo -e "  \e[32mCompressed with gzip\e[0m"
-            else
-                kill $progress_pid 2>/dev/null
-                wait $progress_pid 2>/dev/null
-                trap - EXIT INT TERM
-                echo ""
-                echo -e "\e[31mERROR: Failed to create components archive with gzip\e[0m"
-                cd - >/dev/null || exit
-                exit 1
-            fi
+            echo -e "  \e[93mNo content directory found in component-amdgpu, skipping compression\e[0m"
         fi
+        echo ""
     fi
 
-    local end_time
-    end_time=$(date +%s)
-
-    local duration=$((end_time - start_time))
-
-    if [[ ! -f "$MAIN_ARCHIVE" || ! -s "$MAIN_ARCHIVE" ]]; then
-        echo -e "\e[31mERROR: Main archive creation failed or is empty\e[0m"
-        cd - >/dev/null || exit
-        exit 1
+    # Skip compression for component-rocm-deb (small metadata-only directory)
+    if [[ -d "component-rocm-deb" ]]; then
+        echo "Skipping compression for component-rocm-deb (metadata-only, <1MB)"
     fi
-
-    report_archive_time "Archive created in" "$duration"
-
-    # Get archive size and calculate compression ratio
-    local archive_size_kb
-    local archive_size_mb
-
-    archive_size_kb=$(du -k "$MAIN_ARCHIVE" | awk '{print $1}')
-    archive_size_mb=$((archive_size_kb / 1024))
-
-    local archive_size_gb_int=$((archive_size_mb / 1024))
-    local archive_size_gb_dec=$(( (archive_size_mb * 100 / 1024) % 100 ))
-
-    local ratio=$((main_size_kb / archive_size_kb))
-    local reduction=$(( 100 - (archive_size_kb * 100 / main_size_kb) ))
-
-    echo ""
-    echo "Compression results:"
-    echo "  Archive: $MAIN_ARCHIVE"
-    report_size "Size" "${main_size_gb_int}.${main_size_gb_dec} GB -> ${archive_size_gb_int}.${archive_size_gb_dec} GB (ratio ${ratio}:1)"
-    echo "  Size reduction: ${reduction}%"
-
-    # Remove uncompressed component directories
-    echo ""
-    echo "Removing uncompressed component directories..."
-    local removed_count=0
-    for comp_dir in "${component_dirs[@]}"; do
-        if [[ -d "$comp_dir" ]]; then
-            rm -rf "$comp_dir"
-            ((removed_count++))
-        fi
-    done
-    echo -e "  \e[93mRemoved $removed_count component directories.\e[0m"
 
     cd - >/dev/null || exit
     echo ""
-    echo "Components compression complete."
+    echo "-------------------------------------------------------------"
+    echo "Compression Summary:"
+    echo "  Total archives created: $total_compressed"
+    echo "  Errors: $total_errors"
+
+    if [[ $total_errors -gt 0 ]]; then
+        echo -e "  \e[31mStatus: FAILED (with errors)\e[0m"
+        exit 1
+    else
+        echo -e "  \e[32mStatus: SUCCESS\e[0m"
+    fi
+
     echo "-------------------------------------------------------------"
 }
 
@@ -1662,6 +1385,11 @@ do
         EXTRACT_TYPE="contentlist"
         shift
         ;;
+    nocompress)
+        echo "Disabling component/test compression."
+        BUILD_COMPRESS="no"
+        shift
+        ;;
     norunfile)
         echo "Disabling runfile build."
         BUILD_INSTALLER="no"
@@ -1698,17 +1426,8 @@ do
             hybrid)
                 echo "Setting compression mode: hybrid (xz-9 for everything, maximum compression)"
                 ;;
-            hybridmix)
-                echo "Setting compression mode: hybridmix (pigz + xz for tests, embedded xz-static)"
-                ;;
             hybriddev)
                 echo "Setting compression mode: hybriddev (xz-3 for everything, fast compression)"
-                ;;
-            devsmall)
-                echo "Setting compression mode: devsmall (xz - best compression)"
-                ;;
-            devmedium)
-                echo "Setting compression mode: devmedium (pbzip2 - balanced production)"
                 ;;
             dev)
                 echo "Setting compression mode: dev (pigz + complevel 6)"
@@ -1716,9 +1435,12 @@ do
             normal)
                 echo "Setting compression mode: normal (gzip -9)"
                 ;;
+            nocomp)
+                echo "Setting compression mode: nocomp (no compression - debugging only)"
+                ;;
             *)
                 echo -e "\e[31mERROR: Invalid mscomp value: $MAKESELF_COMPRESS_MODE\e[0m"
-                echo "Valid options: hybrid, hybridmix, hybriddev, devsmall, devmedium, dev, normal"
+                echo "Valid options: hybrid, hybriddev, dev, normal, nocomp"
                 exit 1
                 ;;
         esac
@@ -1743,10 +1465,15 @@ extract_packages
 # Setup version/build info (before compression to access amdgpu-dkms-ver.txt)
 write_version
 
-# Compress packages if hybrid mode is enabled
-if [[ "$HYBRID_COMPRESSION" == "yes" ]]; then
+# Compress packages if hybrid mode is enabled and compression not disabled
+if [[ "$HYBRID_COMPRESSION" == "yes" ]] && [[ "$BUILD_COMPRESS" == "yes" ]]; then
+    compress_setup
     compress_tests
     compress_components
+elif [[ "$BUILD_COMPRESS" == "no" ]]; then
+    echo "-------------------------------------------------------------"
+    echo "Skipping compression (nocompress flag specified)"
+    echo "-------------------------------------------------------------"
 fi
 
 # Generate component lists and headers
