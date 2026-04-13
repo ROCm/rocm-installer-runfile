@@ -385,7 +385,7 @@ ctest --test-dir build --output-on-failure
 After the initial configure step, only the build and test commands are needed for subsequent runs.
 
 
-### Formatting using pre-commit hokos
+### Formatting using pre-commit hooks
 
 We enforce formatting for certain languages using
 [_pre-commit_](https://pre-commit.com/) with hooks defined in
@@ -394,6 +394,12 @@ We enforce formatting for certain languages using
 To get started with pre-commit:
 
 ```bash
+# Install Python (only tested this with python 3.12.11)
+# Create venv folder
+python3 -m venv venv
+
+source venv/bin/activate
+
 # Download.
 pip install pre-commit
 
