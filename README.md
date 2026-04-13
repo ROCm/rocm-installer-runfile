@@ -411,10 +411,14 @@ pre-commit run --all-files
 
 # (Optional but recommended)
 # Install git hook. Now pre-commit runs on every git commit.
-
-# If you install the git hook, pre-commit runs automatically on every git commit:
-# If checks pass: Commit proceeds normally.
-# If checks fail with auto-fixes (e.g., Black, trailing-whitespace): The commit is blocked, but files are fixed in-place. Run git add on the fixed files and commit again.
-# If checks fail without auto-fixes (e.g., shellcheck): The commit is blocked. Manually fix the errors shown, then git add and commit again.
 pre-commit install
+```
+
+### CodeQL Analysis
+
+Runs Github's CodeQL tool to analyse the C code in `runfile-installer/UI/src`. 
+
+```shell
+cd runfile-installer/tests/codeql-test
+bash run-codeql-analysis.sh --config configs/rocm-ui.conf
 ```
