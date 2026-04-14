@@ -98,7 +98,7 @@ void create_pre_menu_window(WINDOW *pMenuWindow)
     menuPre.drawMenuFunc = pre_menu_draw;
 
     // Set user pointers for "item" event
-    for (int i = 0; i < menuPre.itemList[0].numItems - 1; ++i) 
+    for (int i = 0; i < menuPre.itemList[0].numItems - 1; ++i)
     {
         set_item_userptr(menuPre.itemList[0].items[i], process_item);
     }
@@ -168,7 +168,7 @@ void pre_menu_draw()
 
     char depsPath[LARGE_CHAR_SIZE];
     char cwd[512];
-    
+
     getcwd(cwd, sizeof(cwd));
     sprintf(depsPath, "%s/%s", cwd, DEPS_OUT_FILE);
 
@@ -177,7 +177,7 @@ void pre_menu_draw()
     wattroff(pWin, WHITE | A_BOLD);
 
     wattron(pWin, A_BOLD);
-    
+
     if(access(depsPath, F_OK) != -1)
     {
         mvwprintw(pWin, DEP_FILE_Y, DEP_FILE_X, "File: %s", depsPath);
@@ -186,11 +186,11 @@ void pre_menu_draw()
     {
         mvwprintw(pWin, DEP_FILE_Y, DEP_FILE_X, "File: ");
     }
-    
+
     wattroff(pWin, A_BOLD);
 
     menu_draw(&menuPre);
-    
+
     draw_deps_selections();
 }
 
@@ -214,7 +214,7 @@ void draw_logs_path(WINDOW *pWin)
 {
     char cwd[512];
     getcwd(cwd, sizeof(cwd));
-    
+
     mvwprintw(pWin, DEP_FILE_Y, DEP_FILE_X, "Install logs:   ");
     wattron(pWin, A_BOLD);
     mvwprintw(pWin, DEP_FILE_Y+1, DEP_FILE_X, "%s/%s", cwd, LOG_FILE_DIR);
@@ -228,7 +228,7 @@ void draw_window_title(WINDOW *pWin, char *pTitle)
     wclear(pWin);
 
     box(pWin, 0, 0);
-    
+
     wattron(pWin, CYAN | A_BOLD);
     mvwprintw(pWin, 1, (int)temp, "%s", pTitle);
     wattroff(pWin, CYAN | A_BOLD);
@@ -239,19 +239,19 @@ void draw_window_title(WINDOW *pWin, char *pTitle)
 
 int execute_cmd_with_progress(const char *script, const char *arg1, const char *arg2, const char *arg3)
 {
-    int height = 3; 
+    int height = 3;
     int width = PROGRESS_BAR_WIDTH + 5;
     int start_y = WIN_NUM_LINES;
     int start_x = WIN_START_X + 1;
-    
+
     int status;
     int fd = -1;
-    
+
     WINDOW *progress_win = newwin(height, width, start_y, start_x);
     wrefresh(progress_win);
 
     pid_t pid = fork();
-    if (pid == 0) 
+    if (pid == 0)
     {
         // Child
         fd = open("/dev/null", O_WRONLY);
@@ -259,19 +259,19 @@ int execute_cmd_with_progress(const char *script, const char *arg1, const char *
         {
             exit(1);
         }
-        
+
         dup2(fd, 1);
 
         execl("/bin/bash", "bash", script, arg1, arg2, arg3, NULL);
-        
+
         exit(1); // exit if execl fails
-    } 
-    else if (pid > 0) 
+    }
+    else if (pid > 0)
     {
         // Parent
         status = wait_with_progress_bar(pid, 5000, 0);
-    } 
-    else 
+    }
+    else
     {
         // Fork failed
         endwin();
@@ -323,7 +323,7 @@ void process_pre_menu()
     MENU *pMenu = menuPre.pMenu;
     WINDOW *pWin = menuPre.pMenuWindow;
     ITEM *pCurrentItem = current_item(pMenu);
-    
+
     int index = item_index(pCurrentItem);
 
     int numDeps = 0;
@@ -358,14 +358,14 @@ void process_pre_menu()
         else if (index == PRE_MENU_ITEM_DEPS_LIST_INDEX) // list
         {
             char *pTitle;
-            
+
             // set the components to list
             if (g_pPreConfig->rocm_deps)
             {
                 strncat(components, "rocm ", SMALL_CHAR_SIZE - strlen(components) - 1);
                 pTitle = "ROCm Dependencies";
             }
-            if (g_pPreConfig->driver_deps) 
+            if (g_pPreConfig->driver_deps)
             {
                 strncat(components, "amdgpu", SMALL_CHAR_SIZE - strlen(components) - 1);
                 pTitle = "amdgpu driver Dependencies";
@@ -377,7 +377,7 @@ void process_pre_menu()
             }
 
             sprintf(args, "deps=list %s", components);
-            
+
             // run the dependency list command
             if (execute_cmd("./rocm-installer.sh", args, NULL) == 0)
             {
@@ -402,13 +402,13 @@ void process_pre_menu()
             char *pArg2 = NULL;
 
             // set the components to validate
-            if (g_pPreConfig->rocm_deps) 
+            if (g_pPreConfig->rocm_deps)
             {
                 strncat(arg1, "rocm", SMALL_CHAR_SIZE - strlen(arg1) - 1);
                 pArg1 = arg1;
             }
 
-            if (g_pPreConfig->driver_deps) 
+            if (g_pPreConfig->driver_deps)
             {
                 if (strlen(arg1) > 0)
                 {
@@ -447,7 +447,7 @@ void process_pre_menu()
             if (g_pPreConfig->rocm_deps) strncat(components, "rocm ", SMALL_CHAR_SIZE - strlen(components) - 1);
             if (g_pPreConfig->driver_deps) strncat(components, "amdgpu", SMALL_CHAR_SIZE - strlen(components) - 1);
             sprintf(args, "deps=install-only %s", components);
-	        
+
             // run the dependency install command
             if (execute_cmd("./rocm-installer.sh", args, pWin) == 0)
             {

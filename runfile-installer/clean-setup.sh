@@ -208,7 +208,7 @@ if [ $CLEAN_BUILD -eq 1 ]; then
         echo -e "\e[93mRemoving: package-extractor/logs\e[0m"
         $SUDO rm -r package-extractor/logs
     fi
-    
+
     if [ -f "rocm-installer/epel-release-latest-8.noarch.rpm" ]; then
         echo -e "\e[93mRemoving: rocm-installer/epel-release-latest-8.noarch.rpm\e[0m"
         $SUDO rm rocm-installer/epel-release-latest-8.noarch.rpm*
@@ -223,7 +223,7 @@ if [ $CLEAN_BUILD -eq 1 ]; then
         echo -e "\e[93mRemoving: rocm-installer/epel-release-latest-10.noarch.rpm\e[0m"
         $SUDO rm rocm-installer/epel-release-latest-10.noarch.rpm*
     fi
-    
+
     if [ -d "rocm-installer/component-rocm" ]; then
         echo -e "\e[93mRemoving: rocm-installer/component-rocm\e[0m"
         $SUDO rm -r rocm-installer/component-rocm

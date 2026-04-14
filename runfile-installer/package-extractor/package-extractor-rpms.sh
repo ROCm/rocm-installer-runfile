@@ -118,7 +118,7 @@ Usage: $PROG [options]
 
     nocontent               = Disables content extraction (deps, scriptlets will be extracted only).
     contentlist             = Lists all files extracted to content directories during extraction.
-    
+
     resolveautodeps          = Enable automatic dependency resolution.  Requires build-config to be specified.
     build-config=<file_path> = <file_path> Path to build-config file used during package pull.
                                Contains ROCM_REPO variable with repository configuration.
@@ -265,7 +265,7 @@ dump_extract_stats() {
     echo +++++++++++++++++++++++++++++++++++++++++++++
     echo STATS
     echo -----
-    
+
     local stat_dir=$1
 
     echo "$stat_dir":
@@ -290,14 +290,14 @@ dump_extract_stats() {
 
 init_stats() {
     echo Initialize package information.
-    
+
     PACKAGES=
-    
+
     AMD_PACKAGES=
     OTHER_PACKAGES=
-    
+
     GLOBAL_DEPS=
-    
+
     SCRIPLET_PREINST_COUNT=0
     SCRIPLET_POSTINST_COUNT=0
     SCRIPLET_PRERM_COUNT=0
@@ -335,16 +335,16 @@ move_opt_contents() {
 
 move_etc_contents_rocm() {
     local content_etc_dir="$PACKAGE_DIR/content-etc"
-             
+
     echo Creating content-etc directory: "$content_etc_dir"
     mkdir "$content_etc_dir"
-     
+
     # Move all contents of the 'etc' directory to the content-etc directory
     mv "$dir/"* "$content_etc_dir/"
-    
+
     # Remove the empty 'etc' directory
     rmdir "$dir"
-    
+
     echo "Moved contents of '$dir' to '$content_etc_dir'."
 }
 
@@ -362,7 +362,7 @@ move_usr_contents_rocm() {
 
 move_data() {
     echo -e "\e[36mMoving data...\e[0m"
-    
+
     local content_dir="$1"
     echo "Content root: $content_dir"
 
@@ -375,24 +375,24 @@ move_data() {
         if [[ -d "$dir" && "$dirname" == "opt" ]]; then
             echo -e "\e[93m'opt' directory detected: $dir\e[0m"
             move_opt_contents "$content_dir" "$dir"
-        
+
         elif [[ -d "$dir" && "$dirname" == "etc" ]]; then
             echo -e "\e[93m'etc' directory detected: $dir\e[0m"
             if [[ $content_dir =~ "component-rocm" ]]; then
-                move_etc_contents_rocm 
-            fi 
-             
+                move_etc_contents_rocm
+            fi
+
         elif [[ -d "$dir" && "$dirname" == "usr" ]]; then
             echo -e "\e[93m'usr' directory detected: $dir\e[0m"
             if [[ $content_dir =~ "component-rocm" ]]; then
                 move_usr_contents_rocm "$dir"
             fi
-              
+
         else
             echo -e "\e[93m$dir not moved.\e[0m"
         fi
     done
-    
+
     echo Moving data...Complete.
 }
 
@@ -412,9 +412,9 @@ extract_data() {
 
     echo Creating content directory: "$package_dir_content"
     mkdir -p "$package_dir_content"
-    
+
     echo "Extracting Data..."
-    
+
     # Extract the rpm package file content
     pushd "$package_dir_content" || exit
 
@@ -450,7 +450,7 @@ extract_version() {
         # Extract version from package filename
         local pkg_basename
         pkg_basename=$(basename "$pkg")
-        
+
         local pattern='amdrocm-base([0-9]+\.[0-9]+)-'
 
         if [[ $pkg_basename =~ $pattern ]]; then
@@ -867,7 +867,7 @@ extract_scriptlets() {
     echo +++++++++++
     echo "$scriptlets"
     echo +++++++++++
-   
+
     echo "$scriptlets" | awk -v output_dir="$package_dir_scriptlet" '
     /scriptlet \(using/ {
         if (section) {
@@ -890,14 +890,14 @@ extract_scriptlets() {
         }
     }
     '
-    
+
     # Make the output scripts executable
     for scriptlet in "$package_dir_scriptlet"/*; do
        if [[ -s "$scriptlet" ]]; then
            echo ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
            echo Making scriptlet "$scriptlet" executable.
            chmod +x "$scriptlet"
-           
+
            # Check the script content for /opt
            if grep -q '/opt' "$scriptlet"; then
                echo "Scriptlet contains /opt"
@@ -934,9 +934,9 @@ extract_scriptlets() {
 
                # Rename for rocm-installer
                mv "$scriptlet" "$(dirname "$scriptlet")/postrm"
-               
+
            fi
-           
+
        else
            if [[ -f "$scriptlet" ]]; then
                #echo Removing empty scriptlet $(basename $scriptlet).
@@ -944,7 +944,7 @@ extract_scriptlets() {
            fi
        fi
     done
-    
+
     echo Extracting Scriptlets...Complete.
     echo ---------------------------------
 }
@@ -986,19 +986,19 @@ extract_package() {
 add_extra_deps() {
     echo ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     echo Additional Dependencies...
-    
+
     echo "Adding Extra Dependencies."
     for pkg in "${EXTRA_DEPS[@]}"; do
         echo "    $pkg"
         GLOBAL_DEPS+=", $pkg"
     done
-    
+
     echo "Adding Installer Dependencies."
     for pkg in "${INSTALLER_DEPS[@]}"; do
         echo "    $pkg"
         GLOBAL_DEPS+=", $pkg"
     done
-    
+
     echo Additional Dependencies...Complete.
     echo ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 }
@@ -1020,7 +1020,7 @@ check_package_owner() {
            fi
        fi
     fi
-    
+
     if [[ $AMDPKG == 1 ]] ; then
         print_no_err "AMD PACKAGE"
         AMD_COUNT=$((AMD_COUNT+1))
@@ -1064,40 +1064,40 @@ filter_deps_version() {
     # Read config file from metadata_dir
     local config_file="$metadata_dir/$EXTRACT_PKG_CONFIG_FILE"
     CONFIG_PKGS=$(<"$config_file")
-    
+
     if [ -f "$deps_file_filtered" ]; then
         rm "$deps_file_filtered"
     fi
-    
+
     # read the global deps file and filter to new file base on package versions
     while IFS= read -r line; do
         echo "<><><><><><><><><><><><><><><><><><><><><><>"
         echo -e "dep : \e[96m$line\e[0m"
-        
+
         # Remove (x86-64) substrings
         line="${line//(x86-64)/}"
-        
+
         # Remove open bracket from the start and close bracket from the end and replace " or " with "|"
         line=$(echo "$line" | sed 's/^[(]//; s/[)]$//' | sed 's/ or /|/g')
         echo "line: $line"
 
         # filter the versioning within brackets
         current_package=$(echo "$line" | awk -F '[()]' '{print $1}' | awk '{print $1}')
-        
+
         # extract the current version number only
         current_version=$(echo "$line" | sed -n 's/.*[>=]\s*\(.*\)/\1/p')
-        
+
         # init a null version to 0 (for rpmdev-vercmp)
         if [[ -z "$current_version" ]]; then
             current_version="0"
         fi
-        
+
         echo ++++++
         echo "current  : $current_package : $current_version"
         echo "prev     : $prev_package : $prev_version"
         echo "prev_line: $prev_line"
         echo ++++++
-        
+
         if [[ -n $prev_package ]]; then
             # check if the current and previous dep are equal.  If equal, compare the version
             if [ "$current_package" = "$prev_package" ]; then
@@ -1113,7 +1113,7 @@ filter_deps_version() {
             else
                 # the packages are different, so write out the previous dep to the filter deps file
                 echo "Diff package (cur != prev)"
-                
+
                 # before writing out, check for "tags" or if the dep is in the extracted package list
                 if echo "$CONFIG_PKGS" | grep -qw "$prev_package"; then
                     echo -e "\e[32mConfig package: write prev_package: $prev_package\e[0m"
@@ -1136,21 +1136,21 @@ filter_deps_version() {
 
     # write out the last line
     echo "$prev_line" >> "$deps_file_filtered"
-    
+
     sort -u "$deps_file_filtered" -o "$deps_file_filtered"
-    
+
     # diff the package list against the deps and write out deps that are not installed
     diff "$packages_file" "$deps_file_filtered" | grep '^>' | sed 's/^> //' > "$reqs_file"
-    
+
     # remove the filtered global list
     rm "$deps_file_filtered"
-    
+
     echo "<><><><><><><><><><><><><><><><><><><><><><>"
     echo "Required Dependencies:"
     while IFS= read -r dep; do
         echo "$dep"
     done < "$reqs_file"
-    
+
     echo Dependency Version Filter...Complete.
 }
 
@@ -1274,9 +1274,9 @@ combine_rocm_deps() {
             local remaining_count
             filtered_count=$(wc -l < "$gfx_deps_sorted")
             remaining_count=$(wc -l < "$gfx_deps_filtered")
-            
+
             local removed_count=$((filtered_count - remaining_count))
-            
+
             echo "Filtered out $removed_count AMD ROCm package dependencies"
             echo "Remaining external dependencies: $remaining_count"
 
@@ -1660,7 +1660,7 @@ extract_test_packages() {
                 # Find deps.txt for this package from deps/ structure
                 local gfx_tag
                 gfx_tag=$(basename "$gfx_dir")
-                
+
                 local deps_file=""
                 if [ -f "../rocm-installer/component-rocm/deps/$gfx_tag/$current_pkg/deps.txt" ]; then
                     deps_file="../rocm-installer/component-rocm/deps/$gfx_tag/$current_pkg/deps.txt"
@@ -1855,7 +1855,7 @@ generate_rocm_signature_files() {
             if [ -d "$pkg_dir" ]; then
                 local pkg_name
                 pkg_name=$(basename "$pkg_dir")
-                
+
                 local signature_file="$deps_base_dir/$pkg_name/signature.txt"
                 mkdir -p "$(dirname "$signature_file")"
 
@@ -1869,14 +1869,14 @@ generate_rocm_signature_files() {
         if [ -d "$gfx_dir" ]; then
             local gfx_tag
             gfx_tag=$(basename "$gfx_dir")
-            
+
             local deps_gfx_dir="$EXTRACT_DEPS_DIR/$gfx_tag"
 
             for pkg_dir in "$gfx_dir"/*; do
                 if [ -d "$pkg_dir" ]; then
                     local pkg_name
                     pkg_name=$(basename "$pkg_dir")
-                    
+
                     local signature_file="$deps_gfx_dir/$pkg_name/signature.txt"
                     mkdir -p "$(dirname "$signature_file")"
 
@@ -1918,7 +1918,7 @@ extract_rocm_rpms() {
 
     echo "Processing packages from: $PACKAGE_DIR"
     echo "Organizing by gfx tag into component-rocm subdirectories..."
-    
+
     PACKAGE_LIST=
 
     # Collect all package files and group by gfx/base tag
@@ -2053,13 +2053,13 @@ extract_amdgpu_rpms() {
 
     # Extract the amdgpu rpms
     extract_rpms
-    
+
     echo Extracting AMDGPU RPMs...Complete.
 
     echo -e "\e[93m========================================\e[0m"
     echo -e "\e[93m$PKG_COUNT AMDGPU packages extracted\e[0m"
     echo -e "\e[93m========================================\e[0m"
-    
+
     # extract the amdgpu-dkms build version
     # content/{distro}/amdgpu-dkms/usr/src
     local amdgpu_dkms_path="$EXTRACT_CONTENT_DIR/$COMP_TYPE/amdgpu-dkms/usr/src"
@@ -2090,7 +2090,7 @@ extract_amdgpu_rpms() {
 
     local packages
     packages=$(cat "$config_file")
-    
+
     local reordered_packages=""
 
     # Ensure "amdgpu-dkms-firmware" is the first package
@@ -2251,7 +2251,7 @@ fi
 if [[ $AMDGPU_EXTRACT == 1 ]]; then
     extract_amdgpu_rpms
     write_extract_info
-    
+
     filter_deps_version
 fi
 

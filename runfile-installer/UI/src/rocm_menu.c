@@ -57,9 +57,9 @@ MENU_PROP rocmMenuMainProps  = {
     .pMenuTitle = "ROCm Options",
     .pMenuControlMsg = "<DONE> to exit",
     .numLines = ARRAY_SIZE(rocmMenuMainOp) - 1,
-    .numCols = MAX_MENU_ITEM_COLS, 
-    .starty = ROCM_MENU_ITEM_START_Y, 
-    .startx = ROCM_MENU_ITEM_START_X, 
+    .numCols = MAX_MENU_ITEM_COLS,
+    .starty = ROCM_MENU_ITEM_START_Y,
+    .startx = ROCM_MENU_ITEM_START_X,
     .numItems = ARRAY_SIZE(rocmMenuMainOp)
 };
 
@@ -180,9 +180,9 @@ void create_rocm_menu_window(WINDOW *pMenuWindow)
     set_menu_grey(menuROCm.pMenu, BLUE);
     menu_set_item_select(&menuROCm, menuROCm.itemList[0].numItems - 4, false);  // space before done
     rocm_menu_toggle_grey_items(false);
-    
+
     // create a form for user input
-    create_form(&menuROCm, pMenuWindow, ROCM_MENU_NUM_FORM_FIELDS, ROCM_MENU_FORM_FIELD_WIDTH, ROCM_MENU_FORM_FIELD_HEIGHT, 
+    create_form(&menuROCm, pMenuWindow, ROCM_MENU_NUM_FORM_FIELDS, ROCM_MENU_FORM_FIELD_WIDTH, ROCM_MENU_FORM_FIELD_HEIGHT,
             ROCM_MENU_FORM_ROW, ROCM_MENU_FORM_COL);
 
     strcpy(menuROCm.pFormList.formControlMsg, DEFAULT_FORM_CONTROL_MSG);
@@ -224,9 +224,9 @@ void rocm_menu_toggle_grey_items(bool enable)
     }
 }
 
-int find_rocm_with_progress(char *target) 
+int find_rocm_with_progress(char *target)
 {
-    int height = 3; 
+    int height = 3;
     int width = PROGRESS_BAR_WIDTH + 5;
     int start_y = WIN_NUM_LINES;
     int start_x = WIN_START_X + 1;
@@ -246,7 +246,7 @@ int find_rocm_with_progress(char *target)
     memset(g_pRocmConfig->rocm_paths, '\0', sizeof(g_pRocmConfig->rocm_paths));
     g_pRocmConfig->rocm_count = 0;
 
-    if (pipe(pipefd) == -1) 
+    if (pipe(pipefd) == -1)
     {
         perror("pipe");
         return -1;
@@ -256,12 +256,12 @@ int find_rocm_with_progress(char *target)
     wrefresh(progress_win);
 
     pid_t pid = fork();
-    if (pid == 0) 
+    if (pid == 0)
     {
         // Child
 
         close(pipefd[0]); // Close unused read end
-        
+
         fd = open("/dev/null", O_WRONLY);
         if (fd == -1)
         {
@@ -275,7 +275,7 @@ int find_rocm_with_progress(char *target)
 
         // Write the result to the pipe
         write(pipefd[1], &g_pRocmConfig->rocm_count, sizeof(g_pRocmConfig->rocm_count));
-        for (int i = 0; i < g_pRocmConfig->rocm_count; i++) 
+        for (int i = 0; i < g_pRocmConfig->rocm_count; i++)
         {
             write(pipefd[1], g_pRocmConfig->rocm_paths[i], sizeof(g_pRocmConfig->rocm_paths[i]));
         }
@@ -284,24 +284,24 @@ int find_rocm_with_progress(char *target)
 
         // exit with the function's return status
         exit(status);
-    } 
-    else if (pid > 0) 
+    }
+    else if (pid > 0)
     {
         // Parent
-        
+
         close(pipefd[1]); // Close unused write end
 
         status = wait_with_progress_bar(pid, 5000, 0);
 
         // Read the result from the pipe
         read(pipefd[0], &g_pRocmConfig->rocm_count, sizeof(g_pRocmConfig->rocm_count));
-        for (int i = 0; i < g_pRocmConfig->rocm_count; i++) 
+        for (int i = 0; i < g_pRocmConfig->rocm_count; i++)
         {
             read(pipefd[0], g_pRocmConfig->rocm_paths[i], sizeof(g_pRocmConfig->rocm_paths[i]));
         }
 
         close(pipefd[0]); // Close read end
-    } 
+    }
     else
     {
         // Fork failed
@@ -386,7 +386,7 @@ void check_rocm_install_status()
             {
                 // rocm installation/s found at target
                 g_pRocmConfig->is_rocm_installed = true;
-                
+
                 // installer is installing the same version of rocm for the current found path
                 // check if the found path is in /opt/rocm and a package manager install
                 if (check_target_for_package_install(g_pRocmConfig->rocm_install_path, g_pRocmConfig->rocm_paths[i]) == 1)
@@ -437,12 +437,12 @@ void check_rocm_install_status()
 
 void rocm_status_draw()
 {
-    if (!g_pRocmConfig->install_rocm) 
+    if (!g_pRocmConfig->install_rocm)
     {
         clear_menu_msg(&menuROCm);
         return;
     }
-    
+
     // check if the rocm target install path is valid - draw msg updates if valid
     if (g_pRocmConfig->is_rocm_path_valid)
     {
@@ -477,7 +477,7 @@ void rocm_menu_draw()
     char drawName[DEFAULT_CHAR_SIZE];
 
     menu_info_draw_bool(&menuROCm, ROCM_MENU_ITEM_INSTALL_ROCM_ROW, ROCM_MENU_FORM_COL, g_pRocmConfig->install_rocm);
-    
+
     field_trim(g_pRocmConfig->rocm_install_path, drawName, ROCM_MENU_FORM_FIELD_WIDTH);
     mvwprintw(pMenuWindow, ROCM_MENU_FORM_ROW,  ROCM_MENU_FORM_COL, "%s", drawName);
 
@@ -529,7 +529,7 @@ void rocm_menu_submenu_draw(MENU_DATA *pMenuData)
 }
 
 void do_rocm_menu()
-{  
+{
     MENU *pMenu = menuROCm.pMenu;
 
     wclear(menuROCm.pMenuWindow);
@@ -708,7 +708,7 @@ void draw_rocm_uninstall_types()
 {
     WINDOW *pWin = menuROCmUninstall.pMenuWindow;
     int draw_index = 0;
-    
+
     // mark each rocm install by type
     for (int i = 0; i < g_pRocmConfig->rocm_count; i++)
     {
@@ -815,7 +815,7 @@ void create_rocm_uninstall_window(WINDOW *pMenuWindow)
     int i;
 
     // set the path pointers to the found rocm paths
-    if (g_pRocmConfig->rocm_count != 0) 
+    if (g_pRocmConfig->rocm_count != 0)
     {
         // check for "any" package manager install
         for (i = 0; i < g_pRocmConfig->rocm_count; i++)
@@ -831,7 +831,7 @@ void create_rocm_uninstall_window(WINDOW *pMenuWindow)
         g_uninstall_rocm_runfile_index = g_pRocmConfig->rocm_runfile_path_index;
 
         // set the menu item names to the rocm paths found
-        for (i = 0; i < g_pRocmConfig->rocm_count; i++) 
+        for (i = 0; i < g_pRocmConfig->rocm_count; i++)
         {
             rocm_paths_items[i] = g_pRocmConfig->rocm_paths[i];
             rocm_paths_item_desc[i] = g_pRocmConfig->rocm_paths[i];
@@ -938,7 +938,7 @@ void destroy_rocm_uninstall_menu_window()
 
     g_uninstall_start_index = 0;
     g_uninstall_end_index = 19;
-    
+
     g_uninstall_rocm_pkg_index = -1;
     g_uninstall_rocm_runfile_index = -1;
 }
@@ -1048,7 +1048,7 @@ void process_rocm_uninstall_item()
         g_uninstall_end_index--;
         g_uninstall_start_index--;
     }
-    
+
     draw_rocm_uninstall_types();
 
     // white/bold
@@ -1135,7 +1135,7 @@ void create_rocm_menu_device_window(WINDOW *pMenuWindow)
                                             rocmMenuDeviceOps, rocmMenuDeviceDesc);
 
     // Setup and create the device menu
-    if (item_count != 0) 
+    if (item_count != 0)
     {
         for (int j = 0; j < MAX_MENU_ITEMS; j++)
         {

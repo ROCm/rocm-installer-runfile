@@ -117,7 +117,7 @@ typedef struct _FORM_DATA
 typedef struct _MENU_DATA
 {
     WINDOW      *pMenuWindow;   // window associated with the menu
-    
+
     MENU        *pMenu;         // menu object
     MENU_PROP   *pMenuProps;    // menu items in pMenu
     char        menuTitle[MAX_MENU_ITEM_COLS];
@@ -135,7 +135,7 @@ typedef struct _MENU_DATA
     FORM_DATA   pFormList;
 
     bool enableMultiSelection;
-    
+
     // For menus where user can select/deselect items
     bool isMenuItemsSelectable;
 
@@ -156,7 +156,7 @@ typedef struct _MENU_DATA
 
     // Only clear the debug/err message area after KEY_UP or KEY_DOWN
     // events in menu_loop iff this is set to true.
-    bool clearErrMsgAfterUpOrDownKeyPress; 
+    bool clearErrMsgAfterUpOrDownKeyPress;
 }MENU_DATA;
 
 

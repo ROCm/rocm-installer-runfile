@@ -771,7 +771,7 @@ setup_puller_config_rocm() {
         echo -e "\e[31mERROR: Template file not found: $TEMPLATE_DEB\e[0m"
         exit 1
     fi
-    
+
     if [ ! -f "$TEMPLATE_RPM" ]; then
         echo -e "\e[31mERROR: Template file not found: $TEMPLATE_RPM\e[0m"
         exit 1
