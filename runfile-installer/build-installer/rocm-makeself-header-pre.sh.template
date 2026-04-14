@@ -290,19 +290,19 @@ Usage:
                              * If compo=/gfx= not specified, auto-detects and uninstalls all installed components
 
         uninstall-amdgpu = Uninstall amdgpu driver.
-        	           
-    
+
+
     Information/Debug:
     ------------------
     findrocm = Search for an install of ROCm.
     complist = List the version of ROCm components included in the installer.
     prompt   = Run the installer with user prompts.
     verbose  = Run installer with verbose logging
-    
+
 +++++++++++++++++++++++++++++++
 Usage examples:
 +++++++++++++++++++++++++++++++
-    
+
 # ROCm installation (no Dependency install)
 
     * ROCm install location (default) => /opt/rocm-x.y.z
@@ -487,7 +487,7 @@ MS_Decompress()
     else
         eval "$GUNZIP_CMD"
     fi
-    
+
     if test \$? -ne 0; then
         echo " ... Decompression failed." >&2
     fi
@@ -765,7 +765,7 @@ fi
 
 if test x"$NEED_ROOT" = xy -a \`id -u\` -ne 0; then
 	echo "Administrative privileges required for this archive (use su or sudo)" >&2
-	exit 1	
+	exit 1
 fi
 
 if test x"\$copy" \!= xphase2; then

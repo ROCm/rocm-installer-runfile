@@ -472,16 +472,16 @@ if [[ -f "$RESULTS_DIR/security-and-quality.csv" ]]; then
 
     {
         echo ""
-        echo "Warnings:" 
+        echo "Warnings:"
     } >> "$RESULTS_DIR/SUMMARY.txt"
-    
+
     grep -c '"warning"' "$RESULTS_DIR/security-and-quality.csv" >> "$RESULTS_DIR/SUMMARY.txt" 2>/dev/null || echo "0" >> "$RESULTS_DIR/SUMMARY.txt"
 
     {
-        echo "" 
+        echo ""
         echo "Recommendations:"
     } >> "$RESULTS_DIR/SUMMARY.txt"
-    
+
     grep -c '"recommendation"' "$RESULTS_DIR/security-and-quality.csv" >> "$RESULTS_DIR/SUMMARY.txt" 2>/dev/null || echo "0" >> "$RESULTS_DIR/SUMMARY.txt"
 
     {
@@ -489,7 +489,7 @@ if [[ -f "$RESULTS_DIR/security-and-quality.csv" ]]; then
         echo "Top Issues:"
         echo "------------"
     } >> "$RESULTS_DIR/SUMMARY.txt"
-   
+
     grep -E '"warning"|"error"' "$RESULTS_DIR/security-and-quality.csv" | \
         cut -d',' -f1 | sort | uniq -c | sort -rn | head -10 >> "$RESULTS_DIR/SUMMARY.txt" 2>/dev/null || true
 fi

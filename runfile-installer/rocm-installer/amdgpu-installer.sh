@@ -226,7 +226,7 @@ get_version() {
             AMDGPU_DKMS_BUILD_NUM="N/A"
         fi
     fi
-    
+
     echo "AMDGPU Build: $AMDGPU_DKMS_BUILD_NUM"
 }
 
@@ -858,6 +858,7 @@ install_deps() {
     # Parse the dependency args
     if [[ $DEPS_ARG == "list" ]]; then
         echo Listing required AMDGPU dependencies
+        # shellcheck disable=SC2086  # depOp intentionally unquoted for word splitting
         ./deps-installer.sh "amdgpu" $depOp list
         status=$?
 
@@ -870,6 +871,7 @@ install_deps() {
 
     elif [[ $DEPS_ARG == "validate" ]]; then
         echo Validating required AMDGPU dependencies
+        # shellcheck disable=SC2086  # depOp intentionally unquoted for word splitting
         ./deps-installer.sh "amdgpu" $depOp
         status=$?
 
@@ -881,6 +883,7 @@ install_deps() {
         exit 0
 
     elif [[ $DEPS_ARG == "install" ]] || [[ $DEPS_ARG == "install-only" ]]; then
+        # shellcheck disable=SC2086  # depOp intentionally unquoted for word splitting
         ./deps-installer.sh "amdgpu" $depOp install
         status=$?
 
@@ -1001,4 +1004,3 @@ case "$COMMAND" in
 esac
 
 echo "Installer log stored in: $AMDGPU_INSTALLER_CURRENT_LOG"
-

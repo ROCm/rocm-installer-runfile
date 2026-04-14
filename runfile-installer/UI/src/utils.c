@@ -38,9 +38,9 @@ void exit_error(char *pError)
     // exit ncurses with an error string to stderr
 
     endwin();
-    
+
     fprintf(stderr, "%s\n", pError);
-    
+
     exit(1);
 }
 
@@ -55,7 +55,7 @@ int get_char_array_size(char *array[])
 {
     // array must have last element defined as NULL
     int size = 0;
-    if (array != NULL) 
+    if (array != NULL)
     {
         while (array[size] != NULL) {
             size++;
@@ -69,7 +69,7 @@ bool is_field_empty(char *text)
 {
     int count = strlen(text);
     int i = 0;
-   
+
     while (i < count)
     {
         // When user deletes char(s) from form field, it simply replaces the deleted
@@ -105,7 +105,7 @@ int get_field_length(char *text, int field_width)
 void field_trim(char *src, char *dst, int max)
 {
     int field_len = get_field_length(src, max);
-    
+
     memset(dst, '\0', DEFAULT_CHAR_SIZE);
     strncpy(dst, src, (max-3));
     if (field_len > (max -3) )
@@ -204,23 +204,23 @@ int clear_str(char *str)
 bool is_dir_exist(char *path)
 {
     DIR* dir = opendir(path);
-    if (dir) 
+    if (dir)
     {
         /* Directory exists. */
         closedir(dir);
         return true;
-    } 
-    else 
+    }
+    else
     {
         return false;
     }
 
 }
 
-int is_rocm_pkg_installed(DISTRO_TYPE distroType) 
+int is_rocm_pkg_installed(DISTRO_TYPE distroType)
 {
     int status;
-    
+
     if (distroType == eDISTRO_TYPE_DEB)
     {
         status = system("dpkg -l rocm-core > /dev/null 2>&1");
@@ -230,7 +230,7 @@ int is_rocm_pkg_installed(DISTRO_TYPE distroType)
         status = system("rpm -q rocm-core > /dev/null 2>&1");
     }
 
-    if (status == -1) 
+    if (status == -1)
     {
         perror("system");
         return 0;
@@ -408,7 +408,7 @@ int get_rocm_version_str_from_path(char *rocm_loc, char *rocm_core_ver)
 
     // get the base directory name from the current location
     char *rocm_dir = basename(rocm_loc);
-    
+
     // extract "rocm-"
     char *rocm_str = strstr(rocm_dir, "rocm-");
     if (NULL != rocm_str)
@@ -445,7 +445,7 @@ int get_rocm_core_pkg(DISTRO_TYPE distroType, char *rocm_core_out, size_t out_si
         fp = popen("rpm -q rocm-core", "r");
     }
 
-    if (fp == NULL) 
+    if (fp == NULL)
     {
         perror("popen failed");
         return -1;
@@ -453,21 +453,21 @@ int get_rocm_core_pkg(DISTRO_TYPE distroType, char *rocm_core_out, size_t out_si
 
     // Read the output a line at a time and store it in rocm_core_out
     rocm_core_out[0] = '\0'; // Initialize rocm_core_out to an empty string
-    while (fgets(path, sizeof(path), fp) != NULL) 
+    while (fgets(path, sizeof(path), fp) != NULL)
     {
         strncat(rocm_core_out, path, out_size - strlen(rocm_core_out) - 1);
     }
 
     // Close the command and get the exit status
     status = pclose(fp);
-    if (status == -1) 
+    if (status == -1)
     {
         perror("pclose");
         return -1;
     }
 
     // Check if the command was successful
-    if (WIFEXITED(status) && WEXITSTATUS(status) == 0) 
+    if (WIFEXITED(status) && WEXITSTATUS(status) == 0)
     {
         // the command may have succeeded, check that dkms provide output
         if (strlen(rocm_core_out) > 0)
@@ -475,8 +475,8 @@ int get_rocm_core_pkg(DISTRO_TYPE distroType, char *rocm_core_out, size_t out_si
             return 0;
         }
         return -1;
-    } 
-    else 
+    }
+    else
     {
         return -1;
     }
@@ -502,7 +502,7 @@ int is_loc_opt_rocm(char *rocm_loc)
 int is_dkms_pkg_installed(DISTRO_TYPE distroType)
 {
     int status;
-    
+
     if (distroType == eDISTRO_TYPE_DEB)
     {
         status = system("apt list --installed 2>&1 | grep dkms  > /dev/null 2>&1");
@@ -512,7 +512,7 @@ int is_dkms_pkg_installed(DISTRO_TYPE distroType)
         status = system("rpm -q dkms > /dev/null 2>&1");
     }
 
-    if (status == -1) 
+    if (status == -1)
     {
         perror("system");
         return 0;
@@ -522,10 +522,10 @@ int is_dkms_pkg_installed(DISTRO_TYPE distroType)
     return WIFEXITED(status) && WEXITSTATUS(status) == 0;
 }
 
-int is_amdgpu_dkms_pkg_installed(DISTRO_TYPE distroType) 
+int is_amdgpu_dkms_pkg_installed(DISTRO_TYPE distroType)
 {
     int status;
-    
+
     if (distroType == eDISTRO_TYPE_DEB)
     {
         status = system("apt list --installed 2>&1 | grep amdgpu-dkms  > /dev/null 2>&1");
@@ -535,7 +535,7 @@ int is_amdgpu_dkms_pkg_installed(DISTRO_TYPE distroType)
         status = system("rpm -q amdgpu-dkms > /dev/null 2>&1");
     }
 
-    if (status == -1) 
+    if (status == -1)
     {
         perror("system");
         return 0;

@@ -154,7 +154,7 @@ void process_post_menu()
         {
             g_pPostConfig->current_user_grp = !g_pPostConfig->current_user_grp;
             menu_info_draw_bool(&menuPost, POST_MENU_ITEM_CUR_USER_ROW, POST_MENU_FORM_COL, g_pPostConfig->current_user_grp);
-        
+
             if (g_pPostConfig->current_user_grp)
             {
                 // disable udev and set to false
@@ -167,7 +167,7 @@ void process_post_menu()
                 // enable udev
                 menu_set_item_select(&menuPost, POST_MENU_ITEM_ALL_USER_INDEX, true);
             }
-        
+
         }
         else if (index == POST_MENU_ITEM_ALL_USER_INDEX)
         {

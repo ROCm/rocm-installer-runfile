@@ -29,7 +29,7 @@
 #define ROCM_MENU_ITEM_START_X              1   // minimum starting x/col
 
 // ROCM status menu draw loc
-#define ROCM_STATUS_MENU_ITEM_START_Y       23              
+#define ROCM_STATUS_MENU_ITEM_START_Y       23
 #define ROCM_STATUS_MENU_ITEM_START_X       1
 
 // ROCm menu indices
@@ -90,4 +90,3 @@ void destroy_rocm_menu_compo_window();
 
 
 #endif // _ROCM_MENU_H
-

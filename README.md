@@ -416,7 +416,7 @@ pre-commit install
 
 ### CodeQL Analysis
 
-Runs Github's CodeQL tool to analyse the C code in `runfile-installer/UI/src`. 
+Runs Github's CodeQL tool to analyse the C code in `runfile-installer/UI/src`.
 
 ```shell
 cd runfile-installer/tests/codeql-test
