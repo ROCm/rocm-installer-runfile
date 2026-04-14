@@ -1073,7 +1073,7 @@ setup_amdgpu() {
     # Pull AMDGPU packages
     pushd ../package-puller || exit
         echo -------------------------------------------------------------
-        echo "`Setting up for AMDGPU components...`"
+        echo "Setting up for AMDGPU components..."
         echo "========================================="
         echo "Pulling AMDGPU packages for $DISTRO_NAME $DISTRO_VER..."
         echo "========================================="
