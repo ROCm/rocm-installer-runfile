@@ -1,0 +1,29 @@
+name: CodeQL Analysis
+
+on:
+  pull_request:
+    paths:
+      - 'runfile-installer/UI/src/**'
+  push:
+    branches:
+      - main
+      - release/therock-*
+    paths:
+      - 'runfile-installer/UI/src/**'
+  schedule:
+    - cron: '0 6 * * 0'  # Weekly on Sunday
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  analyze:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: runfile-installer/tests/codeql-test
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # 6.0.2
+      - name: Perform CodeQL Analysis
+        run: bash run-codeql-analysis.sh --config ./configs/rocm-ui.conf

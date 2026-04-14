@@ -1,3 +1,5 @@
 # Default owner for everything in the repo.
 * @dbieleck
 .github/CODEOWNERS @dbieleck
+.github/workflows/** @pbhandar
+.pre-commit-config.yaml @pbhandar

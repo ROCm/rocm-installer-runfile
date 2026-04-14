@@ -383,3 +383,42 @@ ctest --test-dir build --output-on-failure
 ```
 
 After the initial configure step, only the build and test commands are needed for subsequent runs.
+
+
+### Formatting using pre-commit hooks
+
+We enforce formatting for certain languages using
+[_pre-commit_](https://pre-commit.com/) with hooks defined in
+[`.pre-commit-config.yaml`](/.pre-commit-config.yaml).
+
+To get started with pre-commit:
+
+```bash
+# Install Python (only tested this with python 3.12.11)
+# Create venv folder
+python3 -m venv venv
+
+source venv/bin/activate
+
+# Download.
+pip install pre-commit
+
+# Run locally on staged files.
+pre-commit run
+
+# Run locally on all files.
+pre-commit run --all-files
+
+# (Optional but recommended)
+# Install git hook. Now pre-commit runs on every git commit.
+pre-commit install
+```
+
+### CodeQL Analysis
+
+Runs Github's CodeQL tool to analyse the C code in `runfile-installer/UI/src`. 
+
+```shell
+cd runfile-installer/tests/codeql-test
+bash run-codeql-analysis.sh --config configs/rocm-ui.conf
+```
