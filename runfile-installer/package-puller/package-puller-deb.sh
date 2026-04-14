@@ -55,18 +55,18 @@ Usage: $PROG [Options] [Pull_Config] [Packages] [Output]
 
 [Options}:
     help   = Display this help information.
-    
+
     prompt  = Run the package puller with user prompts.
     amd     = Copy amd-specific packages out.
     other   = Copy non-amd packages out.
     verbose = Run the package puller with verbose logging.
-    
-[Pull_Config]:   
+
+[Pull_Config]:
     config=<file_path> = <file_path> Path to a .config file with create settings in the format of create-default.config.
 
 [Packages]:
     pkg=<package list> = <package-list> List of Package/Packages to pull
-    
+
 [Output]:
     out=<file_path>    = <file_path> Path to output directory for pulled packages
 
@@ -74,7 +74,7 @@ Example (pull by config):
 -------------------------
 
     ./package_puller.sh config="config/rocm-6.2-22.04.config" out="/home/amd/package-extractor/packages" prompt amd
-       
+
 END_USAGE
 }
 
@@ -164,42 +164,42 @@ cleanup() {
             $SUDO rm "/etc/apt/keyrings/$index"
         fi
     done
-    
+
     $SUDO apt-get update
-    
+
     echo Cleaning up...Complete.
 }
 
 cleanup_pkg_cache() {
     echo ++++++++++++++++++++++++++++++++
     echo Cleaning up package cache...
-    
+
     if [ -f "./pkgcache.bin" ]; then
         $SUDO rm "./pkgcache.bin"
     fi
-            
-    if [ -f "./lock" ]; then            
+
+    if [ -f "./lock" ]; then
         $SUDO rm "./lock"
     fi
-            
+
     if [ -f "./srcpkgcache.bin" ]; then
         $SUDO rm "./srcpkgcache.bin"
     fi
-            
+
     if [ -d "./partial" ]; then
         $SUDO rm -R "./partial"
     fi
-    
+
     echo Cleaning up package cache...Complete.
 }
 
 config_create() {
     echo ++++++++++++++++++++++++++++++++
     echo Create Configure...
-    
+
     CREATE_CONFIG_FILE=
     local CREATE_CONFIG_FILE_INPUT=$1
-    
+
     # Check for user-modified config file (input .config to create script)
     if [[ ${CREATE_CONFIG_FILE_INPUT##*.} == "config" ]]; then
          CREATE_CONFIG_FILE=$CREATE_CONFIG_FILE_INPUT
@@ -216,7 +216,7 @@ config_create() {
         print_err "Fail.  No config file."
         exit 1
     fi
-    
+
     echo Create Configure...Complete.
 }
 
@@ -403,7 +403,7 @@ check_package_owner() {
     local package
     local maintainer
     local description
-    
+
     package=$(dpkg -I "$pkgName" | grep "Package:")
     maintainer=$(dpkg -I "$pkgName" | grep -m 1 "Maintainer:")
     description=$(dpkg -I "$pkgName" | grep "Description:")
@@ -411,10 +411,10 @@ check_package_owner() {
     if [[ $VERBOSE == 1 ]]; then
         dpkg -I "$pkgName"
     fi
-    
+
     if [[ $package =~ "amdgpu" || $package =~ "rocm" || $package =~ "hip" ]]; then
         AMDPKG=1
-        
+
         # filter out any distro-versions of amdgpu packages
         if [[ $package =~ amdgpu && -n $maintainer ]]; then
             if [[ ! $maintainer =~ \<gpudriverdevsupport@amd\.com\> && ! $maintainer =~ \<slava\.grigorev@amd\.com\>  ]]; then
@@ -435,15 +435,15 @@ check_package_owner() {
                AMDPKG=1
            fi
        fi
-       
+
        if [[ -n $description ]]; then
            if [[ $description =~ "Advanced Micro Devices" || $description =~ "Radeon"  ]]; then
                AMDPKG=1
            fi
        fi
     fi
-    
-    # for amd or amdgpu-specific packages copy to separate directories  
+
+    # for amd or amdgpu-specific packages copy to separate directories
     if [[ $AMDPKG == 1 ]] ; then
         AMD_COUNT=$((AMD_COUNT+1))
         ROCM_PACKAGES+="$(basename "$pkgName") "
@@ -485,7 +485,7 @@ check_package_owner() {
 
             cp "$pkgName" "$PWD/packages-other"
         fi
-        
+
         print_str "$NON_AMD_COUNT: 3rd Party PACKAGE" 4
     fi
 }
@@ -495,7 +495,7 @@ dump_packages_info() {
     AMD_COUNT=0
     AMDGPU_COUNT=0
     NON_AMD_COUNT=0
-    
+
     PACKAGES=
     ROCM_PACKAGES=
     OTHER_PACKAGES=
@@ -516,7 +516,7 @@ dump_packages_info() {
             check_package_owner "$pkg"
        done
    popd || exit
-   
+
    echo -----------------------------
    echo "Package Total         = $PKG_COUNT"
    echo "Package AMD           = $AMD_COUNT"
@@ -653,4 +653,3 @@ fi
 if [[ -n $PULL_CURRENT_LOG ]]; then
     echo -e "\e[32mExtract log stored in: $PULL_CURRENT_LOG\e[0m"
 fi
-

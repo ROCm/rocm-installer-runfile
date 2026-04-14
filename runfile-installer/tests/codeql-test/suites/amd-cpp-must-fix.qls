@@ -1,5 +1,5 @@
 #AMD Must Fix 1.0 queries
-- query: Likely Bugs/Arithmetic/BadAdditionOverflowCheck.ql 
+- query: Likely Bugs/Arithmetic/BadAdditionOverflowCheck.ql
 - query: Likely Bugs/Memory Management/PointerOverflow.ql
 - query: Likely Bugs/Underspecified Functions/TooFewArguments.ql
 - query: Security/CWE/CWE-190/ComparisonWithWiderType.ql

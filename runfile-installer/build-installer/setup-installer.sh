@@ -771,7 +771,7 @@ setup_puller_config_rocm() {
         echo -e "\e[31mERROR: Template file not found: $TEMPLATE_DEB\e[0m"
         exit 1
     fi
-    
+
     if [ ! -f "$TEMPLATE_RPM" ]; then
         echo -e "\e[31mERROR: Template file not found: $TEMPLATE_RPM\e[0m"
         exit 1
@@ -1356,4 +1356,3 @@ echo "=============================="
 echo -e "\e[36mTotal setup time: ${SETUP_HOURS}h ${SETUP_MINUTES}m ${SETUP_SECONDS}s (${SETUP_ELAPSED} seconds)\e[0m"
 echo ==============================
 echo ""
-

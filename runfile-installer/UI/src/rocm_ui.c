@@ -609,9 +609,9 @@ int main()
     noecho();
     keypad(stdscr, TRUE);
     curs_set(0);
-    
+
     // init colors
-    
+
     // Single colors (foreground on black background)
     init_pair(1, COLOR_RED, COLOR_BLACK);
     init_pair(2, COLOR_CYAN, COLOR_BLACK);
@@ -657,12 +657,12 @@ int main()
     post_menu(pMenu);
     print_menu_item_selection(&menuMain, MENU_SEL_START_Y, MENU_SEL_START_X);
     wrefresh(menuWindow);
-    
+
     while( done == 0 )
     {
         c = wgetch(menuWindow);
         switch(c)
-        {	
+        {
             case KEY_RESIZE: // Terminal window resize
                 if (should_window_be_resized(menuWindow, WIN_NUM_LINES,WIN_WIDTH_COLS))
                 {
@@ -699,14 +699,14 @@ int main()
 
         print_menu_item_selection(&menuMain, MENU_SEL_START_Y, MENU_SEL_START_X);
         wrefresh(menuWindow);
-    } 
+    }
 
     destroy_menu(&menuMain);
 
     destroy_pre_menu_window();
     destroy_rocm_menu_window();
     destroy_post_menu_window();
-    
+
     delwin(menuWindow);
     endwin();
 
@@ -741,5 +741,3 @@ int main()
     return 0;
 
 }
-
-

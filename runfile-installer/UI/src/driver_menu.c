@@ -188,7 +188,7 @@ void check_driver_install_status()
             g_pDriverConfig->is_driver_installed = false;
         }
     }
-    
+
     // grey-out the driver install ops depending if the driver is installed or not
     menu_set_item_select(&menuDriver, DRIVER_MENU_ITEM_INSTALL_DRIVER_INDEX, !g_pDriverConfig->is_driver_installed);
 
@@ -214,7 +214,7 @@ void driver_clear_status()
 void driver_status_draw()
 {
     WINDOW *pMenuWindow = menuDriver.pMenuWindow;
-    
+
     // check for the driver status and draw
     if (g_pDriverConfig->driver_install_type == 0)
     {
