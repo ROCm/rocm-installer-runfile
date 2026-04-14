@@ -1,0 +1,31 @@
+# Runs code quality check on all the files in the repo
+
+name: Code Quality Check
+
+on:
+  pull_request:
+  push:
+    branches: 
+      - main
+      - release/therock-*
+
+permissions:
+  contents: read
+
+jobs:
+  code-quality:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+      # Runs pre-commit with the argument --all-files
+      - uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
+      
+      - name: Add help message on failure
+        if: failure()
+        run: |
+          echo "## Pre-commit checks failed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Some files need formatting or have linting errors." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "See [Formatting using pre-commit hooks](https://github.com/${{ github.repository }}/blob/main/README.md#formatting-using-pre-commit-hooks) for instructions on running the style checker locally." >> $GITHUB_STEP_SUMMARY

@@ -626,6 +626,7 @@ load_manifest_for_uninstall() {
             local found=0
             for i in "${!gfx_components[@]}"; do
                 if [[ "${gfx_components[$i]}" == *"|$gfx_arch" ]]; then
+                    # shellcheck disable=SC2004
                     gfx_components[$i]="${gfx_components[$i]%|*} $comp_name|$gfx_arch"
                     found=1
                     break
