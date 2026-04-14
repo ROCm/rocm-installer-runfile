@@ -100,7 +100,7 @@ if [[ ! -d "$WORK_DIR" ]]; then
     exit 1
 fi
 
-cd "$WORK_DIR"
+cd "$WORK_DIR" || exit
 
 print_header "CodeQL Cleanup Script"
 echo "Working directory: $WORK_DIR"

@@ -183,7 +183,6 @@ os_release() {
 
         case "$ID" in
         almalinux)
-            PULL_DISTRO_TYPE=el
             PULL_DISTRO_PACKAGE_TYPE=rpm
             if [[ "$DISTRO_MAJOR_VER" == "10" ]]; then
                 DISTRO_TAG="el10"
@@ -403,24 +402,19 @@ write_version() {
 install_tools() {
     echo -------------------------------------------------------------
     echo "Installing required tools for $DISTRO_NAME $DISTRO_VER..."
+    echo "Installing tools for EL-based system..."
 
-    if [ $PULL_DISTRO_TYPE == "el" ]; then
-        echo "Installing tools for EL-based system..."
-
-        # Check if all required tools are already installed
-        if command -v sudo &> /dev/null && command -v wget &> /dev/null; then
-            echo "All required tools are already installed (sudo, wget)"
-        else
-            # One or more tools missing, install all
-            echo "Installing required tools: sudo wget"
-            if ! dnf install -y sudo wget; then
-                echo -e "\e[31mERROR: Failed to install tools.\e[0m"
-                exit 1
-            fi
-            echo "Tools installed successfully"
-        fi
+    # Check if all required tools are already installed
+    if command -v sudo &> /dev/null && command -v wget &> /dev/null; then
+        echo "All required tools are already installed (sudo, wget)"
     else
-        echo "Skipping tool installation (only EL-based systems supported)."
+        # One or more tools missing, install all
+        echo "Installing required tools: sudo wget"
+        if ! dnf install -y sudo wget; then
+            echo -e "\e[31mERROR: Failed to install tools.\e[0m"
+            exit 1
+        fi
+        echo "Tools installed successfully"
     fi
 
     echo "Installing required tools...Complete"
@@ -881,31 +875,14 @@ setup_puller_config_amdgpu() {
 
 configure_setup_rocm() {
     echo ++++++++++++++++++++++++++++++++
+    echo "Configuring for RPM packages."
 
-    if [ $PULL_DISTRO_PACKAGE_TYPE == "deb" ]; then
-        echo "Configuring for DEB packages."
-
-        PULLER_CONFIG="${PULLER_CONFIG:-$PULLER_CONFIG_DEB}"
-        if [[ -n $PULLER_CONFIG_DEB ]]; then
-            PULLER_CONFIG=$PULLER_CONFIG_DEB
-        fi
-
-        echo "Using configuration: $PULLER_CONFIG"
-
-    elif [ $PULL_DISTRO_PACKAGE_TYPE == "rpm" ]; then
-        echo "Configuring for RPM packages."
-
-        PULLER_CONFIG="${PULLER_CONFIG:-$PULLER_CONFIG_RPM}"
-        if [[ -n $PULLER_CONFIG_RPM ]]; then
-            PULLER_CONFIG=$PULLER_CONFIG_RPM
-        fi
-
-        echo "Using configuration: $PULLER_CONFIG"
-        
-    else
-        echo "Invalid Distro Package Type: $PULL_DISTRO_PACKAGE_TYPE"
-        exit 1
+    PULLER_CONFIG="${PULLER_CONFIG:-$PULLER_CONFIG_RPM}"
+    if [[ -n $PULLER_CONFIG_RPM ]]; then
+        PULLER_CONFIG=$PULLER_CONFIG_RPM
     fi
+
+    echo "Using configuration: $PULLER_CONFIG"
 }
 
 configure_setup_amdgpu() {
@@ -1078,20 +1055,9 @@ setup_amdgpu() {
         echo "Pulling AMDGPU packages for $DISTRO_NAME $DISTRO_VER..."
         echo "========================================="
 
-        # Call the appropriate package puller based on distro type
-        if [ $PULL_DISTRO_TYPE == "deb" ]; then
-            ./package-puller-deb.sh amd config="$PULLER_CONFIG" pkg="$PULLER_PACKAGES_AMDGPU"
-            pull_status=$?
-        elif [ $PULL_DISTRO_TYPE == "el" ]; then
-            ./package-puller-el.sh amd config="$PULLER_CONFIG" pkg="$PULLER_PACKAGES_AMDGPU"
-            pull_status=$?
-        elif [ $PULL_DISTRO_TYPE == "sle" ]; then
-            ./package-puller-sle.sh amd config="$PULLER_CONFIG" pkg="$PULLER_PACKAGES_AMDGPU"
-            pull_status=$?
-        else
-            echo -e "\e[31mUnsupported distro type: $PULL_DISTRO_TYPE\e[0m"
-            exit 1
-        fi
+        # Call the EL package puller
+        ./package-puller-el.sh amd config="$PULLER_CONFIG" pkg="$PULLER_PACKAGES_AMDGPU"
+        pull_status=$?
 
         # check if package pull was successful
         if [[ $pull_status -ne 0 ]]; then

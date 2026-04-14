@@ -903,8 +903,8 @@ fi
 cd "\$tmpdir"
 
 # ROCm Hybrid Compression: Delegate to install-init.sh for extraction
-# Check for hybrid compression markers
-if test -f "components.tar.xz" || test -f "components.tar.gz"; then
+# Check for hybrid compression markers (on-demand compressed content archives)
+if test -d "component-rocm" || test -d "component-amdgpu"; then
     # Hybrid compression detected - let install-init.sh handle extraction
     # This path handles both noexec and normal execution
 
