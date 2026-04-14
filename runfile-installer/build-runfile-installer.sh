@@ -67,16 +67,16 @@ This script performs a complete ROCm runfile installer build:
 [Setup Options] - Passed to setup-installer.sh:
     rocm                  = Setup only ROCm packages (skip AMDGPU).
     amdgpu                = Setup only AMDGPU packages (skip ROCm).
-    
+
     amdgpu-mode=all       = Setup AMDGPU packages for all supported distributions (default).
     amdgpu-mode=single    = Setup AMDGPU packages for current distro only.
-    
+
     rocm-mode=native      = Pull DEB packages using native OS (default).
     rocm-mode=chroot      = Pull DEB packages using Ubuntu chroot (for RPM-based OS).
     rocm-archs=<archs>    = Set GPU architectures to pull (e.g., gfx94x,gfx950).
                             Default: gfx908,gfx90a,gfx94x,gfx950,gfx110x,gfx1150,gfx1151,gfx120x
                             Legacy (ROCm < 7.12): gfx90x,gfx94x,gfx950,gfx110x,gfx1150,gfx1151,gfx120x
-    
+
     pull=<release-type>   = Pull ROCm packages from specified repository (required).
                             Valid types: dev, nightly, prerelease, release
     pulltag=<tag>         = Set ROCm build tag (required for all builds).

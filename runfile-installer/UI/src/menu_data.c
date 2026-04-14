@@ -30,7 +30,7 @@ int create_menu(MENU_DATA *pMenuData, WINDOW *pMenuWin, MENU_PROP *pProperties, 
 
     // Set the menu window
     pMenuData->pMenuWindow = pMenuWin;
-    
+
     pMenuData->enableMultiSelection = true;
 
     pMenuData->pMenuProps = pProperties;
@@ -38,7 +38,7 @@ int create_menu(MENU_DATA *pMenuData, WINDOW *pMenuWin, MENU_PROP *pProperties, 
     // Set the menu title, control message and configuration structure
     strcpy(pMenuData->menuTitle, pProperties->pMenuTitle);
     strcpy(pMenuData->menuControlMsg, pProperties->pMenuControlMsg);
-    
+
     pMenuData->pConfig = pConfig;
 
     // Create items - main item list (index 0)
@@ -66,7 +66,7 @@ int create_menu(MENU_DATA *pMenuData, WINDOW *pMenuWin, MENU_PROP *pProperties, 
     // Set main window and sub window
     set_menu_win(pMenuData->pMenu, pMenuWin);
     set_menu_sub(pMenuData->pMenu, derwin(pMenuWin, subwin_numlines, pProperties->numCols,  pProperties->starty,  pProperties->startx));
-    
+
     return 0;
 }
 
@@ -111,7 +111,7 @@ int add_menu_items(MENU_DATA *pMenuData, int itemListIndex, ITEMLIST_PARAMS *pIt
         print_menu_err_msg(pMenuData, "Failed to allocate item list");
         return -1;
     }
-    
+
     return 0;
 }
 
@@ -424,15 +424,15 @@ void menu_item_select(MENU_DATA *pMenuData, ITEM *pCurrentItem)
     // Clears warning messages at the very bottom of the window.
     clear_menu_msg(pMenuData);
 
-    // Deselect all other items if multiselection is disabled and the 
+    // Deselect all other items if multiselection is disabled and the
     // new item is not currently selected.
     if ( (!pMenuData->enableMultiSelection) && ((item_value(pCurrentItem) == FALSE)) )
     {
         ITEM **items = menu_items(pMenu);
-        
-        for (int i = 0; i < item_count(pMenu); i++) 
+
+        for (int i = 0; i < item_count(pMenu); i++)
         {
-            if (item_value(items[i]) == TRUE) 
+            if (item_value(items[i]) == TRUE)
             {
                 set_item_value(items[i], false);
             }
@@ -441,7 +441,7 @@ void menu_item_select(MENU_DATA *pMenuData, ITEM *pCurrentItem)
         }
 
         pMenuData->itemSelections = 0;
-    }           
+    }
 
     // update the item selection bitfield
     TOGGLE_BIT( (pMenuData->itemSelections), (item_index(pCurrentItem)) );
@@ -600,24 +600,24 @@ void menu_loop(MENU_DATA *pMenuData)
 
     void (*p)(MENU_DATA*);
     void (*drawFunc)(MENU_DATA*);
-    
+
     // Menu loop
     while( done == 0 )
-    {   
+    {
         pCurrentItem = current_item(pMenu);
 
         c = wgetch(pMenuWindow);
-        
+
         switch(c)
-        {	
+        {
             case KEY_RESIZE: // Terminal window resize
                 if (should_window_be_resized(pMenuWindow, WIN_NUM_LINES,WIN_WIDTH_COLS))
                 {
                     reset_window_before_resizing(pMenuData);
-                    
+
                     drawFunc = pMenuData->drawMenuFunc;
-                    drawFunc(pMenuData); 
-                }   
+                    drawFunc(pMenuData);
+                }
 
                 p = item_userptr(pCurrentItem);
                 if (NULL != p)
@@ -637,15 +637,15 @@ void menu_loop(MENU_DATA *pMenuData)
             case ' ':
                 // Don't do anything if item isn't selectable.
                 if (item_opts(pCurrentItem) != O_SELECTABLE) continue;
-                
+
                 // Space bar selection only enabled for menus where isMenuItemSelectable is true.
                 if (!pMenuData->isMenuItemsSelectable) continue;
 
                 // Prevents users from trying to select the <DONE> and <HELP> menu items.
-                if (is_menu_item_done_item_index(pMenuData, listIndex, pCurrentItem) || 
+                if (is_menu_item_done_item_index(pMenuData, listIndex, pCurrentItem) ||
                     is_menu_item_help_item_index(pMenuData, listIndex, pCurrentItem))
                 {
-                    continue;   
+                    continue;
                 }
 
                 menu_item_select(pMenuData, pCurrentItem);
@@ -654,8 +654,8 @@ void menu_loop(MENU_DATA *pMenuData)
                 if (NULL != p)
                 {
                     p((MENU_DATA*)pMenuData);
-                }                
-                
+                }
+
                 break;
 
             case 10:    // Enter
@@ -679,7 +679,7 @@ void menu_draw(MENU_DATA *pMenuData)
 
     print_menu_title(pMenuData, MENU_TITLE_Y, MENU_TITLE_X, WIN_WIDTH_COLS, pMenuData->menuTitle, CYAN);
     print_menu_item_title(pMenuData,  ITEM_TITLE_Y, ITEM_TITLE_X, pMenuData->itemList[curItemListIndex].itemTitle, MAGENTA);
-    
+
     print_menu_item_selection(pMenuData, MENU_SEL_START_Y, MENU_SEL_START_X);
     print_menu_control_msg(pMenuData);
 
@@ -790,7 +790,7 @@ void print_menu_item_title(MENU_DATA *pMenuData, int starty, int startx, char *s
 }
 
 void print_border_around_item_description(WINDOW *pMenuWindow, int starty)
-{   
+{
     mvwaddch(pMenuWindow, starty, WIN_WIDTH_COLS-1, ACS_VLINE);
     mvwaddch(pMenuWindow, starty+1, 0, ACS_VLINE);
     mvwaddch(pMenuWindow, starty+1, WIN_WIDTH_COLS-1, ACS_VLINE);
@@ -811,7 +811,7 @@ void remove_menu_item_selection_description(MENU_DATA *pMenuData, int starty, in
 void print_menu_item_selection_opt(MENU_DATA *pMenuData, int starty, int startx, const char *description)
 {
     WINDOW *pMenuWindow = pMenuData->pMenuWindow;
-    
+
     wmove(pMenuWindow, starty, startx);
     wclrtoeol(pMenuWindow);
 
@@ -821,9 +821,9 @@ void print_menu_item_selection_opt(MENU_DATA *pMenuData, int starty, int startx,
 #if ENABLE_MENU_DEBUG
     MENU *pMenu = pMenuData->pMenu;
     ITEM *pItem = current_item(pMenu);
-    mvwprintw(pMenuWindow, starty, startx, "%d: name %s: %s", 
-        item_index(pItem) + 1,  
-        item_name(pItem), 
+    mvwprintw(pMenuWindow, starty, startx, "%d: name %s: %s",
+        item_index(pItem) + 1,
+        item_name(pItem),
         description);
 #else
     mvwprintw(pMenuWindow, starty, startx, "* %s", description);
@@ -835,7 +835,7 @@ void print_menu_item_selection_opt(MENU_DATA *pMenuData, int starty, int startx,
 void print_menu_item_selection(MENU_DATA *pMenuData, int starty, int startx)
 {
     ITEM *pItem = current_item(pMenuData->pMenu);
-    
+
     // draw the item description if present
     if (item_description(pItem))
     {
@@ -875,7 +875,7 @@ void print_menu_msg(MENU_DATA *pMenuData, chtype color, const char *fmt, ...)
 
     wmove(pMenuWindow, y, x);
     wclrtoeol(pMenuWindow);
-    
+
     wattron(pMenuWindow, color | A_BOLD);
     mvwprintw(pMenuWindow, y, x, "%s", string);
     wattroff(pMenuWindow, color | A_BOLD);
@@ -893,7 +893,7 @@ void print_menu_warning_msg(MENU_DATA *pMenuData, const char *fmt, ...)
 
     va_list args;
     va_start(args, fmt);
-    
+
     int len = vsnprintf(NULL, 0, fmt, args);
     va_end(args);
 
@@ -938,7 +938,7 @@ void print_menu_err_msg(MENU_DATA *pMenuData, const char *fmt, ...)
 
     wmove(pMenuWindow, y, x);
     wclrtoeol(pMenuWindow);
-    
+
     wattron(pMenuWindow, RED | A_BOLD);
     mvwprintw(pMenuWindow, y, x, "ERROR: %s", string);
     wattroff(pMenuWindow, RED | A_BOLD);
@@ -950,7 +950,7 @@ void print_menu_err_msg(MENU_DATA *pMenuData, const char *fmt, ...)
 void clear_menu_msg(MENU_DATA *pMenuData)
 {
     WINDOW *pMenuWindow = pMenuData->pMenuWindow;
-    
+
     wmove(pMenuWindow, DEBUG_ERR_START_Y, DEBUG_ERR_START_X);
     wclrtoeol(pMenuWindow);
     print_border_around_item_description(pMenuWindow, DEBUG_ERR_START_Y-1);
@@ -993,7 +993,7 @@ void print_menu_control_msg(MENU_DATA *pMenuData)
 }
 
 int create_form(MENU_DATA *pMenuData, WINDOW *pMenuWin, int numFields, int width, int height, int starty, int startx)
-{ 
+{
     int i;
     int rows, cols;
 
@@ -1084,13 +1084,13 @@ void form_loop(MENU_DATA *pMenuData, bool enableNextField)
             case 8:
             case 127:
                 x = getcurx(pMenuWindow);
-                
+
                 FIELD *pCurrentField = current_field(pForm);
                 // don't run REQ_DEL_PREV if cursor is at the beginning of the field
                 // due to ncurses behaviour that changes cmd REQ_DEL_PREV into
                 // REQ_PREV_FIELD when on the first char.
                 // workaround of setting option O_BS_OVERLOAD off doesn't work.
-                if (x > pCurrentField->fcol ) 
+                if (x > pCurrentField->fcol )
                 {
                     form_driver(pForm, REQ_DEL_PREV);
                 }
@@ -1109,20 +1109,20 @@ void form_loop(MENU_DATA *pMenuData, bool enableNextField)
                 done = 1;
 
                 break;
-                
+
             case KEY_DC:
                 form_driver(pForm, REQ_DEL_CHAR);
                 break;
-                
+
             case KEY_LEFT:
                 form_driver(pForm, REQ_LEFT_CHAR);
                 break;
-                
+
             case KEY_RIGHT:
                 form_driver(pForm, REQ_RIGHT_CHAR);
                 break;
-                
-            default:	
+
+            default:
                 form_driver(pForm, c);
                 break;
         }
@@ -1160,7 +1160,7 @@ void resize_and_reposition_window_and_subwindow(MENU_DATA *pMenuData, int y, int
     WINDOW *pSubMenuWindow = menu_sub(pMenuData->pMenu); // displays menu items
 
     wresize(pMenuWindow, y, x);
-    
+
     // resize and resposition pSubMenuWindow relative to parent window
     wresize(pSubMenuWindow, pProperties->numLines, pProperties->numCols);
     mvderwin(pSubMenuWindow, pProperties->starty, pProperties->startx);
@@ -1292,7 +1292,7 @@ int display_help_scroll_window(MENU_DATA *pMenuData, char *filename)
 
         line = NULL;
         line_length = 0;
-        
+
         num_lines++;
     }
 
@@ -1399,7 +1399,7 @@ int display_help_scroll_window(MENU_DATA *pMenuData, char *filename)
         wrefresh(win);
 
         c = wgetch(win);
-        switch (c) 
+        switch (c)
         {
             case KEY_RESIZE:
                 if (should_window_be_resized(win, WIN_NUM_LINES,WIN_WIDTH_COLS))
@@ -1416,7 +1416,7 @@ int display_help_scroll_window(MENU_DATA *pMenuData, char *filename)
                 break;
 
             case KEY_UP:
-                if (start_line > 0) 
+                if (start_line > 0)
                 {
                     start_line--;
                 }
@@ -1476,7 +1476,7 @@ int display_scroll_window(char *windowTitle, char *listTitle, char *filename, in
 
     // Draw the window title
     temp = (WIN_WIDTH_COLS - strlen(windowTitle))/ 2;
-    
+
     wattron(win, CYAN | A_BOLD);
     mvwprintw(win, 1, (int)temp, "%s", windowTitle);
     wattroff(win, CYAN | A_BOLD);
@@ -1523,7 +1523,7 @@ int display_scroll_window(char *windowTitle, char *listTitle, char *filename, in
 
         line = NULL;
         line_length = 0;
-        
+
         num_lines++;
     }
 
@@ -1540,12 +1540,12 @@ int display_scroll_window(char *windowTitle, char *listTitle, char *filename, in
     wattron(win, BLACK_ON_MAGENTA | A_BOLD);
     mvwprintw(win, 3, 1, "Total %d", num_lines);
     wattroff(win, BLACK_ON_MAGENTA | A_BOLD);
-    
+
     // Draw the contents of the file line-by-line
     while( done == 0 )
     {
         // Display all the lines of text up until the size of the window
-        for (int i = 0; i < max_win_lines - 1; i++) 
+        for (int i = 0; i < max_win_lines - 1; i++)
         {
             if (lines != NULL)
             {
@@ -1553,7 +1553,7 @@ int display_scroll_window(char *windowTitle, char *listTitle, char *filename, in
                 {
                     mvwprintw(win, i+list_start_row, 1, "%s", lines[start_line + i]);
                 }
-            }       
+            }
         }
 
         // draw the line count message
@@ -1573,7 +1573,7 @@ int display_scroll_window(char *windowTitle, char *listTitle, char *filename, in
         wrefresh(win);
 
         c = wgetch(win);
-        switch (c) 
+        switch (c)
         {
             case KEY_DOWN:
                 if (start_line < num_lines - (max_win_lines-1))
@@ -1583,7 +1583,7 @@ int display_scroll_window(char *windowTitle, char *listTitle, char *filename, in
                 break;
 
             case KEY_UP:
-                if (start_line > 0) 
+                if (start_line > 0)
                 {
                     start_line--;
                 }
@@ -1606,7 +1606,7 @@ int display_scroll_window(char *windowTitle, char *listTitle, char *filename, in
     // clean up
     if (lines != NULL)
     {
-        for (int i = 0; i < num_lines; i++) 
+        for (int i = 0; i < num_lines; i++)
         {
             if (lines[i] != NULL) free(lines[i]);
         }
@@ -1620,46 +1620,46 @@ int display_scroll_window(char *windowTitle, char *listTitle, char *filename, in
     return 0;
 }
 
-void draw_progress_bar(WINDOW *win, int percentage, int show) 
+void draw_progress_bar(WINDOW *win, int percentage, int show)
 {
     int bar_width = (percentage * PROGRESS_BAR_WIDTH) / 100;
     mvwprintw(win, 2, 1, "[");
 
-    for (int i = 0; i < PROGRESS_BAR_WIDTH; ++i) 
+    for (int i = 0; i < PROGRESS_BAR_WIDTH; ++i)
     {
-        if (i < bar_width) 
+        if (i < bar_width)
         {
             waddch(win, '=');
-        } 
-        else 
+        }
+        else
         {
             waddch(win, ' ');
         }
     }
 
-    wprintw(win, "]"); 
+    wprintw(win, "]");
 
     if (show)
     {
         mvwprintw(win, 2, 1, "%3d%%", percentage);
     }
-   
+
     wrefresh(win);
 }
 
 int wait_with_progress_bar(pid_t pid, int time, int show)
 {
-    int height = 3; 
+    int height = 3;
     int width = PROGRESS_BAR_WIDTH + 5;
     int start_y = WIN_NUM_LINES;
     int start_x = WIN_START_X + 1;
-    
+
     WINDOW *progress_win = newwin(height, width, start_y, start_x);
     wrefresh(progress_win);
 
     int status;
     int progress = 0;
-    while (waitpid(pid, &status, WNOHANG) == 0) 
+    while (waitpid(pid, &status, WNOHANG) == 0)
     {
         draw_progress_bar(progress_win, progress, show);
         progress = (progress + 1) % 101; // Loop progress from 0 to 100

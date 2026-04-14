@@ -95,7 +95,7 @@ os_release() {
         DISTRO_NAME=$ID
         DISTRO_VER=$(awk -F= '/^VERSION_ID=/{print $2}' /etc/os-release | tr -d '"')
         DISTRO_MAJOR_VER=${DISTRO_VER%.*}
-        
+
         case "$ID" in
         rhel|ol|rocky|almalinux)
             echo "Pulling packages for EL $DISTRO_VER."
@@ -186,7 +186,7 @@ setup_epel_crb() {
     # Setup EPEL/crb
     local epel_pkg="epel-release-latest-$DISTRO_MAJOR_VER.noarch.rpm"
     local codeready_repo="codeready-builder-for-rhel-$DISTRO_MAJOR_VER-x86_64-rpms"
-    
+
     if [ -f /etc/yum.repos.d/epel.repo ]; then
         echo "EPEL repo exists."
     else
@@ -196,17 +196,17 @@ setup_epel_crb() {
             $SUDO dnf install -y wget > /dev/null 2>&1
             echo "Package: wget installed."
         fi
-    
+
         echo "EPEL repo setup for EL $DISTRO_MAJOR_VER."
 
         if ! wget --tries 5 https://dl.fedoraproject.org/pub/epel/"$epel_pkg"; then
             print_err "Unsupported version for EPEL."
             exit 1
         fi
-        
+
         $SUDO rpm -ivh "$epel_pkg"
     fi
-    
+
     # Enable the codeready-builder repo (RHEL only)
     if [[ "$DISTRO_NAME" = "rhel" ]]; then
         if ! $SUDO dnf repolist all | grep -q "^$codeready_repo"; then
@@ -258,23 +258,23 @@ cleanup() {
             $SUDO rm "/etc/yum.repos.d/$index"
         fi
     done
-    
+
     # cleanup dnf cache
     $SUDO dnf clean all
     $SUDO rm -r /var/cache/dnf/*
-    
+
     restore_dnf_conf
-    
+
     echo Cleaning up...Complete.
 }
 
 config_create() {
     echo ++++++++++++++++++++++++++++++++
     echo Create Configure...
-    
+
     CREATE_CONFIG_FILE=
     local CREATE_CONFIG_FILE_INPUT=$1
-    
+
     # Check for user-modified config file (input .config to create script)
     if [[ ${CREATE_CONFIG_FILE_INPUT##*.} == "config" ]]; then
          CREATE_CONFIG_FILE=$CREATE_CONFIG_FILE_INPUT
@@ -291,26 +291,26 @@ config_create() {
         print_err "Fail.  No config file."
         exit 1
     fi
-    
+
     echo Create Configure...Complete.
 }
 
 setup_repo_priorities() {
     echo Setting up repo priorities...
-    
+
     # Set EPEL to exclude ROCm and HIP packages and lower priority
     if [ -f /etc/yum.repos.d/epel.repo ]; then
         if ! grep -q "excludepkgs=rocm" /etc/yum.repos.d/epel.repo; then
             echo "Excluding ROCm and HIP packages from EPEL..."
             $SUDO sed -i '/\[epel\]/a excludepkgs=rocm* hip*' /etc/yum.repos.d/epel.repo
         fi
-        
+
         if ! grep -q "priority=" /etc/yum.repos.d/epel.repo; then
             echo "Setting EPEL priority to 10..."
             $SUDO sed -i '/excludepkgs=rocm*/a priority=10' /etc/yum.repos.d/epel.repo
         fi
     fi
-    
+
     # Set ROCm repo to higher priority and include ROCm and HIP packages
     if [ -f /etc/yum.repos.d/rocm-build.repo ]; then
         if ! grep -q "includepkgs=rocm" /etc/yum.repos.d/rocm-build.repo; then
@@ -318,11 +318,11 @@ setup_repo_priorities() {
             $SUDO sed -i '/priority=1/a includepkgs=rocm* hip*' /etc/yum.repos.d/rocm-build.repo
         fi
     fi
-    
+
     # Clear cache to apply changes
     $SUDO dnf clean all
     $SUDO dnf makecache > /dev/null 2>&1
-    
+
     echo Setting up repo priorities...Complete.
 }
 
@@ -519,7 +519,7 @@ check_package_owner() {
     local package
     local vendor
     local epoch
-    
+
     package=$(rpm -q --queryformat "%{NAME}" --nosignature "$pkg")
     vendor=$(rpm -qi --nosignature "$pkg" | grep Vendor)
     epoch=$(rpm -q --queryformat "%{EPOCH}" --nosignature "$pkg")
@@ -527,7 +527,7 @@ check_package_owner() {
     if [[ $VERBOSE == 1 ]]; then
         rpm -qi --nosignature "$pkgName"
     fi
-    
+
     if [[ $package =~ "amdgpu" || $package =~ "rocm" ]]; then
         AMDPKG=1
     else
@@ -537,8 +537,8 @@ check_package_owner() {
            fi
        fi
     fi
-    
-    # for amd or amdgpu-specific packages copy to separate directories  
+
+    # for amd or amdgpu-specific packages copy to separate directories
     if [[ $AMDPKG == 1 ]] ; then
         AMD_COUNT=$((AMD_COUNT+1))
         ROCM_PACKAGES+="$(basename "$pkgName") "
@@ -578,7 +578,7 @@ check_package_owner() {
 
             cp "$pkgName" "$PWD/packages-other"
         fi
-        
+
         print_str "$NON_AMD_COUNT: 3rd Party PACKAGE" 4
     fi
 }
@@ -588,7 +588,7 @@ dump_packages_info() {
     AMD_COUNT=0
     AMDGPU_COUNT=0
     NON_AMD_COUNT=0
-    
+
     PACKAGES=
     ROCM_PACKAGES=
     OTHER_PACKAGES=
@@ -609,7 +609,7 @@ dump_packages_info() {
             check_package_owner "$pkg"
        done
    popd || exit
-   
+
    echo -----------------------------
    echo "Package Total         = $PKG_COUNT"
    echo "Package AMD           = $AMD_COUNT"

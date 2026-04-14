@@ -85,22 +85,22 @@ Usage: bash $PROG [options]
 [options]:
     help    = Displays this help information.
     version = Display version information.
-    
+
     Dependencies:
     -------------
         deps=<arg> <compo>
-        
+
         <arg>
             list <compo>         = Lists required dependencies for install <compo>.
             validate <compo>     = Validates installed and not installed required dependencies for install <compo>.
             install-only <compo> = Install dependencies only for <compo>.
             install <compo>      = Install with dependencies for <compo>.
-            
+
             file <file_path>      = Install with dependencies from a dependencies configuration file with path <file_path>.
             file-only <file_path> = Install with dependencies from a dependencies configuration file only with path <file_path>.
-            
+
         <compo> = install component (rocm/amdgpu/rocm amdgpu)
-    
+
     Install:
     --------
         rocm   = Enable ROCm components install.
@@ -152,11 +152,11 @@ Usage: bash $PROG [options]
         amdgpu-start = Start the amdgpu driver after install.
 
         gpu-access=<access_type>
-        
+
                    <access_type>
                        user = Add current user to render,video group for GPU access
                        all  = Grant GPU access to all users on the system via udev rules.
-                 
+
     Uninstall:
     ----------
         uninstall-rocm target=<directory/rocm-ver> = Uninstall ROCm version at target directory path.
@@ -166,21 +166,21 @@ Usage: bash $PROG [options]
                              * If target=<directory/rocm-ver> is not provided, uninstall will be from /opt/rocm-x.y.z
                              * Optional: Use compo= and gfx= for selective uninstall (same args as install)
                              * If compo=/gfx= not specified, auto-detects and uninstalls all installed components
-      
+
         uninstall-amdgpu = Uninstall amdgpu driver.
-                       
-    
+
+
     Information/Debug:
     ------------------
     findrocm = Search for an install of ROCm.
     complist = List the version of ROCm components included in the installer.
     prompt   = Run the installer with user prompts.
     verbose  = Run installer with verbose logging
-    
+
 +++++++++++++++++++++++++++++++
 Usage examples:
 +++++++++++++++++++++++++++++++
-    
+
 # ROCm installation (no Dependency install)
 
     * ROCm install location (default) => /opt/rocm-x.y.z
@@ -248,18 +248,18 @@ Usage examples:
     ** Recommended ***
 
 # amdgpu Driver installation (no Dependency install)
-    
+
     bash $PROG amdgpu
 
 # amdgpu Driver + Dependency installation
-    
+
     bash $PROG deps=install amdgpu
-    
+
 # Combined Installation
 
     bash $PROG deps=install gfx=gfx94x rocm amdgpu gpu-access=all
     bash $PROG deps=install target="$HOME/myrocm" gfx=gfx94x rocm amdgpu gpu-access=all
-    
+
 # Uninstall
 
     * Complete uninstall (auto-detects all installed components)
@@ -275,7 +275,7 @@ Usage examples:
 
     * Uninstall combined
         bash $PROG uninstall-amdgpu uninstall-rocm
-    
+
 END_USAGE
 }
 
@@ -371,7 +371,7 @@ get_version() {
                 0) INSTALLER_VERSION="$line" ;;
                 1) ROCM_VERSION="$line" ;;
                 2) BUILD_TAG="$line" ;;
-                3) BUILD_RUNID="$line" ;; 
+                3) BUILD_RUNID="$line" ;;
                 4) BUILD_TAG_INFO="$line" ;;
                 5) AMDGPU_DKMS_BUILD_NUM="$line" ;;
             esac
@@ -447,12 +447,12 @@ print_warning() {
 print_str() {
     local str=$1
     local clr=$2
-    
+
     if [[ $VERBOSE == 1 ]]; then
         if [[ $clr == 1 ]]; then
             echo -e "\e[93m$str\e[0m"   # yellow
         elif [[ $clr == 2 ]]; then
-            echo -e "\e[32m$str\e[0m"   # green  
+            echo -e "\e[32m$str\e[0m"   # green
         elif [[ $clr == 3 ]]; then
             echo -e "\e[31m$str\e[0m"   # red
         elif [[ $clr == 4 ]]; then
@@ -650,16 +650,16 @@ load_manifest_for_uninstall() {
 extract_content_if_needed() {
     # Extract ROCm content archives on-demand based on GFX selection
     # Only extracts archives that haven't been extracted yet
-    
+
     local gfx_tags_needed="base"
-    
+
     # Add selected GFX tags
     if [[ -n "$INSTALL_GFX" ]]; then
         gfx_tags_needed="$gfx_tags_needed $INSTALL_GFX"
     fi
-    
+
     echo "GFX architectures needed: $gfx_tags_needed"
-    
+
     for gfx_tag in $gfx_tags_needed; do
         local archive="$INSTALLER_DIR/component-rocm/content-${gfx_tag}.tar.xz"
         local extract_dir="$EXTRACT_ROCM_DIR/content"
@@ -748,17 +748,17 @@ dump_rocm_state() {
     echo ============================
     echo ROCm Install Summary
     echo ============================
-    
+
     local rocm_install_loc=$TARGET_DIR
     local ls_opt=
-    
+
     for dir in "$rocm_install_loc"/*; do
         if [[ -d "$dir" && $(basename "$dir") == "$INSTALLER_ROCM_VERSION_NAME" ]]; then
             rocm_directory=$dir
             break
         fi
     done
-    
+
     echo -e "\e[32mROCm Installed to: $rocm_directory\e[0m"
 
     if [[ $VERBOSE == 1 ]]; then
@@ -767,32 +767,32 @@ dump_rocm_state() {
         echo ----------------------------
         echo -e "\e[95m$rocm_install_loc\e[0m"
         ls $ls_opt "$rocm_install_loc"
-        
+
         echo ----------------------------
         echo -e "\e[95m$rocm_directory\e[0m"
         ls $ls_opt "$rocm_directory"
-        
+
         echo ----------------------------
         echo -e "\e[95m/etc/ld.so.conf.d\e[0m"
         ls /etc/ld.so.conf.d
-        
+
         echo ----------------------------
         echo -e "\e[95m/etc/alternatives\e[0m"
         ls $ls_opt /etc/alternatives
-        
+
         echo ----------------------------
         echo -e "\e[95m$rocm_directory/include\e[0m"
         ls $ls_opt "$rocm_directory/include"
-        
+
         echo ----------------------------
         echo -e "\e[95m$rocm_directory/bin\e[0m"
         ls $ls_opt "$rocm_directory/bin"
-        
+
         echo ----------------------------
         echo -e "\e[95m$rocm_directory/lib\e[0m"
         ls $ls_opt "$rocm_directory/lib"
     fi
-    
+
     echo ----------------------------
     echo -e "\e[95mInstalled Components:\e[0m"
     echo "Base: $COMPONENTS"
@@ -957,13 +957,13 @@ dump_stats() {
     echo ----------------------------
     echo STATS
     echo -----
-    
+
     echo "COMPONENT_COUNT = $COMPONENT_COUNT"
     echo "POSTINST_COUNT  = $POSTINST_COUNT"
-    
+
     echo -----
     local stat_dir="$1/$INSTALLER_ROCM_VERSION_NAME"
-    
+
     if [[ "$stat_dir" == //* ]]; then
         stat_dir="/${stat_dir#//}"
     fi
@@ -992,31 +992,31 @@ install_deps() {
     echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
     echo -e "\e[96mINSTALL Dependencies : $DISTRO_NAME $DISTRO_VER\e[0m"
     echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
-    
+
     echo Installing Dependencies...
-    
+
     echo "DEPS_ARG = $DEPS_ARG"
-    
+
     local status=0
-    
+
     # select switch deps to be install (rocm/amdgpu)
     if [[ $ROCM_INSTALL == 1 ]]; then
         deps_rocm="rocm"
     fi
-    
+
     if [[ $AMDGPU_INSTALL == 1 ]]; then
         deps_amdgpu="amdgpu"
     fi
-    
+
     # check for verbose logging enable
     if [[ $VERBOSE == 1 ]]; then
         depOp="verbose "
     fi
-    
+
     if [[ $PROMPT_USER == 1 ]]; then
         depOp+="prompt"
     fi
-    
+
     # parse the dependency args
     if [[ $DEPS_ARG == "list" ]]; then
 
@@ -1024,53 +1024,53 @@ install_deps() {
 
         ./deps-installer.sh "$deps_rocm" "$deps_amdgpu" $depOp list
         status=$?
-        
+
          if [[ status -ne 0 ]]; then
             print_err "Failed Dependencies list."
             exit 1
         fi
-        
+
         exit 0
-        
+
     elif [[ $DEPS_ARG == "validate" ]]; then
 
         echo Validating required dependencies
 
         ./deps-installer.sh "$deps_rocm" "$deps_amdgpu" $depOp
         status=$?
-        
+
         if [[ status -ne 0 ]]; then
             print_err "Failed Dependencies validation."
             exit 1
         fi
-        
+
         exit 0
-        
+
     elif [[ $DEPS_ARG == "install" ]] || [[ $DEPS_ARG == "install-only" ]]; then
 
        ./deps-installer.sh "$deps_rocm" "$deps_amdgpu" $depOp install
         status=$?
-        
+
         if [[ status -ne 0 ]]; then
             print_err "Failed Dependencies Install."
             exit 1
         fi
-        
+
         if [[ $DEPS_ARG == "install-only" ]]; then
             echo Only dependencies installed.  Exiting.
             exit 0
         fi
-    
+
     elif [[ $DEPS_ARG == "file" ]] || [[ $DEPS_ARG == "file-only" ]]; then
-    
+
         ./deps-installer.sh install-file "$DEPS_ARG2" $depOp
         status=$?
-        
+
         if [[ status -ne 0 ]]; then
             print_err "Failed Dependencies Install."
             exit 1
         fi
-        
+
         if [[ $DEPS_ARG == "file-only" ]]; then
             echo Only dependencies installed.  Exiting.
             exit 0
@@ -1094,7 +1094,7 @@ list_components() {
     else
         print_err "Components list $COMPO_ROCM_LIST does not exist."
     fi
-    
+
     exit 0
 }
 
@@ -1124,13 +1124,13 @@ configure_scriptlet() {
     local rocm_default="/opt"
     local rocm_reloc="$TARGET_DIR"
     local postinst_reloc="$1-reloc"
-    
+
     echo "config: $rocm_reloc"
-    
+
     if echo "$scriptlet" | grep -q '/opt'; then
          print_str "/opt detected -> $rocm_reloc"
     fi
-    
+
     print_str "Using scriptlet: $1"
 
     sed "s|$rocm_default|$rocm_reloc|g" "$1" > "$postinst_reloc"
@@ -1140,10 +1140,10 @@ configure_scriptlet() {
 install_postinst_scriptlet() {
     local component=$1
     local extract_dir=${2:-"$EXTRACT_DIR"}
-    
+
     local gfx_tag
     gfx_tag=$(basename "$extract_dir")
-    
+
     local postinst_scriptlet="$EXTRACT_ROCM_DIR/scriptlets/$gfx_tag/$component/postinst"
 
     # execute post install with arg "configure" or "1"
@@ -1172,10 +1172,10 @@ install_postinst_scriptlet() {
 uninstall_prerm_scriptlet() {
     local component=$1
     local extract_dir=${2:-"$EXTRACT_DIR"}
-    
+
     local gfx_tag
     gfx_tag=$(basename "$extract_dir")
-    
+
     local prerm_scriptlet="$EXTRACT_ROCM_DIR/scriptlets/$gfx_tag/$component/prerm"
 
     # execute pre-install with arg "remove" or "0"
@@ -1204,10 +1204,10 @@ uninstall_prerm_scriptlet() {
 uninstall_postrm_scriptlet() {
     local component=$1
     local extract_dir=${2:-"$EXTRACT_DIR"}
-    
+
     local gfx_tag
     gfx_tag=$(basename "$extract_dir")
-    
+
     local postrm_scriptlet="$EXTRACT_ROCM_DIR/scriptlets/$gfx_tag/$component/postrm"
 
     # execute post uninstall with arg "remove" or "0"
@@ -1597,7 +1597,7 @@ detect_meta_packages() {
                     for entry in "${gfx_components[@]}"; do
                         local comps="${entry%|*}"
                         local gfx_extract_dir="${entry#*|}"
-                        
+
                         local gfx_arch
                         gfx_arch=$(basename "$gfx_extract_dir")
 
@@ -1666,10 +1666,10 @@ install_rocm_component() {
 
     local component=$1
     local extract_dir=${2:-"$EXTRACT_DIR"}
-    
+
     local gfx_tag
     gfx_tag=$(basename "$extract_dir")
-    
+
     local content_dir="$EXTRACT_ROCM_DIR/content/$gfx_tag/$component"
 
     echo Copying content component: "$component"...
@@ -1750,7 +1750,7 @@ draw_progress_bar() {
 
 check_rocm_package_install() {
     #echo Checking for package installation: $1...
-    
+
     local rocm_loc=$1
     local ret=0
 
@@ -1772,18 +1772,18 @@ check_rocm_package_install() {
 
         if [[ -n $rocm_core_pkg ]] && [[ "$rocm_core_pkg" == *"$rocm_core_ver"* ]]; then
             echo rocm-core package detected : "$rocm_core_ver"
-        
+
             # cached the installed packages
             INSTALLED_PKGS=$($PKG_INSTALLED_CMD 2>&1)
             ret=1
         fi
-    
+
         if [[ $FORCE_INSTALL == 1 ]]; then
             echo Force install for package-based install.
             INSTALLED_PKGS=
         fi
     fi
-    
+
     return $ret
 }
 
@@ -1793,7 +1793,7 @@ find_rocm_with_progress() {
     local rocm_find_base=
     local rocm_version_dir=""
     local rocm_depth=
-    
+
     local find_opt=$1
     local found=1
     local progress=0
@@ -1817,7 +1817,7 @@ find_rocm_with_progress() {
     # Use regex to match only paths ending in /rocm/core-* (not subdirectories)
     find "$rocm_find_base" $rocm_depth -type d -regex '.*/rocm/core-[^/]*$' ! -path '*/rocm-installer/component-rocm/*' ! -path '*/component-rocm/base/*/rocm/core-*' ! -path '*/component-rocm/gfx*/*/rocm/core-*' -print 2>/dev/null > "$temp_file" &
     local find_pid=$!
-    
+
     # Update the progress bar while the find command is running
     while kill -0 "$find_pid" 2>/dev/null; do
         draw_progress_bar $progress
@@ -1834,10 +1834,10 @@ find_rocm_with_progress() {
     # Draw the final progress bar
     draw_progress_bar 100
     echo
-    
+
     # Read the output from the temporary file into the variable
     rocm_version_dir=$(cat "$temp_file")
-    
+
     # Check if the version directory was found and set the rocm directory path
     if [ -n "$rocm_version_dir" ]; then
         echo "ROCm detected in target $rocm_find_base"
@@ -1857,10 +1857,10 @@ find_rocm_with_progress() {
             echo "    $rocm_inst"
             ROCM_INSTALLS+="${rocm_inst},"
         done < <(sort -V "$temp_file")
-        
+
         found=0
     fi
-    
+
     if [ -f "$temp_file" ]; then
         rm "$temp_file"
     fi
@@ -1895,7 +1895,7 @@ query_prev_rocm() {
     # Check for a package manager install of the install version
     check_rocm_package_install "$inst"
     pkg_install=$?
-    
+
     if [[ $pkg_install -eq 0 ]]; then
         print_warning "Runfile Installation of ROCm detected : $inst"
     else
@@ -1908,7 +1908,7 @@ query_prev_rocm() {
         echo "Proceeding with install..."
     else
         echo -e "Exiting Installer.\n"
-        
+
         if [[ $pkg_install -eq 0 ]]; then
             echo -e "Please uninstall previous version/s of ROCm using the Runfile installer.\n"
             echo "Usage:"
@@ -1924,7 +1924,7 @@ query_prev_rocm() {
 
 process_prev_rocm() {
     local prev_install=0
-    
+
     # Check if rocm install is being forced, if not, prompt the user
     if [[ $FORCE_INSTALL == 1 ]]; then
         print_warning "Forcing ROCm install."
@@ -1939,28 +1939,28 @@ process_prev_rocm() {
                 break
             fi
         done
-        
+
         # Query the user for processing of the previous install of rocm
         if [[ $prev_install -eq 1 ]]; then
             query_prev_rocm "$inst"
-        fi  
+        fi
     fi
 }
 
 preinstall_rocm() {
     echo --------------------------------
     echo Preinstall ROCm...
-    
+
     # Check for installer prerequisites
     prereq_installer_check
-    
+
     # Check for any previous installs of ROCm for the current target
     if find_rocm_with_progress "$TARGET_DIR"; then
         process_prev_rocm
     else
         print_no_err "ROCm Install not found."
     fi
-    
+
     echo Preinstall ROCm...Complete.
     echo --------------------------------
 }
@@ -2206,9 +2206,9 @@ install_rocm() {
     echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
     echo -e "\e[96mINSTALL ROCm\e[0m"
     echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
-    
+
     set_rocm_target
-    
+
     # If using a target, check that the target directory for install exists
     if [[ -n "$INSTALL_TARGET" && ! -d "$TARGET_DIR" ]]; then
         print_err "Target directory $TARGET_DIR for install does not exist."
@@ -2223,7 +2223,7 @@ install_rocm() {
 
     # Check if rocm is installable
     preinstall_rocm
-    
+
     prompt_user "Install ROCm (y/n): "
     if [[ $option == "N" || $option == "n" ]]; then
         echo "Exiting Installer."
@@ -2264,14 +2264,14 @@ uninstall_rocm_target() {
 
     echo "ROCM Version Directory : $rocm_ver_dir/"
     echo "ROCm Removal Directory : $rocm_rm_dir"
-    
+
     # Start the uninstall
     prompt_user "Uninstall ROCm (y/n): "
     if [[ $option == "N" || $option == "n" ]]; then
         echo "Exiting Installer."
         exit 1
     fi
-    
+
     echo -e "\e[95mUninstalling ROCm target: $rocm_ver_dir\e[0m"
 
     # if the directory for removal exists, then remove the components and delete it
@@ -2425,17 +2425,17 @@ uninstall_rocm_target() {
         print_err "ROCm remove target: $rocm_rm_dir does not exist."
         exit 1
     fi
-    
+
     echo "PRERM_COUNT  = $PRERM_COUNT"
     echo "POSTRM_COUNT = $POSTRM_COUNT"
-    echo -e "\e[95mUNINSTALL ROCm Components. Complete.\e[0m"   
+    echo -e "\e[95mUNINSTALL ROCm Components. Complete.\e[0m"
 }
 
 uninstall_rocm() {
     echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
     echo -e "\e[95mUNINSTALL ROCm\e[0m"
     echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
-    
+
     set_rocm_target
 
     # Check for any previous installs of ROCm
@@ -2449,9 +2449,9 @@ uninstall_rocm() {
 
         # Check the list of rocm installs for the current target
         IFS=',' read -ra rocm_install <<< "$ROCM_INSTALLS"
-        
+
         print_no_err "ROCm Installs found: ${#rocm_install[@]}"
-        
+
         # Check if multiple rocm installs at current target
         if [[ ${#rocm_install[@]} -gt 1 ]]; then
             echo "Multiple ROCm installs for target=$INSTALL_TARGET"
@@ -2463,10 +2463,10 @@ uninstall_rocm() {
                 exit 1
             fi
         fi
-        
+
         # Uninstall each rocm install at target
         for inst in "${rocm_install[@]}"; do
-        
+
             # Check for a package manager install of the install version
             check_rocm_package_install "$inst"
             if [[ $? -eq 1 ]]; then
@@ -2474,9 +2474,9 @@ uninstall_rocm() {
                 echo "Please uninstall previous version of ROCm using the package manager."
                 exit 1
             fi
-            
+
             uninstall_rocm_target "$inst"
-            
+
         done
     else
         print_err "ROCm Install Directory not found."
@@ -2724,11 +2724,11 @@ install_post_rocm() {
         # Now check if the target rocm version matches the installer rocm version
         local rocm_ver_name
         rocm_ver_name=$(basename "${rocm_install[0]}")
-        
+
         # Remove both "rocm-" and "core-" prefixes and extract version
         local rocm_ver_extracted="${rocm_ver_name#rocm-}"  # Remove rocm- prefix if present
         rocm_ver_extracted="${rocm_ver_extracted#core-}"   # Remove core- prefix if present
-        
+
         local rocm_ver_short
         rocm_ver_short=$(echo "$rocm_ver_extracted" | cut -d '.' -f 1-2)
 
@@ -2976,18 +2976,18 @@ do
         ;;
     findrocm)
         echo "Finding ROCm install."
-        
+
         find_rocm_with_progress "all"
 
         if [[ $? -eq 1 ]]; then
             echo "ROCm Install not found."
             exit 1
         fi
-        
+
         IFS=',' read -ra rocm_install <<< "$ROCM_INSTALLS"
         echo
         print_no_err "ROCm Installs found: ${#rocm_install[@]}"
-        
+
         echo -e "\nChecking rocm installation type...\n"
         for inst in "${rocm_install[@]}"; do
             if check_rocm_package_install "$inst"; then
@@ -2997,7 +2997,7 @@ do
             fi
 
         done
-        
+
         exit 0
         ;;
     complist)

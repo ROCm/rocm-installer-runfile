@@ -226,7 +226,7 @@ get_version() {
             AMDGPU_DKMS_BUILD_NUM="N/A"
         fi
     fi
-    
+
     echo "AMDGPU Build: $AMDGPU_DKMS_BUILD_NUM"
 }
 

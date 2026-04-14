@@ -96,7 +96,7 @@ Usage: $PROG [options]
     buildtag=<tag>       = Set the build tag (default: 1).
     buildrunid=<id>      = Set the Runfile build run ID (default: 99999).
     buildtaginfo=<tag>   = Set a tag/name for the builds package pull information. (ie. pulltag-pullid)
-    
+
     mscomp=<mode>        = Makeself compression mode (build speed vs file size):
 
                            Mode       Speed    Size      Compatibility    Use Case
@@ -1166,7 +1166,7 @@ compress_components() {
             if [[ -d "$content_dir" ]]; then
                 local gfx_tag
                 gfx_tag=$(basename "$content_dir")
-                
+
                 local archive_name="component-rocm/content-${gfx_tag}.tar.xz"
 
                 echo "[$((total_compressed + 1))] Compressing ROCm content for: $gfx_tag"
@@ -1282,10 +1282,10 @@ build_installer() {
         echo Creating $BUILD_DIR directory.
         mkdir $BUILD_DIR
     fi
-    
+
     if [ $BUILD_INSTALLER == "yes" ]; then
         echo Building installer runfile...
-        
+
         echo "MAKESELF_OPT_HEADER   = $MAKESELF_OPT_HEADER"
         echo "MAKESELF_OPT          = $MAKESELF_OPT"
         echo "MAKESELF_OPT_COMPRESS = $MAKESELF_OPT_COMPRESS"
@@ -1314,7 +1314,7 @@ build_installer() {
     else
         echo Runfile build disabled.
     fi
-    
+
     echo Building Installer Package...Complete
 }
 
