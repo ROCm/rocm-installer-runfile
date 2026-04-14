@@ -75,8 +75,8 @@ jobs:
         with:
           python-version: 3.12
 
-      # Autodetects latest nightly build and ROCM version using today's date 
-      # if PULL_TAG and PULL_RUN_ID are left empty in this workflow.
+      # Autodetects latest nightly build and ROCm version using today's date 
+      # if PULL_TAG and PULL_RUN_ID are left empty.
       - name: Setup parameters
         id: params
         run: |
