@@ -1004,4 +1004,3 @@ case "$COMMAND" in
 esac
 
 echo "Installer log stored in: $AMDGPU_INSTALLER_CURRENT_LOG"
-

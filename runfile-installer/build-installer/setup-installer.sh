@@ -1356,4 +1356,3 @@ echo "=============================="
 echo -e "\e[36mTotal setup time: ${SETUP_HOURS}h ${SETUP_MINUTES}m ${SETUP_SECONDS}s (${SETUP_ELAPSED} seconds)\e[0m"
 echo ==============================
 echo ""
-

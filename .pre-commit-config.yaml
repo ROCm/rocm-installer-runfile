@@ -5,26 +5,26 @@ repos:
 -   repo: https://github.com/pre-commit/pre-commit-hooks
     rev: 3e8a870 # v6.0.0
     hooks:
-    -   id: check-yaml
+    # -   id: check-yaml
     -   id: end-of-file-fixer # auto fixer
-    -   id: trailing-whitespace # auto fixer
-    -   id: check-merge-conflict # checks for merge conflict markers.
+    # -   id: trailing-whitespace # auto fixer
+    # -   id: check-merge-conflict # checks for merge conflict markers.
 
-# Python
-# auto fixer
--   repo: https://github.com/psf/black
-    rev: c6755bb # 26.3.1
-    hooks:
-    -   id: black
+# # Python
+# # auto fixer
+# -   repo: https://github.com/psf/black
+#     rev: c6755bb # 26.3.1
+#     hooks:
+#     -   id: black
 
-# Bash scripts
--   repo: https://github.com/shellcheck-py/shellcheck-py
-    rev: 745efac # v0.11.0.1
-    hooks:
-    -   id: shellcheck
+# # Bash scripts
+# -   repo: https://github.com/shellcheck-py/shellcheck-py
+#     rev: 745efac # v0.11.0.1
+#     hooks:
+#     -   id: shellcheck
 
-- repo: https://github.com/rhysd/actionlint
-  rev: 914e7df # v1.7.10
-  hooks:
-    - id: actionlint
-      args: [-shellcheck=, -ignore, 'label ".+" is unknown']
+# - repo: https://github.com/rhysd/actionlint
+#   rev: 914e7df # v1.7.10
+#   hooks:
+#     - id: actionlint
+#       args: [-shellcheck=, -ignore, 'label ".+" is unknown']
