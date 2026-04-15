@@ -54,9 +54,9 @@ cleanup_install() {
 
     if [ -d $AMDGPU_COMP_DIR ]; then
         print_msg "Cleaning up amdgpu components..."
-        
+
         $SUDO rm -rf $AMDGPU_COMP_DIR
-        
+
         print_msg "Cleaning up amdgpu components...Complete"
     fi
 
@@ -67,16 +67,16 @@ cleanup_install() {
             $SUDO rm "$index"
         fi
     done
-    
+
     # Cleanup any configuration files
     if [ -d config ]; then
         print_msg "Cleaning up config..."
-        
+
         $SUDO rm -rf config
-        
+
         print_msg "Cleaning up config...Complete"
     fi
-    
+
     # Remove the UI binary
     if [ -f rocm_ui ]; then
         print_msg "Removing UI binary..."

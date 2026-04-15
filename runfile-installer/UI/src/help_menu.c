@@ -28,7 +28,7 @@ int create_help_menu_window(MENU_DATA *pMenuData, char *helpTile, char *helpFile
 {
     MENU_DATA *pHelpMenuData;
     WINDOW *pMenuWindow = pMenuData->pMenuWindow;
-    
+
     pMenuData->pHelpMenu = calloc(1, sizeof(MENU_DATA));
     if (NULL ==  pMenuData->pHelpMenu)
     {
@@ -82,7 +82,7 @@ void help_draw(MENU_DATA *pHelpMenuData)
     // clear and draw the base help menu window
     wclear(pHelpMenuData->pMenuWindow);
     menu_draw(pHelpMenuData);
-    
+
     // draw/scroll help content
     int ret = display_help_scroll_window(pHelpMenuData, pHelpFile);
     if (ret == -1)

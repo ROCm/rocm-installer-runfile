@@ -174,4 +174,3 @@ else
     # shellcheck disable=SC2086  # ARGS is intentionally unquoted to split arguments
     ./rocm-installer.sh $ARGS
 fi
-

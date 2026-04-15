@@ -53,18 +53,18 @@ Usage: $PROG [Options] [Pull_Config] [Packages] [Output]
 
 [Options}:
     help   = Display this help information.
-    
+
     prompt  = Run the package puller with user prompts.
     amd     = Copy amd-specific packages out.
     other   = Copy non-amd packages out.
     verbose = Run the package puller with verbose logging.
-    
-[Pull_Config]:   
+
+[Pull_Config]:
     config=<file_path> = <file_path> Path to a .config file with create settings in the format of create-default.config.
 
 [Packages]:
     pkg=<package list> = <package-list> List of Package/Packages to pull
-    
+
 [Output]:
     out=<file_path>    = <file_path> Path to output directory for pulled packages
 
@@ -72,7 +72,7 @@ Example (pull by config):
 -------------------------
 
     ./package_puller.sh config="config/rocm-6.2-22.04.config" out="/home/amd/package-extractor/packages" prompt amd
-       
+
 END_USAGE
 }
 
@@ -175,21 +175,21 @@ cleanup() {
             $SUDO rm "/etc/zypp/repos.d/$index"
         fi
     done
-   
+
     # cleanup zypper cache
     $SUDO zypper clean
     $SUDO zypper refresh > /dev/null 2>&1
-    
+
     echo Cleaning up...Complete.
 }
 
 config_create() {
     echo ++++++++++++++++++++++++++++++++
     echo Create Configure...
-    
+
     CREATE_CONFIG_FILE=
     local CREATE_CONFIG_FILE_INPUT=$1
-    
+
     # Check for user-modified config file (input .config to create script)
     if [[ ${CREATE_CONFIG_FILE_INPUT##*.} == "config" ]]; then
          CREATE_CONFIG_FILE=$CREATE_CONFIG_FILE_INPUT
@@ -206,7 +206,7 @@ config_create() {
         print_err "Fail.  No config file."
         exit 1
     fi
-    
+
     echo Create Configure...Complete.
 }
 
@@ -268,14 +268,14 @@ setup_and_download_packages() {
     # create the package directory repo
     echo Creating packages directory: "$PACKAGE_REPO"
     mkdir "$PACKAGE_REPO"
-       
+
     $SUDO zypper clean
     $SUDO zypper refresh > /dev/null
-    
+
     echo "-=-=-= download packages -=-=-="
     prompt_user "Start Download : (y/n): "
     if [[ $option == "Y" || $option == "y" ]]; then
-    
+
         # Download the package dependencies to the dep directory
         pushd "$PACKAGE_REPO" || exit
 
@@ -283,7 +283,7 @@ setup_and_download_packages() {
             ret=$?
 
         popd || exit
-        
+
         # check for any download errors
         if [[ $ret -ne 0 ]]; then
             print_err "Failed packages download."
@@ -292,17 +292,17 @@ setup_and_download_packages() {
         else
             print_no_err "Packages download successful."
         fi
-        
+
     else
         cleanup
-        
+
         echo "Exiting."
         exit 1
     fi
-    
+
     # Copy the packages from the zypp cache to the package directory
     copy_rpms "/var/cache/zypp/packages" "$PACKAGE_REPO"
-    
+
     # simulate/dryrun the install
     # shellcheck disable=SC2086
     if ! $SUDO zypper install -y --dry-run $PACKAGES; then
@@ -314,7 +314,7 @@ setup_and_download_packages() {
     else
         print_no_err "Valid package dependencies."
     fi
-    
+
     echo Downloading and setting up Packaging...Complete.
 }
 
@@ -325,7 +325,7 @@ check_package_owner() {
     local package
     local vendor
     local epoch
-    
+
     package=$(rpm -q --queryformat "%{NAME}" --nosignature "$pkg")
     vendor=$(rpm -qi --nosignature "$pkg" | grep Vendor)
     epoch=$(rpm -q --queryformat "%{EPOCH}" --nosignature "$pkg")
@@ -333,7 +333,7 @@ check_package_owner() {
     if [[ $VERBOSE == 1 ]]; then
         rpm -qi --nosignature "$pkgName"
     fi
-    
+
     if [[ $package =~ "amdgpu" || $package =~ "rocm" ]]; then
         AMDPKG=1
     else
@@ -343,8 +343,8 @@ check_package_owner() {
            fi
        fi
     fi
-    
-    # for amd or amdgpu-specific packages copy to separate directories  
+
+    # for amd or amdgpu-specific packages copy to separate directories
     if [[ $AMDPKG == 1 ]] ; then
         AMD_COUNT=$((AMD_COUNT+1))
         ROCM_PACKAGES+="$(basename "$pkgName") "
@@ -384,7 +384,7 @@ check_package_owner() {
 
             cp "$pkgName" "$PWD/packages-other"
         fi
-        
+
         print_str "$NON_AMD_COUNT: 3rd Party PACKAGE" 4
     fi
 }
@@ -394,7 +394,7 @@ dump_packages_info() {
     AMD_COUNT=0
     AMDGPU_COUNT=0
     NON_AMD_COUNT=0
-    
+
     PACKAGES=
     ROCM_PACKAGES=
     OTHER_PACKAGES=
@@ -415,7 +415,7 @@ dump_packages_info() {
             check_package_owner "$pkg"
        done
    popd || exit
-   
+
    echo -----------------------------
    echo "Package Total         = $PKG_COUNT"
    echo "Package AMD           = $AMD_COUNT"
@@ -547,4 +547,3 @@ fi
 if [[ -n $PULL_CURRENT_LOG ]]; then
     echo -e "\e[32mExtract log stored in: $PULL_CURRENT_LOG\e[0m"
 fi
-
