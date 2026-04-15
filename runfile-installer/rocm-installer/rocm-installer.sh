@@ -3108,4 +3108,3 @@ fi
 if [[ $ROCM_INSTALL == 1 ]] || [[ $POST_ROCM_INSTALL == 1 ]] || [[ $UNINSTALL_ROCM == 1 ]] || [[ -n $DEPS_ARG ]]; then
     echo "Installer log stored in: $RUN_INSTALLER_CURRENT_LOG"
 fi
-

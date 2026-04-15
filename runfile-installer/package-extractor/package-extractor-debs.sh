@@ -1372,4 +1372,3 @@ fi
 if [[ -n $EXTRACT_CURRENT_LOG ]]; then
     echo -e "\e[32mExtract log stored in: $EXTRACT_CURRENT_LOG\e[0m"
 fi
-

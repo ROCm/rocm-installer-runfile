@@ -221,4 +221,3 @@ int display_scroll_window(char *windowTitle, char *listTitle, char *filename, in
 int wait_with_progress_bar(pid_t pid, int time, int show);
 
 #endif // _MENU_DATA_H
-

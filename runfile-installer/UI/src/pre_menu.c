@@ -469,4 +469,3 @@ void process_pre_menu()
 
     pre_menu_draw();
 }
-

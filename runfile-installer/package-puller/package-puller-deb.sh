@@ -653,4 +653,3 @@ fi
 if [[ -n $PULL_CURRENT_LOG ]]; then
     echo -e "\e[32mExtract log stored in: $PULL_CURRENT_LOG\e[0m"
 fi
-

@@ -90,4 +90,3 @@ void destroy_rocm_menu_compo_window();
 
 
 #endif // _ROCM_MENU_H
-

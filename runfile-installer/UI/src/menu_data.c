@@ -1669,4 +1669,3 @@ int wait_with_progress_bar(pid_t pid, int time, int show)
 
     return (WEXITSTATUS(status));
 }
-
