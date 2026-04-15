@@ -5,7 +5,6 @@ on:
     branches:
       - main
       - release/therock-*
-      - users/pbhandar/ci
   pull_request:
     branches:
       - main
