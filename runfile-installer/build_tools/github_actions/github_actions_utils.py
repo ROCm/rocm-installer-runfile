@@ -2,7 +2,7 @@
 
 See also https://pypi.org/project/github-action-utils/.
 
-Copied from 
+Copied from
 """
 
 from datetime import datetime, timezone
