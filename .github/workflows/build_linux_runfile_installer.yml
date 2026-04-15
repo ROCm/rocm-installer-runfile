@@ -11,22 +11,18 @@ on:
         description: The type of release to build ("dev" or "nightly"). All developer-triggered jobs should use "dev"!
         required: true
         type: string
-        default: "dev"
       gfx_archs:
         description: gfx architectures to build (eg "gfx90x", "gfx94x", "gfx950", "gfx110x", "gfx1150", "gfx1151", "gfx1152", "gfx120x")
         required: false
         type: string
-        default: "gfx110x"
       pull_amdgpu:
         description: Version of amdgpu to be packaged into runfile installer. To see valid values for parameter, run command "bash build-runfile-installer.sh help"
         required: true
         type: string
-        default: "release,30.30.1"
       pull_type:
         description: Specify where you want to pull packages from ("dev", "nightly", "prereleases" or "release") which pull from rocm.devreleases.amd.com, rocm.nightlies.amd.com, rocm.prereleases.amd.com or repo.amd.com
         required: true
         type: string
-        default: "nightly"
       pull_tag:
         description: Set build date in the format (YYYYMMDD) to specify nightly build to build runfile installer off of if pull_type = nightly. Set to rc[BUILD_NUM] if pull_type = prerelease.
         required: true
@@ -39,7 +35,6 @@ on:
         description: Set base package name with optional type prefix. Can set it to base:amdrocm-amdsmi to quickly test your code. Otherwise, leave empty. To see what values are valid, run command "bash build-runfile-installer.sh help"
         required: false
         type: string
-        default: "amdrocm-core-sdk"
       runfile_config:
         description: Runfile config file to use (leave empty to use default based on release_type). Options are dev.config, nightly.config, prerelease.config and release.config
         required: false
@@ -94,12 +89,12 @@ on:
         required: false
         type: choice
         options:
-          - ""
+          - auto            # Uses default based on release_type
           - dev.config
           - nightly.config
           - prerelease.config
           - release.config
-        default: ""
+        default: auto
 permissions:
   id-token: write
   contents: read
@@ -127,15 +122,9 @@ jobs:
       BUILD_TAG: ${{ inputs.pull_tag }}
       GFX_ARCHS: ${{ inputs.gfx_archs }}
       PULL_AMDGPU: ${{ inputs.pull_amdgpu }}
-      # If users enters dev.config for runfile_config, then this becomes
-      # config/dev.config
-
-      # If user leaves runfile_config empty and sets release_type to be nightly, then this becomes
-      # config/nightly.config
-
-      # If users sets runfile_config and sets release_type to a specific value, then value of
-      # runfile_config takes precedence over value of release_type
-      RUNFILE_CONFIG: ${{ inputs.runfile_config && format('config/{0}', inputs.runfile_config) || format('config/{0}.config', inputs.release_type) }}
+      # RUNFILE_CONFIG: Defaults to config/{pull_type}.config when set to "auto".
+      # Explicit values (other than auto, e.g., dev.config) override pull_type.
+      RUNFILE_CONFIG: ${{ inputs.runfile_config != 'auto' && format('config/{0}', inputs.runfile_config) || format('config/{0}.config', inputs.pull_type) }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Delete huge unnecessary tools folder
