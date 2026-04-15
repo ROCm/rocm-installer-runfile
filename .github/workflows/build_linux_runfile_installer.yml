@@ -1,6 +1,9 @@
 name: Build Linux Runfile Installer
 
 on:
+  push:
+    branches:
+      - users/pbhandar/ci
   workflow_call:
     inputs:
       rocm_version:
@@ -32,7 +35,7 @@ on:
         required: true
         type: string
       pull_run_id:
-        description: Workflow run id of deb and rpm packages used to build runfile installer off of. If building nightly, go to this link https://rocm.nightlies.amd.com/rpm/ or https://rocm.nightlies.amd.com/deb/ and you will see the names of the folder in the format YYYYMMDD-[GITHUB_RUN_ID] which is the equivalent of [pull_tag]-[pull_run_id]. If building prelrease, go to https://rocm.prereleases.amd.com/packages/debian12/pool/main/index.html and the packages will be in the format amdrocm-[PACKAGE_NAME][ROCM_VERSION]~rc[NUMBER]-[GITHUB_RUN_ID] which is the equivalent to amdrocm-[PACKAGE_NAME][rocm_version]~rc[pull_tag]-[pull_run_id].
+        description: Workflow run id of deb and rpm packages used to build runfile installer off of. If building nightly, go to this link https://rocm.nightlies.amd.com/rpm/ or https://rocm.nightlies.amd.com/deb/ and you will see the names of the folder in the format YYYYMMDD-[GITHUB_RUN_ID] which is the equivalent of [pull_tag]-[pull_run_id]. If building prerelease, go to https://rocm.prereleases.amd.com/packages/debian12/pool/main/index.html and the packages will be in the format amdrocm-[PACKAGE_NAME][ROCM_VERSION]~rc[NUMBER]-[GITHUB_RUN_ID] which is the equivalent to amdrocm-[PACKAGE_NAME][rocm_version]~rc[pull_tag]-[pull_run_id].
         required: true
         type: string
       pull_pkg:
@@ -132,6 +135,9 @@ jobs:
 
       # If user leaves runfile_config empty and sets release_type to be nightly, then this becomes
       # config/nightly.config
+
+      # If users sets runfile_config and sets release_type to a specific value, then value of
+      # runfile_config takes precedence over value of release_type
       RUNFILE_CONFIG: ${{ inputs.runfile_config && format('config/{0}', inputs.runfile_config) || format('config/{0}.config', inputs.release_type) }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
