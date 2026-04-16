@@ -11,9 +11,11 @@ from pathlib import Path
 import sys
 from typing import Mapping
 
+
 def _log(*args, **kwargs):
     print(*args, **kwargs)
     sys.stdout.flush()
+
 
 def gha_set_output(vars: Mapping[str, str | Path]):
     """Sets values in a step's output parameters.
