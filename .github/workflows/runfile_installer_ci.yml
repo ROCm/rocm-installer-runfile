@@ -31,4 +31,3 @@ jobs:
       pull_pkg: amdrocm-core-sdk
       gfx_archs: gfx110x
       pull_amdgpu: "release,30.30.1"
-      runfile_config: "prerelease.config"
