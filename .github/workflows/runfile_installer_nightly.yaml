@@ -97,7 +97,6 @@ jobs:
       pull_pkg: ${{ needs.setup.outputs.pull_pkg }}
       gfx_archs: ${{ needs.setup.outputs.gfx_archs }}
       pull_amdgpu: ${{ needs.setup.outputs.pull_amdgpu }}
-      runfile_config: nightly.config
     permissions:
       id-token: write
       contents: read
