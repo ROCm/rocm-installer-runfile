@@ -21,7 +21,7 @@ concurrency:
 jobs:
   runfile_installer_ci:
     name: Basic Runfile Installer Build
-    uses: ./.github/workflows/build_linux_runfile_installer.yml
+    uses: ./.github/workflows/build_linux_runfile_installer.yaml
     with:
       rocm_version: "7.12.0"
       release_type: dev

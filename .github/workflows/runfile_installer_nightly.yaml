@@ -87,7 +87,7 @@ jobs:
   build_runfile_installer:
     name: Build Runfile Installer
     needs: setup
-    uses: ./.github/workflows/build_linux_runfile_installer.yml
+    uses: ./.github/workflows/build_linux_runfile_installer.yaml
     with:
       rocm_version: ${{ needs.setup.outputs.rocm_version }}
       release_type: ${{ inputs.release_type || 'nightly' }}
