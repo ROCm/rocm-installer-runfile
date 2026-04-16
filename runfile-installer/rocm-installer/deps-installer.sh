@@ -23,6 +23,11 @@
 # THE SOFTWARE.
 # #############################################################################
 
+# Colour text
+YELLOW="\033[0;93m"
+GREEN='\033[0;32m'
+NC='\033[0m' # No Color
+
 DEPS_COUNT=0
 
 DEPS=
@@ -41,6 +46,8 @@ VERBOSE=0
 INSTALLABLE_PKG_CACHE=
 
 NO_CMD_OUTPUT="> /dev/null 2>&1"
+
+WGET_RETRY_COUNT=5
 
 GCC_TOOLSET_PACKAGES_OL=(gcc-toolset-11-gcc gcc-toolset-11-gcc-c++ gcc-toolset-11-gcc-gfortran gcc-toolset-11-libquadmath-devel gcc-toolset-11-libstdc++-devel gcc-toolset-11-gcc-gdb-plugin)
 
@@ -284,6 +291,11 @@ cleanup() {
 
     if [[ "$DISTRO_NAME" = "rocky" ]]; then
         remove_rocky_kernel_repo
+    elif [[ "$DISTRO_NAME" = "debian" ]]; then
+        # delete block-headers file which may be added during debian 12 dependency install
+        if [[ -f /etc/apt/preferences.d/block-headers ]]; then
+            $SUDO rm /etc/apt/preferences.d/block-headers
+        fi
     fi
 
     echo Cleaning up...Complete.
@@ -1517,6 +1529,80 @@ get_kernel_package_for_kernel_version() {
     done
 }
 
+get_kernel_packages_debian() {
+    echo Debian kernel packages...
+
+    local kernel_ver_sans_arch
+
+    kernel_ver_sans_arch="${KERNEL_VER/-amd64}"
+    # kernel_ver_sans_arch=$(sed 's/-amd64//' <<< "$KERNEL_VER")
+    # kernel_arch==$(awk -F '-' '{print $NF}' <<< "$KERNEL_VER")
+
+    local linux_headers_to_download=(
+        "linux-headers-$KERNEL_VER" # Example, deb 12: (linux-headers-6.1.0-29-common), deb 13 (linux-headers-6.12.38+deb13-amd64)
+        "linux-headers-$kernel_ver_sans_arch-common" # Example: deb 12 (linux-headers-6.1.0-29-common), deb 13 (linux-headers-6.12.38+deb13-common)
+    )
+
+    local linux_headers_package_list=()
+
+    for package in "${linux_headers_to_download[@]}"; do
+        # Example URL: https://snapshot.debian.org/mr/binary/linux-headers-6.1.0-29-common/
+
+        if linux_headers_info=$(wget --quiet --tries $WGET_RETRY_COUNT --no-check-certificate -qO- "https://snapshot.debian.org/mr/binary/$package"); then
+            linux_headers_binary_version=$(jq -r '.result[0].binary_version' <<< "$linux_headers_info")
+
+            # Example URL: https://snapshot.debian.org/mr/binary/linux-headers-6.1.0-29-amd64/6.1.123-1/binfiles
+
+            if linux_headers_file_info=$(wget --quiet --tries $WGET_RETRY_COUNT --no-check-certificate -qO- "https://snapshot.debian.org/mr/binary/$package/$linux_headers_binary_version/binfiles"); then
+                linux_headers_hash_value=$(jq -r '.result[0].hash' <<< "$linux_headers_file_info")
+
+                if grep -q "common" <<< "$package"; then
+                    # Example: linux-headers-6.1.0-29-common_6.1.123-1_all.deb
+                    downloaded_package_name="${package}_${linux_headers_binary_version}_all.deb"
+                else
+                    # Example: linux-kbuild-6.1_6.1.158-1_amd64.deb
+                    downloaded_package_name="${package}_${linux_headers_binary_version}_amd64.deb"
+                fi
+
+                echo "--------------------------"
+                echo "URL: https://snapshot.debian.org/file/$linux_headers_hash_value/$downloaded_package_name"
+                echo "--------------------------"
+
+                echo "Downloading: $package"
+                # Example URL: https://snapshot.debian.org/file/ee32fc44cc642e3c131ac182f98ee11e6b102856/linux-headers-6.1.0-29-common_6.1.123-1_all.deb
+
+                if ! wget --quiet --tries $WGET_RETRY_COUNT --no-check-certificate "https://snapshot.debian.org/file/$linux_headers_hash_value/$downloaded_package_name"; then
+                    echo -e "${YELLOW}Failed to download $package from https://snapshot.debian.org ${NC}"
+                    return 1
+                else
+                    linux_headers_package_list+=("$(pwd)/$downloaded_package_name")
+                fi
+            else
+                echo -e "${YELLOW}Failed to download metadata on kernel package $package from https://snapshot.debian.org ${NC}"
+                return 1
+            fi
+        else
+            echo -e "${YELLOW}Failed to find kernel package $package on https://snapshot.debian.org ${NC}"
+            return 1
+        fi
+    done
+
+    local return_status
+
+    if [[ $INSTALL_DEPS -eq 1 ]]; then
+        echo "Installing downloaded packages: ${linux_headers_package_list[*]}"
+        $SUDO apt-get install -y "${linux_headers_package_list[@]}"
+        return_status=$?
+        if [[ $return_status -eq 0 ]]; then
+            echo -e "${GREEN}Successfully installed kernel headers ${linux_headers_package_list[*]}${NC}"
+        fi
+        return_status=$?
+    fi
+
+    $SUDO rm "${linux_headers_package_list[@]}"
+    return $return_status
+}
+
 get_kernel_packages() {
     echo "------------------------------------"
 
@@ -1529,7 +1615,13 @@ get_kernel_packages() {
 
     # set the kernel packages
     if [ $DISTRO_PACKAGE_MGR == "apt" ]; then
-        KERNEL_PACKAGES="linux-headers-$KERNEL_VER "
+        # Check if package linux-headers-$KERNEL_VER available to download
+        if $SUDO apt-cache policy "^linux-headers-$KERNEL_VER" | sed -n "/Version/,\$p" | grep -q http; then
+            echo "Package linux-headers-$KERNEL_VER available in repository"
+            KERNEL_PACKAGES="linux-headers-$KERNEL_VER "
+        elif [[ $DISTRO_NAME = "debian" ]]; then
+            get_kernel_packages_debian
+        fi
 
     elif [ $DISTRO_PACKAGE_MGR == "dnf" ]; then
 
@@ -1783,6 +1875,28 @@ install_repos_el() {
     echo "------------------------------------"
 }
 
+install_dkms_debian_workaround() {
+    # Add a block to the meta packages linux-headers-amd64, linux-headers-686-pae and linux-headers-generic
+    # if it's installing dkms on debian 12 so the kernel won't be updated to the latest one if kernel headers
+    # are already installed for current kernel KERNEL_VER
+
+    # This is needed because if dkms is installed on debian 12, it will automatically install one of these meta packagesRED
+    # which will update the current kernel on the system which is behaviour we don't want.
+    if [[ $DISTRO_NAME == "debian" ]] && [[ $DISTRO_MAJOR_VER -eq 12 ]]; then
+        if [[ " $INSTALL_LIST " == *" dkms "* ]]; then
+            if $SUDO apt list --installed 2>/dev/null | grep -q "linux-headers-$KERNEL_VER"; then
+                echo "Add a temporary block to meta packages linux-headers-amd64, linux-headers-686-pae and linux-headers-generic"
+cat <<EOF | $SUDO tee /etc/apt/preferences.d/block-headers
+Package: linux-headers-amd64 linux-headers-686-pae linux-headers-generic
+Pin: release *
+Pin-Priority: -1
+EOF
+            fi
+        fi
+    fi
+
+}
+
 install_dependencies() {
     echo ==============================================================
     echo Installing Dependencies...
@@ -1839,6 +1953,7 @@ install_dependencies() {
     if [[ -n $INSTALL_LIST ]]; then
         # install the dependent packages
         if [ $DISTRO_PACKAGE_MGR == "apt" ]; then
+            install_dkms_debian_workaround
             $SUDO apt-get install "$installopt" $INSTALL_LIST
         elif [ $DISTRO_PACKAGE_MGR == "dnf" ]; then
             $SUDO dnf install "$installopt" $INSTALL_LIST

@@ -96,6 +96,15 @@ cleanup_install() {
         $SUDO rm -rf bin
         print_msg "Cleaning up bin directory...Complete"
     fi
+
+    # Remove block-headers file that gets created during deb 12 dependency install
+    if [[ -f /etc/apt/preferences.d/block-headers ]]; then
+        print_msg "Cleaning up file /etc/apt/preferences.d/block-headers..."
+
+        $SUDO rm /etc/apt/preferences.d/block-headers
+
+        print_msg "Cleaning up file /etc/apt/preferences.d/block-headers...Complete"
+    fi
 }
 
 
