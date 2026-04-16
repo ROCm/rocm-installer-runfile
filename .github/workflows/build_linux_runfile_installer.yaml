@@ -1,6 +1,9 @@
 name: Build Linux Runfile Installer
 
 on:
+  push:
+    branches:
+      - users/pbhandar/ci
   workflow_call:
     inputs:
       rocm_version:
