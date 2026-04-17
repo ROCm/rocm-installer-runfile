@@ -358,6 +358,14 @@ is_pkg_installable_deb() {
     return $install_result
 }
 
+is_pkg_available_deb() {
+    # Can be a name or a regex
+    # Eg pkg_regex = "^linux-headers-$KERNEL_VER"
+    local pkg_regex="$1"
+    $SUDO apt-cache policy "$pkg_regex" | sed -n "/Version/,\$p" | grep -q http
+    return $?
+}
+
 get_dep_from_cache() {
     local dep="$1"
 
@@ -1616,7 +1624,8 @@ get_kernel_packages() {
     # set the kernel packages
     if [ $DISTRO_PACKAGE_MGR == "apt" ]; then
         # Check if package linux-headers-$KERNEL_VER available to download
-        if $SUDO apt-cache policy "^linux-headers-$KERNEL_VER" | sed -n "/Version/,\$p" | grep -q http; then
+        # if $SUDO apt-cache policy "^linux-headers-$KERNEL_VER" | sed -n "/Version/,\$p" | grep -q http; then
+        if is_pkg_available_deb "^linux-headers-$KERNEL_VER"; then
             echo "Package linux-headers-$KERNEL_VER available in repository"
             KERNEL_PACKAGES="linux-headers-$KERNEL_VER "
         elif [[ $DISTRO_NAME = "debian" ]]; then
@@ -1875,17 +1884,16 @@ install_repos_el() {
     echo "------------------------------------"
 }
 
-install_dkms_debian_workaround() {
-    # Add a block to the meta packages linux-headers-amd64, linux-headers-686-pae and linux-headers-generic
-    # if it's installing dkms on debian 12 so the kernel won't be updated to the latest one if kernel headers
-    # are already installed for current kernel KERNEL_VER
-
-    # This is needed because if dkms is installed on debian 12, it will automatically install one of these meta packagesRED
-    # which will update the current kernel on the system which is behaviour we don't want.
+block_kernel_meta_packages_debian12() {
+    # On Debian 12, installing dkms triggers installation of kernel meta-packages
+    # (linux-headers-amd64, linux-headers-686-pae, linux-headers-generic), which can
+    # upgrade the running kernel. To prevent unwanted kernel upgrades during DKMS install,
+    # block these meta-packages if kernel headers for current kernel
+    # are already installed or if they will be installed.
     if [[ $DISTRO_NAME == "debian" ]] && [[ $DISTRO_MAJOR_VER -eq 12 ]]; then
         if [[ " $INSTALL_LIST " == *" dkms "* ]]; then
-            if $SUDO apt list --installed 2>/dev/null | grep -q "linux-headers-$KERNEL_VER"; then
-                echo "Add a temporary block to meta packages linux-headers-amd64, linux-headers-686-pae and linux-headers-generic"
+            if $SUDO apt list --installed 2>/dev/null | grep -q "linux-headers-$KERNEL_VER" || grep "$KERNEL_PACKAGES" <<< "$INSTALL_LIST"; then
+                echo "Add a temporary block to meta packages linux-headers-amd64, linux-headers-686-pae and linux-headers-generic to prevent kernel upgrades during DKMS install."
 cat <<EOF | $SUDO tee /etc/apt/preferences.d/block-headers
 Package: linux-headers-amd64 linux-headers-686-pae linux-headers-generic
 Pin: release *
@@ -1953,7 +1961,7 @@ install_dependencies() {
     if [[ -n $INSTALL_LIST ]]; then
         # install the dependent packages
         if [ $DISTRO_PACKAGE_MGR == "apt" ]; then
-            install_dkms_debian_workaround
+            block_kernel_meta_packages_debian12
             $SUDO apt-get install "$installopt" $INSTALL_LIST
         elif [ $DISTRO_PACKAGE_MGR == "dnf" ]; then
             $SUDO dnf install "$installopt" $INSTALL_LIST
