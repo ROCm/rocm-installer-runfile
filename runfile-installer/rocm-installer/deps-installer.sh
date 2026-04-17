@@ -1551,6 +1551,11 @@ get_kernel_packages_debian() {
         "linux-headers-$kernel_ver_sans_arch-common" # Example: deb 12 (linux-headers-6.1.0-29-common), deb 13 (linux-headers-6.12.38+deb13-common)
     )
 
+    if [[ $DISTRO_MAJOR_VER -eq 13 ]]; then
+        # Example deb13: linux-kbuild-6.12.38+deb13
+        linux_headers_to_download+=("linux-kbuild-$kernel_ver_sans_arch") 
+    fi
+
     local linux_headers_package_list=()
 
     for package in "${linux_headers_to_download[@]}"; do
