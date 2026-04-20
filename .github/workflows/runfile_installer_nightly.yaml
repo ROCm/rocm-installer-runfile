@@ -1,0 +1,102 @@
+name: Runfile Installer Nightly Build
+
+on:
+  # Trigger on a schedule to build nightly candidates.
+  schedule:
+    # Runs at 10:00 AM UTC, which is 6:00 AM EDT (UTC-4)
+    - cron: '0 10 * * *'
+  # Trigger manually (typically to test the workflow or manually build a release [candidate])
+  workflow_dispatch:
+    inputs:
+      gfx_archs:
+        description: gfx architectures to build
+        type: string
+        default: "gfx110x"
+      pull_amdgpu:
+        description: Version of amdgpu to be packaged into runfile installer.
+        type: string
+        default: "latest" # If set to latest, script automatically gets the version of the latest released amdgpu driver
+      pull_tag:
+        description: Build date in format YYYYMMDD. If empty, will use today's date.
+        type: string
+      pull_run_id:
+        description: Workflow run id. If empty, will be auto-detected from nightly indexes.
+        type: string
+      pull_pkg:
+        description: Base package name with optional type prefix.
+        type: string
+        default: "amdrocm-core-sdk"
+      release_type:
+        description: Determines where the build runfile package is uploaded to. All developer-triggered jobs should use "dev"!
+        type: choice
+        options:
+          - dev
+          - nightly
+        default: "nightly"
+
+permissions:
+  contents: read
+
+# Scheduled → Nightly Runfile (scheduled)
+# Manual with pull_tag=20260410 → Nightly Runfile (20260410)
+# Manual without pull_tag → Nightly Runfile
+run-name: Nightly Runfile${{ (inputs.pull_tag || github.event_name == 'schedule') && format(' ({0})', inputs.pull_tag || 'scheduled') || '' }}
+
+jobs:
+  setup:
+    name: Setup Parameters
+    if: ${{ github.repository_owner == 'ROCm' || github.event_name != 'schedule' }}
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: ${{ github.workspace }}/runfile-installer
+    env:
+      GFX_ARCHS: ${{ inputs.gfx_archs || 'gfx110x' }}
+      PULL_AMDGPU: ${{ inputs.pull_amdgpu || 'latest' }}
+      PULL_TAG: ${{ inputs.pull_tag }}
+      PULL_RUN_ID: ${{ inputs.pull_run_id }}
+      PULL_PKG: ${{ inputs.pull_pkg || 'amdrocm-core-sdk' }}
+    outputs:
+      rocm_version: ${{ steps.params.outputs.rocm_version }}  # Set by script setup_runfile_installer_nightly.py
+      pull_tag: ${{ steps.params.outputs.pull_tag }}
+      pull_run_id: ${{ steps.params.outputs.pull_run_id }}
+      gfx_archs: ${{ steps.params.outputs.gfx_archs }}
+      pull_amdgpu: ${{ steps.params.outputs.pull_amdgpu }}
+      pull_pkg: ${{ steps.params.outputs.pull_pkg }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: 3.12
+
+      # Autodetects latest nightly build and ROCm version using today's date
+      # if PULL_TAG and PULL_RUN_ID are left empty.
+      - name: Setup parameters
+        id: params
+        run: |
+          python ./build_tools/github_actions/setup_runfile_installer_nightly.py \
+            --gfx-archs "$GFX_ARCHS" \
+            --pull-amdgpu "$PULL_AMDGPU" \
+            --pull-tag "$PULL_TAG" \
+            --pull-run-id "$PULL_RUN_ID" \
+            --pull-pkg "$PULL_PKG"
+
+  build_runfile_installer:
+    name: Build Runfile Installer
+    needs: setup
+    uses: ./.github/workflows/build_linux_runfile_installer.yaml
+    with:
+      rocm_version: ${{ needs.setup.outputs.rocm_version }}
+      release_type: ${{ inputs.release_type || 'nightly' }}
+      pull_type: nightly
+      pull_tag: ${{ needs.setup.outputs.pull_tag }}
+      pull_run_id: ${{ needs.setup.outputs.pull_run_id }}
+      pull_pkg: ${{ needs.setup.outputs.pull_pkg }}
+      gfx_archs: ${{ needs.setup.outputs.gfx_archs }}
+      pull_amdgpu: ${{ needs.setup.outputs.pull_amdgpu }}
+    permissions:
+      id-token: write
+      contents: read

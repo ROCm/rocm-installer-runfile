@@ -21,3 +21,9 @@ _CPack_Packages/
 .idea/
 *.swp
 *~
+
+# Hidden files on macos
+.DS_Store
+
+# Python Byte-compiled / optimized / DLL files
+__pycache__/
