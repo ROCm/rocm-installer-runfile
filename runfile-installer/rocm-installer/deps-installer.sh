@@ -359,8 +359,6 @@ is_pkg_installable_deb() {
 }
 
 is_pkg_available_deb() {
-    # Can be a name or a regex
-    # Eg pkg_regex = "^linux-headers-$KERNEL_VER"
     local pkg_regex="$1"
     $SUDO apt-cache policy "$pkg_regex" | sed -n "/Version/,\$p" | grep -q http
     return $?
@@ -1543,22 +1541,24 @@ get_kernel_packages_debian() {
     local kernel_ver_sans_arch
 
     kernel_ver_sans_arch="${KERNEL_VER/-amd64}"
-    # kernel_ver_sans_arch=$(sed 's/-amd64//' <<< "$KERNEL_VER")
-    # kernel_arch==$(awk -F '-' '{print $NF}' <<< "$KERNEL_VER")
 
-    local linux_headers_to_download=(
-        "linux-headers-$KERNEL_VER" # Example, deb 12: (linux-headers-6.1.0-29-common), deb 13 (linux-headers-6.12.38+deb13-amd64)
-        "linux-headers-$kernel_ver_sans_arch-common" # Example: deb 12 (linux-headers-6.1.0-29-common), deb 13 (linux-headers-6.12.38+deb13-common)
+    # Associative array mapping package names to their expected architecture
+    # Example deb 12: linux-headers-6.1.0-29-amd64, linux-headers-6.1.0-29-common
+    # Example deb 13: linux-headers-6.12.38+deb13-amd64, linux-headers-6.12.38+deb13-common
+    declare -A linux_headers_to_download=(
+        ["linux-headers-$KERNEL_VER"]="amd64"
+        ["linux-headers-$kernel_ver_sans_arch-common"]="all"
     )
 
     if [[ $DISTRO_MAJOR_VER -eq 13 ]]; then
         # Example deb13: linux-kbuild-6.12.38+deb13
-        linux_headers_to_download+=("linux-kbuild-$kernel_ver_sans_arch") 
+        linux_headers_to_download["linux-kbuild-$kernel_ver_sans_arch"]="amd64"
     fi
 
     local linux_headers_package_list=()
 
-    for package in "${linux_headers_to_download[@]}"; do
+    for package in "${!linux_headers_to_download[@]}"; do
+        local expected_arch="${linux_headers_to_download[$package]}"
         # Example URL: https://snapshot.debian.org/mr/binary/linux-headers-6.1.0-29-common/
 
         if linux_headers_info=$(wget --quiet --tries $WGET_RETRY_COUNT --no-check-certificate -qO- "https://snapshot.debian.org/mr/binary/$package"); then
@@ -1567,22 +1567,25 @@ get_kernel_packages_debian() {
             # Example URL: https://snapshot.debian.org/mr/binary/linux-headers-6.1.0-29-amd64/6.1.123-1/binfiles
 
             if linux_headers_file_info=$(wget --quiet --tries $WGET_RETRY_COUNT --no-check-certificate -qO- "https://snapshot.debian.org/mr/binary/$package/$linux_headers_binary_version/binfiles"); then
-                linux_headers_hash_value=$(jq -r '.result[0].hash' <<< "$linux_headers_file_info")
+                # Find the hash for the expected architecture
+                linux_headers_hash_value=$(jq -r --arg arch "$expected_arch" '.result[] | select(.architecture == $arch) | .hash' <<< "$linux_headers_file_info")
 
-                if grep -q "common" <<< "$package"; then
-                    # Example: linux-headers-6.1.0-29-common_6.1.123-1_all.deb
-                    downloaded_package_name="${package}_${linux_headers_binary_version}_all.deb"
-                else
-                    # Example: linux-kbuild-6.1_6.1.158-1_amd64.deb
-                    downloaded_package_name="${package}_${linux_headers_binary_version}_amd64.deb"
+                # If expected architecture not found, skip this package
+                if [[ -z "$linux_headers_hash_value" ]]; then
+                    echo -e "${YELLOW}Architecture $expected_arch not found for $package, skipping${NC}"
+                    continue
                 fi
 
+                # Build the package filename using the expected architecture
+                # Example: linux-headers-6.1.0-29-amd64_6.1.123-1_amd64.deb
+                downloaded_package_name="${package}_${linux_headers_binary_version}_${expected_arch}.deb"
+
+                # Example URL: https://snapshot.debian.org/file/ee32fc44cc642e3c131ac182f98ee11e6b102856/linux-headers-6.1.0-29-common_6.1.123-1_all.deb
                 echo "--------------------------"
                 echo "URL: https://snapshot.debian.org/file/$linux_headers_hash_value/$downloaded_package_name"
                 echo "--------------------------"
 
                 echo "Downloading: $package"
-                # Example URL: https://snapshot.debian.org/file/ee32fc44cc642e3c131ac182f98ee11e6b102856/linux-headers-6.1.0-29-common_6.1.123-1_all.deb
 
                 if ! wget --quiet --tries $WGET_RETRY_COUNT --no-check-certificate "https://snapshot.debian.org/file/$linux_headers_hash_value/$downloaded_package_name"; then
                     echo -e "${YELLOW}Failed to download $package from https://snapshot.debian.org ${NC}"
@@ -1893,11 +1896,11 @@ block_kernel_meta_packages_debian12() {
     # On Debian 12, installing dkms triggers installation of kernel meta-packages
     # (linux-headers-amd64, linux-headers-686-pae, linux-headers-generic), which can
     # upgrade the running kernel. To prevent unwanted kernel upgrades during DKMS install,
-    # block these meta-packages if kernel headers for current kernel
+    # block these meta-packages from installing if kernel headers for current kernel
     # are already installed or if they will be installed.
     if [[ $DISTRO_NAME == "debian" ]] && [[ $DISTRO_MAJOR_VER -eq 12 ]]; then
         if [[ " $INSTALL_LIST " == *" dkms "* ]]; then
-            if $SUDO apt list --installed 2>/dev/null | grep -q "linux-headers-$KERNEL_VER" || grep "$KERNEL_PACKAGES" <<< "$INSTALL_LIST"; then
+            if is_pkg_deb_installed "linux-headers-$KERNEL_VER" || grep "$KERNEL_PACKAGES" <<< "$INSTALL_LIST"; then
                 echo "Add a temporary block to meta packages linux-headers-amd64, linux-headers-686-pae and linux-headers-generic to prevent kernel upgrades during DKMS install."
 cat <<EOF | $SUDO tee /etc/apt/preferences.d/block-headers
 Package: linux-headers-amd64 linux-headers-686-pae linux-headers-generic
