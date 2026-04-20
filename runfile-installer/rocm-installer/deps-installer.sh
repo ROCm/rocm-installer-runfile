@@ -358,9 +358,9 @@ is_pkg_installable_deb() {
     return $install_result
 }
 
-is_pkg_available_deb() {
-    local pkg_regex="$1"
-    $SUDO apt-cache policy "$pkg_regex" | sed -n "/Version/,\$p" | grep -q http
+is_pkg_available_to_download_deb() {
+    local pkg="$1"
+    apt-cache policy "$pkg" | sed -n "/Version/,\$p" | grep -q http
     return $?
 }
 
@@ -1631,9 +1631,7 @@ get_kernel_packages() {
 
     # set the kernel packages
     if [ $DISTRO_PACKAGE_MGR == "apt" ]; then
-        # Check if package linux-headers-$KERNEL_VER available to download
-        # if $SUDO apt-cache policy "^linux-headers-$KERNEL_VER" | sed -n "/Version/,\$p" | grep -q http; then
-        if is_pkg_available_deb "^linux-headers-$KERNEL_VER"; then
+        if is_pkg_available_to_download_deb "linux-headers-$KERNEL_VER"; then
             echo "Package linux-headers-$KERNEL_VER available in repository"
             KERNEL_PACKAGES="linux-headers-$KERNEL_VER "
         elif [[ $DISTRO_NAME = "debian" ]]; then
