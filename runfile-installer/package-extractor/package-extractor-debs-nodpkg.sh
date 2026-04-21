@@ -149,6 +149,14 @@ format_size() {
     fi
 }
 
+format_duration() {
+    local duration=$1
+    local hours=$((duration / 3600))
+    local minutes=$(((duration % 3600) / 60))
+    local seconds=$((duration % 60))
+    echo "${hours}h ${minutes}m ${seconds}s (${duration} seconds)"
+}
+
 ###### NO-DPKG HELPER FUNCTIONS ################################################
 
 # Global variable to cache the control file content
@@ -1103,6 +1111,10 @@ extract_rocm_debs() {
         PACKAGE_DIR="$PACKAGE_ROCM_DIR"
         EXTRACT_PKG_CONFIG_FILE="$EXTRACT_ROCM_PKG_CONFIG_FILE"
 
+        # Capture extraction start time
+        local extract_start_time
+        extract_start_time=$(date +%s)
+
         # Extract packages for this gfx group
         PKG_COUNT=0
         for pkg in $pkg_list; do
@@ -1119,8 +1131,13 @@ extract_rocm_debs() {
         write_extract_info
         filter_deps_version
 
+        # Capture extraction end time and calculate duration
+        local extract_end_time
+        extract_end_time=$(date +%s)
+        local extract_duration=$((extract_end_time - extract_start_time))
+
         echo -e "\e[93m========================================\e[0m"
-        echo -e "\e[93mExtracted: $PKG_COUNT $gfx_tag packages\e[0m"
+        echo -e "\e[93mExtracted: $PKG_COUNT $gfx_tag packages in $(format_duration "$extract_duration")\e[0m"
         echo -e "\e[93m========================================\e[0m"
     done
 

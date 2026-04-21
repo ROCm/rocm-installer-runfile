@@ -207,6 +207,14 @@ format_size() {
     fi
 }
 
+format_duration() {
+    local duration=$1
+    local hours=$((duration / 3600))
+    local minutes=$(((duration % 3600) / 60))
+    local seconds=$((duration % 60))
+    echo "${hours}h ${minutes}m ${seconds}s (${duration} seconds)"
+}
+
 install_tools_el() {
     if [[ "$DISTRO_NAME" = "rocky" ]]; then
         # Rocky Linux - use cpio and diffutils instead of rpmdevtools
@@ -1972,6 +1980,10 @@ extract_rocm_rpms() {
         PACKAGES="$pkg_list"
         PKG_COUNT=${#PKG_LIST[@]}
 
+        # Capture extraction start time
+        local extract_start_time
+        extract_start_time=$(date +%s)
+
         extract_rpms
 
         add_extra_deps
@@ -1979,8 +1991,13 @@ extract_rocm_rpms() {
         write_extract_info
         filter_deps_version
 
+        # Capture extraction end time and calculate duration
+        local extract_end_time
+        extract_end_time=$(date +%s)
+        local extract_duration=$((extract_end_time - extract_start_time))
+
         echo -e "\e[93m========================================\e[0m"
-        echo -e "\e[93mExtracted: $PKG_COUNT $gfx_tag packages\e[0m"
+        echo -e "\e[93mExtracted: $PKG_COUNT $gfx_tag packages in $(format_duration "$extract_duration")\e[0m"
         echo -e "\e[93m========================================\e[0m"
     done
 

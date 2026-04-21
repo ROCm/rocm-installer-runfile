@@ -64,6 +64,13 @@ EXIT STATUS:
 END_USAGE
 }
 
+format_duration() {
+    local duration=$1
+    local minutes=$((duration / 60))
+    local seconds=$((duration % 60))
+    echo "${minutes}m ${seconds}s (${duration} seconds)"
+}
+
 run_with_progress() {
     local message="$1"
     shift
@@ -141,7 +148,7 @@ if [[ "$archive_file" == "extract-all" ]]; then
     if [[ -d "component-amdgpu" ]]; then
         for archive in component-amdgpu/content-*.tar.*; do
             if [[ -f "$archive" ]]; then
-                if "$0" "$archive" "component-amdgpu/content" "$INSTALLER_DIR"; then
+                if "$0" "$archive" "component-amdgpu" "$INSTALLER_DIR"; then
                     extracted_count=$((extracted_count + 1))
                 else
                     failed_count=$((failed_count + 1))
@@ -184,6 +191,9 @@ mkdir -p "$output_dir"
 archive_name=$(basename "$archive_file")
 echo "  Extracting: $archive_name"
 
+# Capture extraction start time
+extract_start_time=$(date +%s)
+
 success=0
 
 if [[ "$archive_file" == *.tar.xz ]]; then
@@ -214,7 +224,11 @@ if [[ $success -eq 0 ]]; then
     exit 1
 fi
 
+# Capture extraction end time and calculate duration
+extract_end_time=$(date +%s)
+extract_duration=$((extract_end_time - extract_start_time))
+
 # Clear any residual progress text before printing success message
 printf "\r\033[K"
-echo -e "  \e[32mExtracted : $archive_name\e[0m"
+echo -e "  \e[32mExtracted : $archive_name in $(format_duration "$extract_duration")\e[0m"
 exit 0

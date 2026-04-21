@@ -453,6 +453,14 @@ extract_amdgpu_if_needed() {
     local archive="$INSTALLER_DIR/component-amdgpu/content-amdgpu.tar.xz"
     local extract_dir="$INSTALLER_DIR/component-amdgpu"
 
+    # Check if content directory already exists from a previous extraction
+    # The content directory contains distro-specific subdirectories (e.g., ub22, el9)
+    if [[ -d "$extract_dir/content" ]]; then
+        echo "AMDGPU content already extracted, skipping extraction"
+        AMDGPU_EXTRACTED=1
+        return 0
+    fi
+
     if [[ ! -f "$archive" ]]; then
         echo -e "\e[31mERROR: AMDGPU content archive not found: $archive\e[0m"
         exit 1
@@ -753,6 +761,9 @@ uninstall_amdgpu() {
     echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
     echo -e "\e[95mUNINSTALL amdgpu\e[0m"
     echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+
+    # Extract AMDGPU component if needed
+    extract_amdgpu_if_needed
 
     # Set up AMDGPU paths based on distro
     setup_amdgpu_paths

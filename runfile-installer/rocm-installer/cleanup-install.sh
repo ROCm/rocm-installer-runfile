@@ -26,7 +26,7 @@ ROCM_COMP_DIR=component-rocm
 ROCM_COMP_DEB_DIR=component-rocm-deb
 AMDGPU_COMP_DIR=component-amdgpu
 
-CLEAN_SCRIPT_LIST=(install-init.sh rocm-installer.sh amdgpu-installer.sh deps-installer.sh component-extractor.sh cleanup-install.sh)
+CLEAN_SCRIPT_LIST=(install-init.sh rocm-installer.sh amdgpu-installer.sh deps-installer.sh component-extractor.sh cleanup-install.sh detect-gpu-gfx.sh)
 
 ###### Functions ###############################################################
 

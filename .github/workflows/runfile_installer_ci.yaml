@@ -1,0 +1,33 @@
+name: Runfile Installer CI
+
+on:
+  push:
+    branches:
+      - main
+      - release/therock-*
+  pull_request:
+    branches:
+      - main
+      - release/therock-*
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  runfile_installer_ci:
+    name: Basic Runfile Installer Build
+    uses: ./.github/workflows/build_linux_runfile_installer.yaml
+    with:
+      rocm_version: "7.12.0"
+      release_type: dev
+      pull_type: prerelease
+      pull_tag: rc1
+      pull_run_id: "23340740363"
+      pull_pkg: amdrocm-core-sdk
+      gfx_archs: gfx110x
+      pull_amdgpu: "release,30.30.1"
