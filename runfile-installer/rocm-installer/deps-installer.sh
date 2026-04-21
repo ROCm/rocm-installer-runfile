@@ -1630,7 +1630,6 @@ install_kernel_packages_debian() {
         echo "Downloading: $package"
 
         if ! wget --quiet --tries $WGET_RETRY_COUNT --no-check-certificate "$url"; then
-            # echo -e "${YELLOW}Failed to download $package from https://snapshot.debian.org ${NC}"
             print_err "Failed to download $package from https://snapshot.debian.org"
             exit 1
         else
@@ -1638,21 +1637,18 @@ install_kernel_packages_debian() {
         fi
     done
 
-    local return_status=0
-
     if [[ ${#linux_headers_package_list[@]} -gt 0 ]]; then
         echo "Installing downloaded packages: ${linux_headers_package_list[*]}"
-        $SUDO apt-get install -qq -y "${linux_headers_package_list[@]}"
-        return_status=$?
-        if [[ $return_status -eq 0 ]]; then
-            echo -e "${GREEN}Successfully installed kernel headers ${linux_headers_package_list[*]}${NC}"
+        if ! $SUDO apt-get install -qq -y "${linux_headers_package_list[@]}"; then
+            print_err "Failed to install kernel headers: ${linux_headers_package_list[*]}"
+            $SUDO rm -f "${linux_headers_package_list[@]}"
+            exit 1
         fi
+        echo -e "${GREEN}Successfully installed kernel headers ${linux_headers_package_list[*]}${NC}"
 
         # Clean up downloaded files
         $SUDO rm -f "${linux_headers_package_list[@]}"
     fi
-
-    return $return_status
 }
 
 get_kernel_packages() {
@@ -1669,7 +1665,7 @@ get_kernel_packages() {
     if [ $DISTRO_PACKAGE_MGR == "apt" ]; then
         if is_pkg_available_to_download_deb "linux-headers-$KERNEL_VER"; then
             echo "Package linux-headers-$KERNEL_VER available in repository"
-            KERNEL_PACKAGES="linux-headers-$KERNEL_VER "
+            KERNEL_PACKAGES="alinux-headers-$KERNEL_VER "
         elif [[ $DISTRO_NAME = "debian" ]]; then
             get_kernel_packages_debian
         fi
@@ -1934,13 +1930,15 @@ block_kernel_meta_packages_debian12() {
     # are already installed or if they will be installed.
     if [[ $DISTRO_NAME == "debian" ]] && [[ $DISTRO_MAJOR_VER -eq 12 ]]; then
         if [[ " $INSTALL_LIST " == *" dkms "* ]]; then
-            if is_pkg_deb_installed "linux-headers-$KERNEL_VER" || grep "$KERNEL_PACKAGES" <<< "$INSTALL_LIST"; then
-                echo "Add a temporary block to meta packages linux-headers-amd64, linux-headers-686-pae and linux-headers-generic to prevent kernel upgrades during DKMS install."
+            if [[ -n $KERNEL_PACKAGES ]]; then
+                if is_pkg_deb_installed "linux-headers-$KERNEL_VER" || grep "$KERNEL_PACKAGES" <<< "$INSTALL_LIST"; then
+                    echo "Add a temporary block to meta packages linux-headers-amd64, linux-headers-686-pae and linux-headers-generic to prevent kernel upgrades during DKMS install."
 cat <<EOF | $SUDO tee /etc/apt/preferences.d/block-headers
 Package: linux-headers-amd64 linux-headers-686-pae linux-headers-generic
 Pin: release *
 Pin-Priority: -1
 EOF
+                fi
             fi
         fi
     fi
