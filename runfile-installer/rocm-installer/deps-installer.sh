@@ -53,6 +53,9 @@ GCC_TOOLSET_PACKAGES_OL=(gcc-toolset-11-gcc gcc-toolset-11-gcc-c++ gcc-toolset-1
 
 declare -A SLES_PKG_CACHE
 
+# Debian kernel package URLs from snapshot.debian.org (package -> URL)
+declare -A DEBIAN_KERNEL_PKG_INFO
+
 EPEL_SETUP=1
 
 ###### Functions ###############################################################
@@ -1259,7 +1262,7 @@ EOF
     return 0
 }
 
-get_kernel_pacakges_repo_rocky() {
+get_kernel_packages_repo_rocky() {
     local package="kernel-headers-$KERNEL_VER.rpm"
 
     # Repo URL list for kernel packages
@@ -1331,7 +1334,7 @@ get_kernel_packages_rocky() {
         echo -e "\e[93mKernel Packages not available in the AppStream repositories.\e[0m"
 
         # check for legacy kernel headers
-    	if ! get_kernel_pacakges_repo_rocky; then
+    	if ! get_kernel_packages_repo_rocky; then
     	    echo -e "\e[93mKernel Packages not available in the repositories.  Using defaults.\e[0m"
     	fi
     fi
@@ -1555,7 +1558,8 @@ get_kernel_packages_debian() {
         linux_headers_to_download["linux-kbuild-$kernel_ver_sans_arch"]="amd64"
     fi
 
-    local linux_headers_package_list=()
+    # Clear any previous info
+    DEBIAN_KERNEL_PKG_INFO=()
 
     for package in "${!linux_headers_to_download[@]}"; do
         local expected_arch="${linux_headers_to_download[$package]}"
@@ -1576,23 +1580,10 @@ get_kernel_packages_debian() {
                     continue
                 fi
 
-                # Build the package filename using the expected architecture
-                # Example: linux-headers-6.1.0-29-amd64_6.1.123-1_amd64.deb
-                downloaded_package_name="${package}_${linux_headers_binary_version}_${expected_arch}.deb"
-
-                # Example URL: https://snapshot.debian.org/file/ee32fc44cc642e3c131ac182f98ee11e6b102856/linux-headers-6.1.0-29-common_6.1.123-1_all.deb
-                echo "--------------------------"
-                echo "URL: https://snapshot.debian.org/file/$linux_headers_hash_value/$downloaded_package_name"
-                echo "--------------------------"
-
-                echo "Downloading: $package"
-
-                if ! wget --quiet --tries $WGET_RETRY_COUNT --no-check-certificate "https://snapshot.debian.org/file/$linux_headers_hash_value/$downloaded_package_name"; then
-                    echo -e "${YELLOW}Failed to download $package from https://snapshot.debian.org ${NC}"
-                    return 1
-                else
-                    linux_headers_package_list+=("$(pwd)/$downloaded_package_name")
-                fi
+                # Build and store the full download URL
+                local deb_filename="${package}_${linux_headers_binary_version}_${expected_arch}.deb"
+                DEBIAN_KERNEL_PKG_INFO["$package"]="https://snapshot.debian.org/file/${linux_headers_hash_value}/${deb_filename}"
+                echo "Found $package on snapshot.debian.org"
             else
                 echo -e "${YELLOW}Failed to download metadata on kernel package $package from https://snapshot.debian.org ${NC}"
                 return 1
@@ -1603,19 +1594,64 @@ get_kernel_packages_debian() {
         fi
     done
 
-    local return_status
+    if [[ ${#DEBIAN_KERNEL_PKG_INFO[@]} -gt 0 ]]; then
+        for pkg in "${!DEBIAN_KERNEL_PKG_INFO[@]}"; do
+            KERNEL_PACKAGES+="$pkg "
+        done
+    fi
 
-    if [[ $INSTALL_DEPS -eq 1 ]]; then
+    echo "Debian kernel packages discovery...Complete."
+    return 0
+}
+
+# Download and install Debian kernel packages from snapshot.debian.org
+# Called from install_dependencies() - uses info stored in DEBIAN_KERNEL_PKG_INFO
+install_kernel_packages_debian() {
+    print_str "--------------------------------"
+    print_str "Installing Debian kernel packages from snapshot.debian.org..."
+
+    local linux_headers_package_list=()
+
+    for package in "${!DEBIAN_KERNEL_PKG_INFO[@]}"; do
+        # Only install packages that are in MANUAL_INSTALL_LIST (i.e., missing packages)
+        if [[ " $MANUAL_INSTALL_LIST " != *" $package "* ]]; then
+            echo "Skipping $package (already installed or not needed)"
+            continue
+        fi
+
+        local url="${DEBIAN_KERNEL_PKG_INFO[$package]}"
+        local filename
+        filename=$(basename "$url")
+
+        echo "--------------------------"
+        echo "URL: $url"
+        echo "--------------------------"
+
+        echo "Downloading: $package"
+
+        if ! wget --quiet --tries $WGET_RETRY_COUNT --no-check-certificate "$url"; then
+            # echo -e "${YELLOW}Failed to download $package from https://snapshot.debian.org ${NC}"
+            print_err "Failed to download $package from https://snapshot.debian.org"
+            exit 1
+        else
+            linux_headers_package_list+=("$(pwd)/$filename")
+        fi
+    done
+
+    local return_status=0
+
+    if [[ ${#linux_headers_package_list[@]} -gt 0 ]]; then
         echo "Installing downloaded packages: ${linux_headers_package_list[*]}"
-        $SUDO apt-get install -y "${linux_headers_package_list[@]}"
+        $SUDO apt-get install -qq -y "${linux_headers_package_list[@]}"
         return_status=$?
         if [[ $return_status -eq 0 ]]; then
             echo -e "${GREEN}Successfully installed kernel headers ${linux_headers_package_list[*]}${NC}"
         fi
-        return_status=$?
+
+        # Clean up downloaded files
+        $SUDO rm -f "${linux_headers_package_list[@]}"
     fi
 
-    $SUDO rm "${linux_headers_package_list[@]}"
     return $return_status
 }
 
@@ -1916,6 +1952,8 @@ install_dependencies() {
     echo Installing Dependencies...
 
     INSTALL_LIST=
+    # Packages that are downloaded directly via wget.
+    MANUAL_INSTALL_LIST=
 
     # remove trailing space
     MISSING_DEPS="${MISSING_DEPS% }"
@@ -1948,6 +1986,17 @@ install_dependencies() {
     IFS=',' read -ra package_array <<< "$MISSING_DEPS"
     for pkg in "${package_array[@]}"; do
         INSTALL_DEPS_COUNT=$((INSTALL_DEPS_COUNT+1))
+
+        # Skip packages that will be installed from snapshot.debian.org
+        local pkg_trimmed
+        # shellcheck disable=SC2001
+        pkg_trimmed=$(echo "$pkg" | sed 's/^ *//')
+        if [[ -n "${DEBIAN_KERNEL_PKG_INFO[$pkg_trimmed]+isset}" ]]; then
+            echo "Skipping apt check for $pkg_trimmed (will be installed from snapshot.debian.org)"
+            MANUAL_INSTALL_LIST+="$pkg_trimmed "
+            continue
+        fi
+
         check_dep_installable "$pkg"
     done
 
@@ -1962,6 +2011,13 @@ install_dependencies() {
         echo Installing the following based on availability:
         echo "$INSTALL_LIST"
         echo -----------------------------------------------
+    fi
+
+    # Some kernel headers for debian need to be downloaded and installed
+    # from snapshot.debian.org because they may not be available in the regular
+    # debian repos.
+    if [[ -n $MANUAL_INSTALL_LIST ]]; then
+        install_kernel_packages_debian
     fi
 
     if [[ -n $INSTALL_LIST ]]; then
