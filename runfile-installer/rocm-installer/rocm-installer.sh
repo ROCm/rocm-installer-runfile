@@ -116,6 +116,7 @@ Usage: bash $PROG [options]
                      Installs base components plus architecture-specific components.
                      If not specified, only base components are installed.
                      Use gfx=list to see available architectures in this installer.
+                     Use gfx=show to detect and display GPU information.
                      Available architectures: gfx94x, gfx950
 
         compo=<component_list>
@@ -803,13 +804,38 @@ dump_rocm_state() {
 
 get_available_gfx_archs() {
     # Scan for available GFX architectures in the installer
+    # Detects both extracted directories and compressed archives
     local archs=()
-    for gfx_dir in "$EXTRACT_ROCM_DIR"/gfx*/; do
-        if [ -d "$gfx_dir" ]; then
-            gfx_name=$(basename "$gfx_dir")
-            archs+=("$gfx_name")
-        fi
-    done
+
+    # Check for extracted GFX directories in content/ (mscomp=nocomp)
+    if [[ -d "$EXTRACT_ROCM_DIR/content" ]]; then
+        for gfx_dir in "$EXTRACT_ROCM_DIR"/content/gfx*/; do
+            if [ -d "$gfx_dir" ]; then
+                gfx_name=$(basename "$gfx_dir")
+                archs+=("$gfx_name")
+            fi
+        done
+    fi
+
+    # Check for compressed GFX archives (mscomp=xz/gz/zst)
+    # Only check if INSTALLER_DIR is set (running from .run file)
+    if [[ -n "$INSTALLER_DIR" ]]; then
+        for archive in "$INSTALLER_DIR"/component-rocm/content-gfx*.tar.*; do
+            if [ -f "$archive" ]; then
+                # Extract gfx name from filename: content-gfx94x.tar.xz -> gfx94x
+                local basename_file
+                basename_file=$(basename "$archive")
+                local gfx_name="${basename_file#content-}"  # Remove "content-" prefix
+                gfx_name="${gfx_name%.tar.*}"               # Remove ".tar.*" suffix
+                # Only add if not already in array
+                local pattern=" $gfx_name "
+                if [[ ! " ${archs[*]} " =~ $pattern ]]; then
+                    archs+=("$gfx_name")
+                fi
+            fi
+        done
+    fi
+
     echo "${archs[@]}"
 }
 
@@ -820,6 +846,155 @@ get_available_components() {
     echo "${components[@]}"
 }
 
+auto_detect_gfx() {
+    # Auto-detect GFX architecture using detect-gpu-gfx.sh
+    # Parameters: $1 = available_archs (space-separated string)
+    # Sets INSTALL_GFX on success, exits on failure
+
+    local available_archs="$1"
+
+    echo "=============================================================="
+    echo "GFX architecture not specified, attempting auto-detection..."
+    echo "=============================================================="
+
+    local detect_script="$INSTALLER_DIR/detect-gpu-gfx.sh"
+    local detected_gfx=""
+    local detect_exit_code=0
+
+    # Check if detection script exists
+    if [[ ! -f "$detect_script" ]]; then
+        # Detection script not found, require manual specification
+        print_err "The gfx= argument is required when installing ROCm components with architecture variants."
+        echo "Requested components: $COMPO_INSTALL"
+        echo ""
+        if [[ -n "$available_archs" ]]; then
+            echo "Available architectures: $available_archs"
+            echo "Example: $PROG compo=$COMPO_INSTALL gfx=${available_archs%% *} rocm"
+        fi
+        echo ""
+        echo "Note: gfx= is not required for base-only components (dev-tools, opencl)"
+        exit 1
+    fi
+
+    # Get detected GFX architecture
+    detected_gfx=$("$detect_script" --output gfx 2>/dev/null)
+    detect_exit_code=$?
+
+    # Show device information
+    if [[ $detect_exit_code -eq 0 ]] || [[ $detect_exit_code -eq 3 ]]; then
+        echo ""
+        echo "Detected GPU(s):"
+
+        # Get device IDs and names
+        local -a device_ids
+        local -a device_names
+        local -a gfx_archs
+
+        mapfile -t device_ids < <("$detect_script" --output device-id 2>/dev/null)
+        mapfile -t device_names < <("$detect_script" --output name 2>/dev/null)
+        mapfile -t gfx_archs < <("$detect_script" --output gfx 2>/dev/null)
+
+        for i in "${!device_ids[@]}"; do
+            local dev_id="${device_ids[$i]}"
+            local dev_name="${device_names[$i]:-Unknown}"
+            local gfx="${gfx_archs[$i]:-unknown}"
+
+            if [[ -n "$dev_name" && "$dev_name" != "Unknown AMD GPU" && "$dev_name" != "N/A" ]]; then
+                echo "  GPU $((i+1)): $dev_name (Device: 0x$dev_id, GFX: $gfx)"
+            else
+                echo "  GPU $((i+1)): AMD GPU Device 0x$dev_id (GFX: $gfx)"
+            fi
+        done
+        echo ""
+    fi
+
+    # Handle different exit codes
+    case $detect_exit_code in
+        0)
+            # Successfully detected single architecture
+            INSTALL_GFX="$detected_gfx"
+            USER_SPECIFIED_GFX=0  # Mark as auto-detected, not user-specified
+            echo "Auto-detected GFX architecture: $INSTALL_GFX"
+            echo "=============================================================="
+            echo ""
+
+            # Prompt user to confirm auto-detected architecture
+            if [[ $PROMPT_USER == 1 ]]; then
+                prompt_user "Continue with auto-detected GFX architecture $INSTALL_GFX? (y/n): "
+                if [[ "$option" == "N" || "$option" == "n" ]]; then
+                    echo ""
+                    if [[ -n "$available_archs" ]]; then
+                        echo "To specify a different architecture, use:"
+                        echo "  $PROG gfx=<arch> rocm"
+                        echo ""
+                        echo "Available architectures: $available_archs"
+                    fi
+                    exit 1
+                fi
+                echo ""
+            fi
+            ;;
+        1)
+            # No AMD GPU detected
+            echo ""
+            print_err "No AMD GPU detected in the system."
+            echo ""
+            echo "The gfx= argument is required when no GPU can be auto-detected."
+            echo "Requested components: $COMPO_INSTALL"
+            if [[ -n "$available_archs" ]]; then
+                echo ""
+                echo "Available architectures in this installer: $available_archs"
+                echo ""
+                echo "Example: $PROG gfx=${available_archs%% *} rocm"
+            fi
+            exit 1
+            ;;
+        2)
+            # AMD GPU detected but unknown architecture
+            echo ""
+            print_err "AMD GPU detected but architecture is unknown or unsupported."
+            echo ""
+            echo "The gfx= argument must be manually specified for this GPU."
+            if [[ -n "$available_archs" ]]; then
+                echo ""
+                echo "Available architectures in this installer: $available_archs"
+                echo ""
+                echo "Example: $PROG gfx=${available_archs%% *} rocm"
+            fi
+            echo ""
+            echo "Run '$detect_script --list' for detailed GPU information."
+            exit 1
+            ;;
+        3)
+            # Multiple different architectures detected
+            echo ""
+            print_err "Multiple different GPU architectures detected: $detected_gfx"
+            echo ""
+            echo "This installer only supports installing for a single GPU architecture."
+            echo "Please specify which architecture to install using the gfx= argument."
+            echo ""
+            echo "Detected architectures: $detected_gfx"
+            echo ""
+            echo "Example: $PROG gfx=${detected_gfx%%,*} rocm"
+            exit 1
+            ;;
+        *)
+            # Unknown error from detection script
+            print_warn "GPU detection script failed (exit code: $detect_exit_code)"
+            echo ""
+            print_err "The gfx= argument is required."
+            echo ""
+            echo "Requested components: $COMPO_INSTALL"
+            if [[ -n "$available_archs" ]]; then
+                echo "Available architectures: $available_archs"
+                echo ""
+                echo "Example: $PROG gfx=${available_archs%% *} rocm"
+            fi
+            exit 1
+            ;;
+    esac
+}
+
 validate_gfx_arg() {
     # Validate gfx= argument for ROCm installation
     #
@@ -828,6 +1003,10 @@ validate_gfx_arg() {
     #   - Components NOT requiring gfx= (base-only): dev-tools, opencl
     #   - If ANY component requires gfx=, then gfx= must be provided
     #   - If ALL components are base-only, gfx= is optional
+
+    # Get available architectures once (used for validation and auto-detection)
+    local available_archs
+    read -r -a available_archs <<< "$(get_available_gfx_archs)"
 
     # Check if gfx= is required but not provided
     # Only required when actually installing ROCm components
@@ -852,21 +1031,8 @@ validate_gfx_arg() {
             # Require gfx= if ANY component needs architecture-specific variants
             # (i.e., if NOT all components are base-only)
             if [[ $base_only_install == 0 ]]; then
-                # Get available architectures from installer
-                local available_archs
-                read -r -a available_archs <<< "$(get_available_gfx_archs)"
-                print_err "The gfx= argument is required when installing ROCm components with architecture variants."
-                echo "Requested components: $COMPO_INSTALL"
-                echo "Example: $PROG compo=$COMPO_INSTALL gfx=gfx94x rocm"
-                echo ""
-                if [ ${#available_archs[@]} -gt 0 ]; then
-                    echo "Available architectures: ${available_archs[*]}"
-                else
-                    echo "Available architectures: gfx94x, gfx950"
-                fi
-                echo ""
-                echo "Note: gfx= is not required for base-only components (dev-tools, opencl)"
-                exit 1
+                # Attempt auto-detection of GFX architecture
+                auto_detect_gfx "${available_archs[*]}"
             fi
         fi
     fi
@@ -883,21 +1049,15 @@ validate_gfx_arg() {
 
         # Validate format: must start with "gfx" followed by alphanumeric
         if [[ ! "$INSTALL_GFX" =~ ^gfx[0-9a-z]+$ ]]; then
-            local available_archs
-            read -r -a available_archs <<< "$(get_available_gfx_archs)"
             print_err "Invalid gfx= format: $INSTALL_GFX"
             echo "The architecture must be in format: gfx<arch>"
             if [ ${#available_archs[@]} -gt 0 ]; then
                 echo "Available architectures: ${available_archs[*]}"
-            else
-                echo "Examples: gfx94x, gfx950, gfx103x"
             fi
             exit 1
         fi
 
         # Validate against available architectures in installer
-        local available_archs
-        read -r -a available_archs <<< "$(get_available_gfx_archs)"
         if [ ${#available_archs[@]} -gt 0 ]; then
             local valid_arch=0
             for arch in "${available_archs[@]}"; do
@@ -2257,7 +2417,7 @@ uninstall_rocm_target() {
 
     # set the version directory
     local rocm_ver_dir="${inst%/}"
-    local rocm_rm_dir="${inst%/\rocm*}"
+    local rocm_rm_dir="${inst%/rocm*}"
 
     # Set manifest file path for uninstall (use detected install path)
     INSTALL_MANIFEST_FILE="$rocm_ver_dir/.info/$INSTALL_MANIFEST_NAME"
@@ -2441,9 +2601,9 @@ uninstall_rocm() {
     # Check for any previous installs of ROCm
     if find_rocm_with_progress "$TARGET_DIR"; then
 
-        # Update the target for scriptlet hanndling
+        # Update the target for scriptlet handling
         if [[ "$TARGET_DIR" == *"rocm"* ]]; then
-            TARGET_DIR="${TARGET_ROCM_DIR%/\rocm*}"
+            TARGET_DIR="${TARGET_ROCM_DIR%/rocm*}"
             echo "TARGET_DIR : $TARGET_DIR"
         fi
 
@@ -2675,7 +2835,7 @@ install_post_rocm() {
         fi
 
         rocm_ver_dir="$ROCM_DIR"
-        TARGET_DIR="${TARGET_DIR%/\rocm-[0-9]*}"
+        TARGET_DIR="${TARGET_DIR%/rocm-[0-9]*}"
 
         # Check if user explicitly specified compo= or gfx= for selective post-install
         if [[ $USER_SPECIFIED_COMPO -eq 1 || $USER_SPECIFIED_GFX -eq 1 ]]; then
@@ -2804,6 +2964,64 @@ EOF
     echo Setting GPU Access...Complete.
 }
 
+show_detected_gpu() {
+    echo "========================================="
+    echo "Detected GPU Information"
+    echo "========================================="
+    echo ""
+
+    local detect_script="$INSTALLER_DIR/detect-gpu-gfx.sh"
+
+    # Check if detection script exists
+    if [[ ! -f "$detect_script" ]]; then
+        echo "Error: GPU detection script not found."
+        echo ""
+        exit 1
+    fi
+
+    # Run detection and capture output
+    local detected_output
+    detected_output=$("$detect_script" --output all --unique 2>/dev/null)
+    local detect_exit_code=$?
+
+    if [[ $detect_exit_code -eq 0 ]] && [[ -n "$detected_output" ]]; then
+        # Parse tab-separated output: name, device-id, revision, gfx
+        echo "Detected AMD GPU(s):"
+        echo ""
+
+        local count=0
+        while IFS=$'\t' read -r name device_id revision gfx; do
+            count=$((count + 1))
+            echo "  GPU $count:"
+            echo "    Name       : $name"
+            echo "    Device ID  : 0x$device_id"
+            echo "    Revision   : 0x$revision"
+            echo "    GFX Arch   : $gfx"
+            echo ""
+        done <<< "$detected_output"
+
+        # Get unique GFX architectures
+        local -a unique_gfx_list
+        mapfile -t unique_gfx_list < <(echo "$detected_output" | cut -f4 | sort -u)
+
+        if [[ ${#unique_gfx_list[@]} -eq 1 ]]; then
+            echo "To install ROCm for detected GPU, use:"
+            echo "  $PROG gfx=${unique_gfx_list[0]} rocm"
+        else
+            echo "To install ROCm for detected GPUs, use one of:"
+            for gfx_arch in "${unique_gfx_list[@]}"; do
+                echo "  $PROG gfx=$gfx_arch rocm"
+            done
+        fi
+    else
+        echo "Unable to detect AMD GPU."
+    fi
+
+    echo ""
+    echo "========================================="
+    exit 0
+}
+
 ####### Main script ###############################################################
 
 # Create the installer log directory
@@ -2884,6 +3102,10 @@ do
         ;;
     target=*)
         INSTALL_TARGET="${1#*=}"
+        # Normalize path: remove trailing slashes (but preserve root /)
+        if [[ "$INSTALL_TARGET" != "/" ]]; then
+            INSTALL_TARGET="${INSTALL_TARGET%/}"
+        fi
         echo Using install target location: "$INSTALL_TARGET"
         TARGET_ROCM_DIR="$INSTALL_TARGET"
         shift
@@ -2915,6 +3137,11 @@ do
             fi
             echo "========================================="
             exit 0
+        fi
+
+        # Handle gfx=show to display detected GPU information
+        if [[ "$INSTALL_GFX" == "show" ]]; then
+            show_detected_gpu
         fi
 
         USER_SPECIFIED_GFX=1

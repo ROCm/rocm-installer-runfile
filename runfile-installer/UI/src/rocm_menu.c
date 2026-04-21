@@ -89,6 +89,8 @@ void do_rocm_menu_device();
 void process_rocm_device_menu();
 void update_rocm_device_name();
 void reset_rocm_device_name();
+void auto_select_detected_gpu();
+const char* extract_gfx_code(const char *item_name);
 
 // ROCm Component Menu
 void create_rocm_menu_compo_window(WINDOW *pMenuWindow);
@@ -543,6 +545,61 @@ void do_rocm_menu()
     unpost_menu(pMenu);
 }
 
+// Auto-select detected GPU when enabling ROCm installation
+void auto_select_detected_gpu()
+{
+    // Auto-select detected GPU if not already set and GPU was detected
+    if (strlen(g_pRocmConfig->rocm_device) == 0 &&
+        strlen(g_pRocmConfig->rocm_device_gpu) == 0 &&
+        g_pConfig->gpu_detection.detected &&
+        g_pConfig->gpu_detection.num_gpus > 0)
+    {
+        // Use first detected GPU
+        strncpy(g_pRocmConfig->rocm_device, g_pConfig->gpu_detection.gpus[0].gfx_arch,
+                sizeof(g_pRocmConfig->rocm_device) - 1);
+        g_pRocmConfig->rocm_device[sizeof(g_pRocmConfig->rocm_device) - 1] = '\0';
+
+        strncpy(g_pRocmConfig->rocm_device_gpu, g_pConfig->gpu_detection.gpus[0].name,
+                sizeof(g_pRocmConfig->rocm_device_gpu) - 1);
+        g_pRocmConfig->rocm_device_gpu[sizeof(g_pRocmConfig->rocm_device_gpu) - 1] = '\0';
+
+        // Set the detected GPU as selected in the device menu
+        ITEM **items = menu_items(menuROCmDevice.pMenu);
+        if (items != NULL)
+        {
+            // Find and select the matching device in the menu
+            for (int i = 0; i < item_count(menuROCmDevice.pMenu); i++)
+            {
+                const char *item_name_str = item_name(items[i]);
+                const char *gfx_code = extract_gfx_code(item_name_str);
+
+                if (gfx_code != NULL)
+                {
+                    // Extract just the gfx code for comparison
+                    char gfx_buf[16];
+                    const char *end = strchr(gfx_code, ')');
+                    if (end)
+                    {
+                        size_t len = end - gfx_code;
+                        if (len < sizeof(gfx_buf))
+                        {
+                            strncpy(gfx_buf, gfx_code, len);
+                            gfx_buf[len] = '\0';
+
+                            // Check if this matches the detected GPU
+                            if (strcmp(gfx_buf, g_pRocmConfig->rocm_device) == 0)
+                            {
+                                set_item_value(items[i], TRUE);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 // process "ENTER" key events from the ROCm main menu
 void process_rocm_menu()
 {
@@ -563,8 +620,15 @@ void process_rocm_menu()
         rocm_menu_toggle_grey_items(g_pRocmConfig->install_rocm);
         menu_info_draw_bool(&menuROCm, ROCM_MENU_ITEM_INSTALL_ROCM_ROW, ROCM_MENU_FORM_COL, g_pRocmConfig->install_rocm);
 
-        // reset any state on rocm install toggle off
-        if (!g_pRocmConfig->install_rocm)
+        // Initialize detected GPU when toggling install on
+        if (g_pRocmConfig->install_rocm)
+        {
+            if (g_pConfig->gpu_detection.num_gpus > 0)
+            {
+                auto_select_detected_gpu();
+            }
+        }
+        else  // reset any state on rocm install toggle off
         {
             // reset the rocm install check
             gRocmStatusCheck = false;
@@ -1330,13 +1394,12 @@ void update_rocm_device_name()
     MENU *pMenu = pMenuData->pMenu;
     ITEM **items = pMenuData->itemList[0].items;
 
-    clear_rocm_device_name();
-
     // check for any selected items in the menu
     for(i = 0; i < item_count(pMenu); ++i)
     {
         if(item_value(items[i]) == TRUE)
         {
+            clear_rocm_device_name();
             set_rocm_device_name(i);
             break;
         }
