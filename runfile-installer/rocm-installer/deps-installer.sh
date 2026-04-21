@@ -1565,12 +1565,12 @@ get_kernel_packages_debian() {
         local expected_arch="${linux_headers_to_download[$package]}"
         # Example URL: https://snapshot.debian.org/mr/binary/linux-headers-6.1.0-29-common/
 
-        if linux_headers_info=$(wget --quiet --tries $WGET_RETRY_COUNT --no-check-certificate -qO- "https://snapshot.debian.org/mr/binary/$package"); then
+        if linux_headers_info=$(wget --quiet --tries $WGET_RETRY_COUNT -qO- "https://snapshot.debian.org/mr/binary/$package"); then
             linux_headers_binary_version=$(jq -r '.result[0].binary_version' <<< "$linux_headers_info")
 
             # Example URL: https://snapshot.debian.org/mr/binary/linux-headers-6.1.0-29-amd64/6.1.123-1/binfiles
 
-            if linux_headers_file_info=$(wget --quiet --tries $WGET_RETRY_COUNT --no-check-certificate -qO- "https://snapshot.debian.org/mr/binary/$package/$linux_headers_binary_version/binfiles"); then
+            if linux_headers_file_info=$(wget --quiet --tries $WGET_RETRY_COUNT -qO- "https://snapshot.debian.org/mr/binary/$package/$linux_headers_binary_version/binfiles"); then
                 # Find the hash for the expected architecture
                 linux_headers_hash_value=$(jq -r --arg arch "$expected_arch" '.result[] | select(.architecture == $arch) | .hash' <<< "$linux_headers_file_info")
 
@@ -1629,7 +1629,7 @@ install_kernel_packages_debian() {
 
         echo "Downloading: $package"
 
-        if ! wget --quiet --tries $WGET_RETRY_COUNT --no-check-certificate "$url"; then
+        if ! wget --quiet --tries $WGET_RETRY_COUNT "$url"; then
             print_err "Failed to download $package from https://snapshot.debian.org"
             exit 1
         else
