@@ -1992,6 +1992,7 @@ install_dependencies() {
         # shellcheck disable=SC2001
         pkg_trimmed=$(echo "$pkg" | sed 's/^ *//')
         if [[ -n "${DEBIAN_KERNEL_PKG_INFO[$pkg_trimmed]+isset}" ]]; then
+            echo --------------------------------------------------------------
             echo "Skipping apt check for $pkg_trimmed (will be installed from snapshot.debian.org)"
             MANUAL_INSTALL_LIST+="$pkg_trimmed "
             continue
