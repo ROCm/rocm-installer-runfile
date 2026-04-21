@@ -1613,8 +1613,8 @@ install_kernel_packages_debian() {
     local linux_headers_package_list=()
 
     for package in "${!DEBIAN_KERNEL_PKG_INFO[@]}"; do
-        # Only install packages that are in MANUAL_INSTALL_LIST (i.e., missing packages)
-        if [[ " $MANUAL_INSTALL_LIST " != *" $package "* ]]; then
+        # Only install packages that are in DIRECT_DOWNLOAD_LIST (i.e., missing packages)
+        if [[ " $DIRECT_DOWNLOAD_LIST " != *" $package "* ]]; then
             echo "Skipping $package (already installed or not needed)"
             continue
         fi
@@ -1665,7 +1665,7 @@ get_kernel_packages() {
     if [ $DISTRO_PACKAGE_MGR == "apt" ]; then
         if is_pkg_available_to_download_deb "linux-headers-$KERNEL_VER"; then
             echo "Package linux-headers-$KERNEL_VER available in repository"
-            KERNEL_PACKAGES="alinux-headers-$KERNEL_VER "
+            KERNEL_PACKAGES="linux-headers-$KERNEL_VER "
         elif [[ $DISTRO_NAME = "debian" ]]; then
             get_kernel_packages_debian
         fi
@@ -1951,7 +1951,7 @@ install_dependencies() {
 
     INSTALL_LIST=
     # Packages that are downloaded directly via wget.
-    MANUAL_INSTALL_LIST=
+    DIRECT_DOWNLOAD_LIST=
 
     # remove trailing space
     MISSING_DEPS="${MISSING_DEPS% }"
@@ -1992,7 +1992,7 @@ install_dependencies() {
         if [[ -n "${DEBIAN_KERNEL_PKG_INFO[$pkg_trimmed]+isset}" ]]; then
             echo --------------------------------------------------------------
             echo "Skipping apt check for $pkg_trimmed (will be installed from snapshot.debian.org)"
-            MANUAL_INSTALL_LIST+="$pkg_trimmed "
+            DIRECT_DOWNLOAD_LIST+="$pkg_trimmed "
             continue
         fi
 
@@ -2015,7 +2015,7 @@ install_dependencies() {
     # Some kernel headers for debian need to be downloaded and installed
     # from snapshot.debian.org because they may not be available in the regular
     # debian repos.
-    if [[ -n $MANUAL_INSTALL_LIST ]]; then
+    if [[ -n $DIRECT_DOWNLOAD_LIST ]]; then
         install_kernel_packages_debian
     fi
 
