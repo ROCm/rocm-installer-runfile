@@ -148,7 +148,7 @@ if [[ "$archive_file" == "extract-all" ]]; then
     if [[ -d "component-amdgpu" ]]; then
         for archive in component-amdgpu/content-*.tar.*; do
             if [[ -f "$archive" ]]; then
-                if "$0" "$archive" "component-amdgpu/content" "$INSTALLER_DIR"; then
+                if "$0" "$archive" "component-amdgpu" "$INSTALLER_DIR"; then
                     extracted_count=$((extracted_count + 1))
                 else
                     failed_count=$((failed_count + 1))

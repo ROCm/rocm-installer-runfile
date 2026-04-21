@@ -673,10 +673,11 @@ collect_from_amd_smi() {
     local -a gfx_archs=()
     local -a names=()
 
-    mapfile -t device_ids < <(echo "$output" | grep -oP 'Device ID:\s+0x\K[0-9a-fA-F]+')
-    mapfile -t rev_ids < <(echo "$output" | grep -oP 'Rev ID:\s+0x\K[0-9a-fA-F]+' | tr '[:lower:]' '[:upper:]')
+    # Try both old and new amd-smi output formats
+    mapfile -t device_ids < <(echo "$output" | grep -oP '(?:DEVICE_ID|Device ID):\s+0x\K[0-9a-fA-F]+')
+    mapfile -t rev_ids < <(echo "$output" | grep -oP '(?:REV_ID|Rev ID):\s+0x\K[0-9a-fA-F]+' | tr '[:lower:]' '[:upper:]')
     mapfile -t gfx_archs < <(echo "$output" | grep -oP 'gfx\w+')
-    mapfile -t names < <(echo "$output" | grep -oP 'Product Name:\s+\K.+' | sed 's/[[:space:]]*$//')
+    mapfile -t names < <(echo "$output" | grep -oP '(?:MARKET_NAME|Product Name):\s+\K.+' | sed 's/[[:space:]]*$//')
 
     local count=${#gfx_archs[@]}
     [[ $count -eq 0 ]] && return 1
