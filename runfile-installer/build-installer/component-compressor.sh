@@ -207,7 +207,8 @@ fi
 # Calculate compression stats
 archive_size_kb=$(du -k "$output_archive" | awk '{print $1}')
 
-ratio=$((source_size_kb / archive_size_kb))
+# Calculate ratio with one decimal place using awk to avoid integer truncation
+ratio=$(awk "BEGIN {printf \"%.1f\", $source_size_kb / $archive_size_kb}")
 reduction=$(( 100 - (archive_size_kb * 100 / source_size_kb) ))
 
 echo -e "  \e[32mCompressed: $(format_size $((archive_size_kb * 1024))) (${ratio}:1, ${reduction}%) in \e[36m$(format_duration "$duration")\e[0m"

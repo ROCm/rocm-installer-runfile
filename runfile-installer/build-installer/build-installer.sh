@@ -644,8 +644,6 @@ configure_compression() {
             XZ_COMPRESS_LEVEL=9
             MAKESELF_OPT_COMPRESS="--nocomp"
             echo "Compression: Hybrid (everything compressed with xz level 9)"
-            echo "  - Main content: xz-9 compressed (6-8:1 ratio, best compression)"
-            echo "  - Test packages: xz-9 compressed (12-15:1 ratio)"
             ;;
         hybriddev)
             # Hybrid Dev: everything=xz-3, embedded xz-static, fast compression
@@ -654,8 +652,6 @@ configure_compression() {
             XZ_COMPRESS_LEVEL=3
             MAKESELF_OPT_COMPRESS="--nocomp"
             echo "Compression: Hybrid Dev (everything compressed with xz level 3)"
-            echo "  - Main content: xz-3 compressed (4-5:1 ratio, 4-6x faster than xz-9)"
-            echo "  - Test packages: xz-3 compressed (8-10:1 ratio, 4-6x faster than xz-9)"
             ;;
         dev)
             # Install and use pigz with compression level 6 (balanced)
@@ -1035,107 +1031,135 @@ compress_tests() {
     echo "-------------------------------------------------------------"
 
     local INSTALLER_DIR="../rocm-installer"
-    local TESTS_ARCHIVE="component-rocm/tests.tar.xz"
-
-    # Change to installer directory
     cd "$INSTALLER_DIR" || exit 1
 
-    # Find all test package content directories
-    local test_content_dirs=()
-
-    # Search for test packages in component-rocm/content/{base,gfx*}/*test*/
+    # Find all GFX architectures with test packages
+    local gfx_archs=()
     if [[ -d "component-rocm/content" ]]; then
         for arch_dir in component-rocm/content/*/; do
             if [[ -d "$arch_dir" ]]; then
-                for component in "$arch_dir"*test*/; do
-                    if [[ -d "$component" ]]; then
-                        test_content_dirs+=("${component%/}")
-                    fi
-                done
+                local arch_name
+                arch_name=$(basename "$arch_dir")
+
+                # Check if this arch has any test packages
+                if compgen -G "$arch_dir*test*" > /dev/null; then
+                    gfx_archs+=("$arch_name")
+                fi
             fi
         done
     fi
 
-    if [[ ${#test_content_dirs[@]} -eq 0 ]]; then
+    if [[ ${#gfx_archs[@]} -eq 0 ]]; then
         echo "No test packages found, skipping test compression."
         cd - >/dev/null || exit
         return 0
     fi
 
-    # Calculate total source size
-    local test_size_kb
-    test_size_kb=$(du -sk "${test_content_dirs[@]}" 2>/dev/null | awk '{s+=$1} END {print s}')
-
     echo ""
-    echo "Compressing test packages (all gfx architectures together)..."
+    echo "Found test packages for ${#gfx_archs[@]} architecture(s): ${gfx_archs[*]}"
     echo ""
-    echo "  Source: ${#test_content_dirs[@]} test package(s) ($(format_size $((test_size_kb * 1024))))"
-    echo "  Target: $TESTS_ARCHIVE"
-    echo "  Method: xz (level: $XZ_COMPRESS_LEVEL)"
 
-    # Remove old archives
-    rm -f "$TESTS_ARCHIVE" 2>/dev/null
+    local total_archives_created=0
+    local total_removed_dirs=0
 
-    local start_time
-    start_time=$(date +%s)
+    # Compress tests for each GFX architecture separately
+    for gfx_arch in "${gfx_archs[@]}"; do
+        echo "  Processing tests for: $gfx_arch"
 
-    # Start progress monitor in background
-    show_compression_progress "$TESTS_ARCHIVE" &
-    local progress_pid=$!
+        # Collect test packages for this architecture
+        local arch_test_dirs=()
+        for component in "component-rocm/content/$gfx_arch"/*test*/; do
+            if [[ -d "$component" ]]; then
+                arch_test_dirs+=("$component")
+            fi
+        done
 
-    # Ensure progress monitor is killed on exit
-    trap 'kill $progress_pid 2>/dev/null; wait $progress_pid 2>/dev/null' EXIT INT TERM
-
-    # Compress all test content into single archive
-    local success=0
-    if tar -cf - "${test_content_dirs[@]}" 2>/dev/null | \
-       xz "-$XZ_COMPRESS_LEVEL" -T"$(nproc)" --verbose 2>/tmp/xz-compression.log > "$TESTS_ARCHIVE"; then
-        success=1
-    fi
-
-    # Stop progress monitor
-    kill $progress_pid 2>/dev/null
-    wait $progress_pid 2>/dev/null
-    trap - EXIT INT TERM
-
-    if [[ $success -eq 0 ]]; then
-        echo ""
-        echo -e "  \e[31mERROR: Failed to compress tests\e[0m"
-        cd - >/dev/null || exit
-        exit 1
-    fi
-
-    # Update with final size to match the summary line
-    local final_size
-    final_size=$(stat -c%s "$TESTS_ARCHIVE" 2>/dev/null || stat -f%z "$TESTS_ARCHIVE" 2>/dev/null || echo 0)
-    printf "\r\033[K  Compressed: %s\n" "$(format_size "$final_size")"
-
-    local end_time
-    end_time=$(date +%s)
-    local duration=$((end_time - start_time))
-
-    # Calculate compression stats
-    local archive_size_kb
-    archive_size_kb=$(du -k "$TESTS_ARCHIVE" | awk '{print $1}')
-
-    local ratio=$((test_size_kb / archive_size_kb))
-    local reduction=$(( 100 - (archive_size_kb * 100 / test_size_kb) ))
-
-    echo -e "  \e[32mCompressed: $(format_size $((archive_size_kb * 1024))) (${ratio}:1, ${reduction}%) in $(format_duration "$duration")\e[0m"
-
-    # Remove test content directories
-    local removed_count=0
-    for test_dir in "${test_content_dirs[@]}"; do
-        if [[ -d "$test_dir" ]]; then
-            rm -rf "$test_dir"
-            ((removed_count++))
+        if [[ ${#arch_test_dirs[@]} -eq 0 ]]; then
+            echo "    No test packages found for $gfx_arch, skipping."
+            continue
         fi
+
+        local tests_archive="component-rocm/tests-${gfx_arch}.tar.xz"
+
+        # Calculate source size
+        local source_size_kb
+        source_size_kb=$(du -sk "${arch_test_dirs[@]}" 2>/dev/null | awk '{s+=$1} END {print s}')
+
+        echo "    Source: ${#arch_test_dirs[@]} test package(s) ($(format_size $((source_size_kb * 1024))))"
+
+        # List test packages being compressed
+        for test_dir in "${arch_test_dirs[@]}"; do
+            local pkg_name
+            pkg_name=$(basename "$test_dir")
+            echo "      - $pkg_name"
+        done
+
+        echo "    Target: $tests_archive"
+        echo "    Method: xz (level: $XZ_COMPRESS_LEVEL)"
+
+        # Remove old archive
+        rm -f "$tests_archive" 2>/dev/null
+
+        local start_time
+        start_time=$(date +%s)
+
+        # Start progress monitor
+        show_compression_progress "$tests_archive" &
+        local progress_pid=$!
+        trap 'kill $progress_pid 2>/dev/null; wait $progress_pid 2>/dev/null' EXIT INT TERM
+
+        # Compress using same pattern as component-compressor.sh
+        local success=0
+        if tar -cf - "${arch_test_dirs[@]}" 2>/dev/null | \
+           xz "-$XZ_COMPRESS_LEVEL" -T"$(nproc)" --verbose 2>/tmp/compress-tests.log > "$tests_archive"; then
+            success=1
+        fi
+
+        # Stop progress monitor
+        kill $progress_pid 2>/dev/null
+        wait $progress_pid 2>/dev/null
+        trap - EXIT INT TERM
+
+        if [[ $success -eq 0 ]]; then
+            echo ""
+            echo -e "    \e[31mFailed to compress tests for $gfx_arch\e[0m"
+            cd - >/dev/null || exit
+            exit 1
+        fi
+
+        # Display final size
+        local final_size
+        final_size=$(stat -c%s "$tests_archive" 2>/dev/null || stat -f%z "$tests_archive" 2>/dev/null || echo 0)
+        printf "\r\033[K    Compressed: %s\n" "$(format_size "$final_size")"
+
+        local end_time
+        end_time=$(date +%s)
+        local duration=$((end_time - start_time))
+
+        # Calculate and display compression stats
+        local archive_size_kb
+        archive_size_kb=$(du -k "$tests_archive" | awk '{print $1}')
+        # Calculate ratio with one decimal place using awk to avoid integer truncation
+        local ratio
+        ratio=$(awk "BEGIN {printf \"%.1f\", $source_size_kb / $archive_size_kb}")
+        local reduction=$(( 100 - (archive_size_kb * 100 / source_size_kb) ))
+
+        echo -e "    \e[32mCompressed: $(format_size $((archive_size_kb * 1024))) (${ratio}:1, ${reduction}%) in \e[36m$(format_duration "$duration")\e[0m"
+
+        # Remove uncompressed test directories
+        for test_dir in "${arch_test_dirs[@]}"; do
+            rm -rf "$test_dir"
+        done
+        echo -e "    \e[93mRemoved ${#arch_test_dirs[@]} uncompressed test content directories\e[0m"
+
+        ((total_archives_created++))
+        total_removed_dirs=$((total_removed_dirs + ${#arch_test_dirs[@]}))
+        echo ""
     done
-    echo -e "  \e[93mRemoved $removed_count uncompressed test content directories\e[0m"
 
     cd - >/dev/null || exit
     echo ""
-    echo "Test compression complete."
+    echo "Test compression complete: $total_archives_created archive(s) created, $total_removed_dirs directories removed."
     echo "-------------------------------------------------------------"
 }
 

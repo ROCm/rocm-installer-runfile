@@ -157,18 +157,21 @@ if [[ "$archive_file" == "extract-all" ]]; then
         done
     fi
 
-    # Extract tests archive if present (located in component-rocm/)
-    # Note: tests.tar.xz contains paths like "component-rocm/content/gfx120x/...",
+    # Extract tests archives if present (located in component-rocm/)
+    # New format: tests-{gfx}.tar.xz (e.g., tests-base.tar.xz, tests-gfx94x.tar.xz)
+    # Note: Archives contain paths like "component-rocm/content/gfx*/...",
     # so extract to current directory (not component-rocm/)
-    for test_archive in component-rocm/tests.tar.xz component-rocm/tests.tar.gz; do
-        if [[ -f "$test_archive" ]]; then
-            if "$0" "$test_archive" "." "$INSTALLER_DIR"; then
-                extracted_count=$((extracted_count + 1))
-            else
-                failed_count=$((failed_count + 1))
+    if [[ -d "component-rocm" ]]; then
+        for test_archive in component-rocm/tests-*.tar.*; do
+            if [[ -f "$test_archive" ]]; then
+                if "$0" "$test_archive" "." "$INSTALLER_DIR"; then
+                    extracted_count=$((extracted_count + 1))
+                else
+                    failed_count=$((failed_count + 1))
+                fi
             fi
-        fi
-    done
+        done
+    fi
 
     echo ""
     echo "Extract-all complete: $extracted_count archive(s) extracted, $failed_count failed"

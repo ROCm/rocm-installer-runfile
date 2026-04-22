@@ -703,46 +703,88 @@ extract_tests_if_needed() {
         return 0
     fi
 
-    # Check if tests archive exists and needs extraction
-    local tests_archive="$INSTALLER_DIR/component-rocm/tests.tar.xz"
-
-    # If archive doesn't exist, tests are already extracted or not available
-    if [[ ! -f "$tests_archive" ]]; then
-        return 0
-    fi
-
     echo "-------------------------------------------------------------"
     echo "Extracting tests..."
     echo "-------------------------------------------------------------"
 
-    # Verify xz-static binary exists
-    local XZ_STATIC="$INSTALLER_DIR/bin/xz-static"
-    if [[ ! -f "$XZ_STATIC" ]]; then
-        print_err "xz-static binary not found: $XZ_STATIC"
-        print_warning "Tests may not be available for installation."
+    # Determine which GFX architectures are needed for tests
+    local gfx_tags_needed="base"
+
+    # Add selected GFX tags
+    if [[ -n "$INSTALL_GFX" ]]; then
+        gfx_tags_needed="$gfx_tags_needed $INSTALL_GFX"
+    fi
+
+    echo "Extracting test packages for: $gfx_tags_needed"
+
+    local extracted_count=0
+    local failed_count=0
+    local skipped_count=0
+
+    for gfx_tag in $gfx_tags_needed; do
+        local tests_archive="$INSTALLER_DIR/component-rocm/tests-${gfx_tag}.tar.xz"
+        local content_dir="$EXTRACT_ROCM_DIR/content/$gfx_tag"
+
+        # Check if tests for this architecture are already extracted
+        # Look for test packages in the content directory
+        if [[ -d "$content_dir" ]]; then
+            local has_tests=0
+            for test_pkg in "$content_dir"/*test*/; do
+                if [[ -d "$test_pkg" ]]; then
+                    has_tests=1
+                    break
+                fi
+            done
+
+            if [[ $has_tests -eq 1 ]]; then
+                echo "  Tests for $gfx_tag already extracted, skipping"
+                ((skipped_count++))
+                continue
+            fi
+        fi
+
+        # Check if archive exists
+        if [[ ! -f "$tests_archive" ]]; then
+            echo "  No test archive found for $gfx_tag ($(basename "$tests_archive")), skipping"
+            continue
+        fi
+
+        echo "  Extracting tests for: $gfx_tag ..."
+
+        local extract_start
+        extract_start=$(date +%s)
+
+        # Extract tests using component-extractor.sh
+        # Note: Archive contains paths like "component-rocm/content/gfx*/...", so extract to INSTALLER_DIR
+        if "$INSTALLER_DIR/component-extractor.sh" "$tests_archive" "$INSTALLER_DIR" "$INSTALLER_DIR"; then
+            local extract_end
+            extract_end=$(date +%s)
+
+            local extract_duration=$((extract_end - extract_start))
+            echo -e "  \e[32mExtracted tests for $gfx_tag successfully ($extract_duration seconds).\e[0m"
+            ((extracted_count++))
+        else
+            echo -e "  \e[31mERROR: Failed to extract test packages for $gfx_tag\e[0m"
+            ((failed_count++))
+        fi
+    done
+
+    echo ""
+    echo "Test extraction summary: $extracted_count extracted, $skipped_count skipped, $failed_count failed"
+
+    if [[ $failed_count -gt 0 ]]; then
+        print_warning "Some test packages failed to extract."
         return 1
     fi
 
-    # Extract tests using embedded xz-static
-    # Note: Archive contains paths like "component-rocm/content/gfx120x/...", so extract to INSTALLER_DIR
-    echo "Extracting compressed archive: $(basename "$tests_archive")..."
-
-    local extract_start
-    extract_start=$(date +%s)
-
-    if "$INSTALLER_DIR/component-extractor.sh" "$tests_archive" "$INSTALLER_DIR" "$INSTALLER_DIR"; then
-        local extract_end
-        extract_end=$(date +%s)
-
-        local extract_duration=$((extract_end - extract_start))
-        echo -e "\e[32mExtracted tests successfully ($extract_duration seconds).\e[0m"
-        echo "Test extraction complete."
-        return 0
-    else
-        print_err "Failed to extract test packages"
-        print_warning "Tests may not be available for installation."
+    if [[ $extracted_count -eq 0 && $skipped_count -eq 0 ]]; then
+        print_warning "No test packages were found or extracted."
         return 1
     fi
+
+    echo "Test extraction complete."
+    echo "-------------------------------------------------------------"
+    return 0
 }
 
 dump_rocm_state() {
@@ -2146,10 +2188,10 @@ process_test_component() {
     fi
 
     # Read test config file for the specified architecture
-    # Test config includes test packages AND their dependencies
+    # Test config includes base test packages, gfx-specific test packages, AND all their dependencies
     local test_config_file="$COMPO_TEST_DIR/${INSTALL_GFX}.config"
     if [ -f "$test_config_file" ]; then
-        echo "  Reading test config (includes dependencies): $test_config_file"
+        echo "  Reading test config (base + $INSTALL_GFX with dependencies): $test_config_file"
         while IFS= read -r pkg; do
             # Skip empty lines
             [[ -z "$pkg" ]] && continue
