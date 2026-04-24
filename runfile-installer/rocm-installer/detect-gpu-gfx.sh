@@ -240,11 +240,11 @@ map_device_id_to_gfx() {
 
     case "$device_id" in
         # CDNA3 - MI300 series
-        74a0|74a1|74a2|74a3|74a4|74a5|74a6|74a7|74a8|74a9|74aa|74ab|74b5|74b6|74b9|74bd)
+        74a0|74a1|74a2|74a3|74a4|74a5|74a6|74a7|74a8|74a9|74aa|74ab|74b4|74b5|74b6|74b9|74bd)
             echo "gfx942" ;;
 
         # CDNA4 - MI350+ series
-        75a0|75a1|75a2|75a3|75a4|75a5|75a6|75a7|75a8|75a9|75aa|75ab|75ac|75ad|75ae|75af|75b0|75b3)
+        75a0|75a1|75a2|75a3|75a4|75a5|75a6|75a7|75a8|75a9|75aa|75ab|75ac|75ad|75ae|75af|75b0|75b2|75b3|75b8)
             echo "gfx950" ;;
 
         # CDNA2 - MI250X/MI250/MI210
