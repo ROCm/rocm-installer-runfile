@@ -38,15 +38,19 @@ TARGET_ROCM_DEFAULT_DIR="/opt"
 TARGET_ROCM_DIR="$TARGET_ROCM_DEFAULT_DIR"
 
 # Component Configuration
-COMPO_ROCM_LIST="$EXTRACT_ROCM_DIR/deps/base/components.txt"
 COMPO_INSTALL="core"  # Default component: core, core-dev, dev-tools, core-sdk, opencl, test (comma-separated)
 COMPO_META_DIR="$EXTRACT_ROCM_DIR/deps/meta"
 COMPO_TEST_DIR="$EXTRACT_ROCM_DIR/deps/test"
+COMPO_VER_FILE="component-versions.txt"
+SIGNATURE_FILE="signature.txt"
 USER_SPECIFIED_COMPO=0  # Track if user explicitly specified compo= argument
 USER_SPECIFIED_GFX=0    # Track if user explicitly specified gfx= argument
 COMPONENTS=
 COMPONENTS_GFX=
 INSTALL_GFX=
+
+# AMDGPU Configuration
+AMDGPU_VER_FILE="amdgpu-dkms-ver.txt"
 
 # On-demand extraction tracking
 EXTRACTED_CONTENT_ARCHIVES=""  # Track which content archives have been extracted
@@ -174,7 +178,8 @@ Usage: bash $PROG [options]
     Information/Debug:
     ------------------
     findrocm = Search for an install of ROCm.
-    complist = List the version of ROCm components included in the installer.
+    manifest = List the version of all ROCm components included in the installer.
+    manifest=<gfx> = List components for specific gfx architecture (e.g., manifest=gfx110x, manifest=base).
     prompt   = Run the installer with user prompts.
     verbose  = Run installer with verbose logging
 
@@ -383,7 +388,7 @@ get_version() {
     # If AMDGPU build number wasn't in VERSION file (pre-build state),
     # try reading from component-amdgpu directory
     if [[ -z "$AMDGPU_DKMS_BUILD_NUM" || "$AMDGPU_DKMS_BUILD_NUM" == "" ]]; then
-        local amdgpu_ver_file="./component-amdgpu/amdgpu-dkms-ver.txt"
+        local amdgpu_ver_file="./component-amdgpu/$AMDGPU_VER_FILE"
         if [ -f "$amdgpu_ver_file" ]; then
             AMDGPU_DKMS_BUILD_NUM=$(tr -d '[:space:]' < "$amdgpu_ver_file")
         else
@@ -1287,16 +1292,80 @@ install_deps() {
 }
 
 list_components() {
-    echo --------------------------------
+    local gfx_filter="$1"
+    local component_files=()
 
-    if [ -f "$COMPO_ROCM_LIST" ]; then
-        while IFS= read -r compo; do
-            echo "$compo"
-        done < "$COMPO_ROCM_LIST"
+    echo "================================================================================"
+
+    if [ -n "$gfx_filter" ]; then
+        # Filter by specific gfx tag or base
+        echo "ROCm Components (${gfx_filter})"
+        echo "================================================================================"
+
+        if [ "$gfx_filter" = "base" ]; then
+            # Show base only
+            component_files=("$EXTRACT_ROCM_DIR/deps/base/$COMPO_VER_FILE")
+        else
+            # Show base + specific gfx tag
+            component_files=(
+                "$EXTRACT_ROCM_DIR/deps/base/$COMPO_VER_FILE"
+                "$EXTRACT_ROCM_DIR/deps/${gfx_filter}/$COMPO_VER_FILE"
+            )
+        fi
     else
-        print_err "Components list $COMPO_ROCM_LIST does not exist."
+        # Show all components (combined file)
+        echo "ROCm Components (All)"
+        echo "================================================================================"
+
+        # Use combined component-versions.txt if it exists, otherwise show all individual files
+        if [ -f "$EXTRACT_ROCM_DIR/deps/$COMPO_VER_FILE" ]; then
+            component_files=("$EXTRACT_ROCM_DIR/deps/$COMPO_VER_FILE")
+        else
+            # Fallback: combine base + all gfx tags
+            component_files=("$EXTRACT_ROCM_DIR/deps/base/$COMPO_VER_FILE")
+            for gfx_dir in "$EXTRACT_ROCM_DIR/deps"/gfx*; do
+                if [ -d "$gfx_dir" ] && [ -f "$gfx_dir/$COMPO_VER_FILE" ]; then
+                    component_files+=("$gfx_dir/$COMPO_VER_FILE")
+                fi
+            done
+        fi
     fi
 
+    # Display components with nice formatting
+    printf "%-50s %s\n" "Component Name" "Version"
+    printf "%-50s %s\n" "----------------" "-------"
+
+    local components_found=0
+    for comp_file in "${component_files[@]}"; do
+        if [ -f "$comp_file" ]; then
+            while IFS= read -r line; do
+                # Skip empty lines
+                [[ -z "$line" ]] && continue
+
+                # Parse: "amdrocm-base7.13 = 7.13.0~20260415"
+                if [[ "$line" =~ ^([^=]+)=(.+)$ ]]; then
+                    local comp_name="${BASH_REMATCH[1]}"
+                    local comp_version="${BASH_REMATCH[2]}"
+                    # Trim whitespace
+                    comp_name=$(echo "$comp_name" | xargs)
+                    comp_version=$(echo "$comp_version" | xargs)
+                    printf "%-50s %s\n" "$comp_name" "$comp_version"
+                    components_found=1
+                fi
+            done < "$comp_file"
+        else
+            if [ -n "$gfx_filter" ]; then
+                print_err "Components list not found: $comp_file"
+                exit 1
+            fi
+        fi
+    done
+
+    if [ $components_found -eq 0 ]; then
+        echo "No components found."
+    fi
+
+    echo "================================================================================"
     exit 0
 }
 
@@ -1459,7 +1528,7 @@ detect_installed_base_components() {
         if [ -d "$pkg_dir" ]; then
             local pkg_name
             pkg_name=$(basename "$pkg_dir")
-            local signature_file="$pkg_dir/signature.txt"
+            local signature_file="$pkg_dir/$SIGNATURE_FILE"
 
             # Check if signature file exists
             if [ ! -f "$signature_file" ]; then
@@ -1610,7 +1679,7 @@ detect_installed_gfx_components() {
                 if [ -d "$pkg_dir" ]; then
                     local pkg_name
                     pkg_name=$(basename "$pkg_dir")
-                    local signature_file="$pkg_dir/signature.txt"
+                    local signature_file="$pkg_dir/$SIGNATURE_FILE"
 
                     # Check if signature file exists
                     if [ ! -f "$signature_file" ]; then
@@ -1737,7 +1806,7 @@ detect_meta_packages() {
                     check_gfx="base"
                 fi
 
-                local meta_sig_file="$EXTRACT_ROCM_DIR/deps/$check_gfx/$meta_name/signature.txt"
+                local meta_sig_file="$EXTRACT_ROCM_DIR/deps/$check_gfx/$meta_name/$SIGNATURE_FILE"
 
                 # Check if the meta package was actually installed by verifying its signature files
                 if [ -f "$meta_sig_file" ]; then
@@ -3269,9 +3338,12 @@ do
 
         exit 0
         ;;
-    complist)
-        echo Component List
+    manifest)
         list_components
+        ;;
+    manifest=*)
+        GFX_FILTER="${1#*=}"
+        list_components "$GFX_FILTER"
         ;;
     prompt)
         echo "Enabling user prompts."

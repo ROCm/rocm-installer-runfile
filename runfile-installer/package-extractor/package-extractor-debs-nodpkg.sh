@@ -45,10 +45,10 @@ EXTRACT_AMDGPU_PKG_CONFIG_FILE="amdgpu-packages.config"
 
 EXTRACT_AMDGPU_DKMS_VER_FILE="amdgpu-dkms-ver.txt"
 
-EXTRACT_COMPO_LIST_FILE="components.txt"          # list the component version of extracted packages
-EXTRACT_PACKAGE_LIST_FILE="packages.txt"          # list all extracted packages
-EXTRACT_REQUIRED_DEPS_FILE="required_deps.txt"    # list only required dependencies (non-amd deps)
-EXTRACT_GLOBAL_DEPS_FILE="global_deps.txt"        # list all extracted dependencies
+EXTRACT_COMPO_VER_FILE="component-versions.txt"    # list the component version of extracted packages
+EXTRACT_PACKAGE_LIST_FILE="packages.txt"           # temp file: list packages for deps filtering (removed after build)
+EXTRACT_REQUIRED_DEPS_FILE="required_deps.txt"     # list only required dependencies (non-amd deps)
+EXTRACT_GLOBAL_DEPS_FILE="global_deps.txt"         # list all extracted dependencies
 
 # Extra/Installer dependencies
 EXTRA_DEPS=(python3-yaml)
@@ -471,7 +471,7 @@ extract_info() {
         echo "$PACKAGE_DIR_NAME" >> "$metadata_dir/$EXTRACT_AMDGPU_PKG_CONFIG_FILE"
     else
         echo "$PACKAGE_DIR_NAME" >> "$metadata_dir/$EXTRACT_ROCM_PKG_CONFIG_FILE"
-        printf "%-25s = %s\n" "$PACKAGE_DIR_NAME" "$VERSION_INFO" >> "$metadata_dir/$EXTRACT_COMPO_LIST_FILE"
+        printf "%-25s = %s\n" "$PACKAGE_DIR_NAME" "$VERSION_INFO" >> "$metadata_dir/$EXTRACT_COMPO_VER_FILE"
         printf "%-25s = %s\n" "$PACKAGE_DIR_NAME" "$VERSION_INFO"
     fi
 
@@ -909,8 +909,8 @@ combine_deps() {
         return 1
     fi
 
-    # Put the combined deps file in EXTRACT_ROCM_DIR root
-    local output_dir="$EXTRACT_ROCM_DIR"
+    # Put the combined deps file in EXTRACT_ROCM_DIR/deps/ directory
+    local output_dir="$EXTRACT_ROCM_DIR/deps"
     local combined_deps_file="$output_dir/rocm_required_deps_deb.txt"
     local gfx_deps_file="$output_dir/rocm_required_deps_deb_gfx.tmp"
     local gfx_deps_sorted="$output_dir/rocm_required_deps_deb_gfx_sorted.tmp"
@@ -1031,6 +1031,58 @@ combine_deps() {
     echo Combining dependencies...Complete.
 }
 
+combine_components_list() {
+    echo Combining components list from all component-rocm subdirectories...
+
+    # This combines all individual components.txt files from base + all gfx tags
+    # into a single components.txt at the deps/ root for easy listing
+
+    local deps_root_dir="$EXTRACT_ROCM_DIR/deps"
+
+    if [ ! -d "$deps_root_dir" ]; then
+        echo "ERROR: deps directory does not exist: $deps_root_dir"
+        return 1
+    fi
+
+    local combined_components_file="$deps_root_dir/component-versions.txt"
+
+    echo "Removing previous component-versions.txt if it exists..."
+    rm -f "$combined_components_file"
+
+    # Process base first, then all gfx tags
+    local base_component_dir="$deps_root_dir/base"
+    if [ -d "$base_component_dir" ] && [ -f "$base_component_dir/$EXTRACT_COMPO_VER_FILE" ]; then
+        echo "Adding base components..."
+        cat "$base_component_dir/$EXTRACT_COMPO_VER_FILE" >> "$combined_components_file"
+    fi
+
+    # Add all gfx-specific components
+    local gfx_count=0
+    for component_dir in "$deps_root_dir"/gfx*; do
+        if [ -d "$component_dir" ]; then
+            local components_file="$component_dir/$EXTRACT_COMPO_VER_FILE"
+            if [ -f "$components_file" ]; then
+                echo "Adding components from: $component_dir"
+                cat "$components_file" >> "$combined_components_file"
+                gfx_count=$((gfx_count + 1))
+            fi
+        fi
+    done
+
+    if [ ! -f "$combined_components_file" ]; then
+        echo "WARNING: No component subdirectories with components.txt found"
+        return 1
+    fi
+
+    local total_components
+    total_components=$(grep -c "^" "$combined_components_file" 2>/dev/null || echo 0)
+    echo "Combined components from base + $gfx_count gfx subdirectories"
+    echo "Total components: $total_components"
+    echo "Output file: $combined_components_file"
+
+    echo Combining components list...Complete.
+}
+
 extract_rocm_debs() {
     echo ===================================================
     echo Extracting ROCm DEBs...
@@ -1145,6 +1197,20 @@ extract_rocm_debs() {
     echo ""
     combine_deps
 
+    # Combine components list from all component-rocm subdirectories
+    echo ""
+    combine_components_list
+
+    # Clean up packages.txt files (used for filtering, not needed in installer)
+    echo ""
+    echo "Cleaning up build-time metadata files..."
+    for component_dir in "${EXTRACT_DEPS_DIR}"/*/; do
+        if [ -f "${component_dir}${EXTRACT_PACKAGE_LIST_FILE}" ]; then
+            rm "${component_dir}${EXTRACT_PACKAGE_LIST_FILE}"
+            echo "  Removed: ${component_dir}${EXTRACT_PACKAGE_LIST_FILE}"
+        fi
+    done
+
     echo ""
     echo Extracting ROCm DEBs...Complete.
 }
@@ -1193,6 +1259,7 @@ extract_amdgpu_debs() {
 
     echo Getting package list...
 
+    # Reset PACKAGE_LIST for AMDGPU extraction
     PACKAGE_LIST=
 
     for pkg in "$PACKAGE_DIR"/*; do
@@ -1381,6 +1448,13 @@ if [[ $AMDGPU_EXTRACT == 1 ]]; then
     write_extract_info
 
     filter_deps_version
+
+    # Clean up packages.txt (used for filtering, not needed in installer)
+    packages_file="$EXTRACT_DEPS_DIR/$COMP_TYPE/$EXTRACT_PACKAGE_LIST_FILE"
+    if [ -f "$packages_file" ]; then
+        rm "$packages_file"
+        echo "Removed build-time metadata: $packages_file"
+    fi
 fi
 
 if [[ -n $EXTRACT_CURRENT_LOG ]]; then

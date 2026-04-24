@@ -36,6 +36,7 @@ AMDGPU_INSTALLER_CURRENT_LOG="$AMDGPU_INSTALLER_LOG_DIR/install_amdgpu_$(date +%
 EXTRACT_AMDGPU_DIR="$PWD/component-amdgpu"
 TARGET_AMDGPU_DIR="/"
 COMPO_AMDGPU_FILE=""
+AMDGPU_VER_FILE="amdgpu-dkms-ver.txt"
 
 # Rsync options for AMDGPU installation
 RSYNC_OPTS_AMDGPU="-a --keep-dirlinks --no-perms --no-owner --no-group --omit-dir-times "
@@ -219,7 +220,7 @@ get_version() {
     # If AMDGPU build number wasn't in VERSION file (pre-build state),
     # try reading from component-amdgpu directory
     if [[ -z "$AMDGPU_DKMS_BUILD_NUM" || "$AMDGPU_DKMS_BUILD_NUM" == "" ]]; then
-        local amdgpu_ver_file="./component-amdgpu/amdgpu-dkms-ver.txt"
+        local amdgpu_ver_file="./component-amdgpu/$AMDGPU_VER_FILE"
         if [ -f "$amdgpu_ver_file" ]; then
             AMDGPU_DKMS_BUILD_NUM=$(tr -d '[:space:]' < "$amdgpu_ver_file")
         else

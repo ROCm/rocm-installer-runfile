@@ -465,6 +465,20 @@ if [ $CLEAN_BUILD -eq 1 ]; then
         echo -e "\e[93mRemoving: /tmp/xz-compression.log\e[0m"
         $SUDO rm /tmp/xz-compression.log 2>/dev/null || true
     fi
+
+    # Clean static analysis test artifacts
+    echo ""
+    echo ">>> Cleaning static analysis test artifacts..."
+
+    if [ -f "tests/codeql-test/cleanup.sh" ]; then
+        echo -e "\e[93mRunning: tests/codeql-test/cleanup.sh\e[0m"
+        (cd tests/codeql-test && ./cleanup.sh) || true
+    fi
+
+    if [ -f "tests/shellcheck-test/cleanup.sh" ]; then
+        echo -e "\e[93mRunning: tests/shellcheck-test/cleanup.sh\e[0m"
+        (cd tests/shellcheck-test && ./cleanup.sh) || true
+    fi
 fi
 
 popd || exit
