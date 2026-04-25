@@ -366,19 +366,20 @@ get_version() {
     fi
 
     # Read VERSION file (written by package-extractor and build-installer)
-    # Line 1: Installer version (from package-extractor)
-    # Line 2: ROCm version (from package-extractor)
-    # Line 3: Build Tag (from build-installer)
-    # Line 4: AMDGPU DKMS build number (from build-installer)
-    # Line 5: Build installer name (from build-installer)
+    # Line 1: Installer version
+    # Line 2: ROCm version
+    # Line 3: Build pull info
+    # Line 4: Build run ID
+    # Line 5: Build workflow number
+    # Line 6: AMDGPU DKMS build number
     if [ -n "$version_file" ]; then
         while IFS= read -r line; do
             case $i in
                 0) INSTALLER_VERSION="$line" ;;
                 1) ROCM_VERSION="$line" ;;
-                2) BUILD_TAG="$line" ;;
+                2) BUILD_PULL_INFO="$line" ;;
                 3) BUILD_RUNID="$line" ;;
-                4) BUILD_TAG_INFO="$line" ;;
+                4) BUILD_WORKFLOW_NUM="$line" ;;
                 5) AMDGPU_DKMS_BUILD_NUM="$line" ;;
             esac
             i=$((i+1))
@@ -398,9 +399,9 @@ get_version() {
 
     echo "Installer Version: $INSTALLER_VERSION"
     echo "ROCm Version     : $ROCM_VERSION"
-    echo "Build Tag        : $BUILD_TAG"
+    echo "Build Pull Info  : $BUILD_PULL_INFO"
     echo "Build Run ID     : $BUILD_RUNID"
-    echo "Build Tag Info   : $BUILD_TAG_INFO"
+    echo "Build Workflow   : $BUILD_WORKFLOW_NUM"
     echo "AMDGPU Build     : $AMDGPU_DKMS_BUILD_NUM"
 }
 

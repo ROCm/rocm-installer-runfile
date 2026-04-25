@@ -37,9 +37,10 @@ VERSION_FILE="$SCRIPT_DIR/VERSION"
 
 INSTALLER_VERSION=
 ROCM_VER=
-BUILD_TAG="1"
-BUILD_RUNID="99999"
-BUILD_TAG_INFO=""
+BUILD_NAME="local"
+BUILD_RUNID="1"
+BUILD_WORKFLOW_NUM="1"
+BUILD_PULL_INFO="1"
 BUILD_INSTALLER_NAME=
 
 AMDGPU_DKMS_FILE="../rocm-installer/component-amdgpu/amdgpu-dkms-ver.txt"
@@ -93,9 +94,10 @@ Usage: $PROG [options]
     norunfile            = Disable makeself build of installer runfile.
     nogui                = Disable GUI building.
     noautodeps           = Disable automatic dependency resolution for RPM packages.
-    buildtag=<tag>       = Set the build tag (default: 1).
-    buildrunid=<id>      = Set the Runfile build run ID (default: 99999).
-    buildtaginfo=<tag>   = Set a tag/name for the builds package pull information. (ie. pulltag-pullid)
+    buildname=<name>     = Set a name for the build (default: local).
+    buildrunid=<id>      = Set the Runfile build run ID (default: 1).
+    buildworkflow=<num>  = Set the build workflow number (default: 1).
+    buildpullinfo=<info> = Set build pull information (default: 1).
 
     mscomp=<mode>        = Makeself compression mode (build speed vs file size):
 
@@ -295,7 +297,7 @@ write_version() {
     get_version
 
     # Set the runfile installer name
-    BUILD_INSTALLER_NAME="rocm-installer-$ROCM_VER-$BUILD_TAG-$BUILD_RUNID"
+    BUILD_INSTALLER_NAME="rocm-installer-$ROCM_VER-$BUILD_NAME-$BUILD_WORKFLOW_NUM"
 
     # get the amdgpu-dkms build/version info
     if [ -f "$AMDGPU_DKMS_FILE" ]; then
@@ -304,18 +306,19 @@ write_version() {
 
     echo "INSTALLER_VERSION        = $INSTALLER_VERSION"
     echo "ROCM_VER                 = $ROCM_VER"
-    echo "BUILD_TAG                = $BUILD_TAG"
+    echo "BUILD_NAME               = $BUILD_NAME"
     echo "BUILD_RUNID              = $BUILD_RUNID"
-    echo "BUILD_TAG_INFO           = $BUILD_TAG_INFO"
+    echo "BUILD_WORKFLOW_NUM       = $BUILD_WORKFLOW_NUM"
+    echo "BUILD_PULL_INFO          = $BUILD_PULL_INFO"
     echo "AMDGPU_DKMS_BUILD_NUM    = $AMDGPU_DKMS_BUILD_NUM"
 
     # Update the version file
     {
         echo "$INSTALLER_VERSION"
         echo "$ROCM_VER"
-        echo "$BUILD_TAG"
+        echo "$BUILD_PULL_INFO"
         echo "$BUILD_RUNID"
-        echo "$BUILD_TAG_INFO"
+        echo "$BUILD_WORKFLOW_NUM"
         echo "$AMDGPU_DKMS_BUILD_NUM"
     } > "$VERSION_FILE"
 
@@ -1429,9 +1432,9 @@ do
         DISABLE_AUTO_DEPS="yes"
         shift
         ;;
-    buildtag=*)
-        BUILD_TAG="${1#*=}"
-        echo "Setting BUILD_TAG = $BUILD_TAG"
+    buildname=*)
+        BUILD_NAME="${1#*=}"
+        echo "Setting BUILD_NAME = $BUILD_NAME"
         shift
         ;;
     buildrunid=*)
@@ -1439,9 +1442,14 @@ do
         echo "Setting BUILD_RUNID = $BUILD_RUNID"
         shift
         ;;
-    buildtaginfo=*)
-        BUILD_TAG_INFO="${1#*=}"
-        echo "Setting BUILD_TAG_INFO = $BUILD_TAG_INFO"
+    buildworkflow=*)
+        BUILD_WORKFLOW_NUM="${1#*=}"
+        echo "Setting BUILD_WORKFLOW_NUM = $BUILD_WORKFLOW_NUM"
+        shift
+        ;;
+    buildpullinfo=*)
+        BUILD_PULL_INFO="${1#*=}"
+        echo "Setting BUILD_PULL_INFO = $BUILD_PULL_INFO"
         shift
         ;;
     mscomp=*)

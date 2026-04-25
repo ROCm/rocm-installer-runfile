@@ -329,16 +329,16 @@ int read_version_file()
                 g_pConfig->rocmVersion[sizeof(g_pConfig->rocmVersion) - 1] = '\0';
                 break;
             case 2:
-                strncpy(g_pConfig->buildTag, line, sizeof(g_pConfig->buildTag) - 1);
-                g_pConfig->buildTag[sizeof(g_pConfig->buildTag) - 1] = '\0';
+                strncpy(g_pConfig->buildPullInfo, line, sizeof(g_pConfig->buildPullInfo) - 1);
+                g_pConfig->buildPullInfo[sizeof(g_pConfig->buildPullInfo) - 1] = '\0';
                 break;
             case 3:
                 strncpy(g_pConfig->buildRunId, line, sizeof(g_pConfig->buildRunId) - 1);
                 g_pConfig->buildRunId[sizeof(g_pConfig->buildRunId) - 1] = '\0';
                 break;
             case 4:
-                strncpy(g_pConfig->buildTagInfo, line, sizeof(g_pConfig->buildTagInfo) - 1);
-                g_pConfig->buildTagInfo[sizeof(g_pConfig->buildTagInfo) - 1] = '\0';
+                strncpy(g_pConfig->buildWorkflowNum, line, sizeof(g_pConfig->buildWorkflowNum) - 1);
+                g_pConfig->buildWorkflowNum[sizeof(g_pConfig->buildWorkflowNum) - 1] = '\0';
                 break;
             case 5:
                 strncpy(g_pConfig->amdgpuDkmsBuild, line, sizeof(g_pConfig->amdgpuDkmsBuild) - 1);

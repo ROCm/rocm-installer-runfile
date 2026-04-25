@@ -463,6 +463,7 @@ list_gpus() {
 
         local gpu_count=0
         local -A pci_revisions
+        # shellcheck disable=SC2034
         while read -r pci_addr _pci_class _pci_vendor _pci_device pci_rest; do
             local rev
             rev=$(echo "$pci_rest" | grep -oP '\(rev \K[0-9a-f]{2}(?=\))' || echo "00")
