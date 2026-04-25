@@ -1774,7 +1774,7 @@ build_dependencies_list_for_compo() {
         # Select the appropriate directory and dependency file based on package type
         if [ "$PACKAGE_TYPE" == "rpm" ]; then
             local deps_dir="$PWD/component-rocm"
-            DEPS_FILE="$deps_dir/rocm_required_deps_rpm.txt"
+            DEPS_FILE="$deps_dir/deps/rocm_required_deps_rpm.txt"
         else
             # For DEB packages, check if component-rocm-deb exists (chroot mode)
             # Otherwise fall back to component-rocm (native DEB system)
@@ -1783,7 +1783,7 @@ build_dependencies_list_for_compo() {
             else
                 local deps_dir="$PWD/component-rocm"
             fi
-            DEPS_FILE="$deps_dir/rocm_required_deps_deb.txt"
+            DEPS_FILE="$deps_dir/deps/rocm_required_deps_deb.txt"
         fi
 
         if [ ! -d "$deps_dir" ]; then
