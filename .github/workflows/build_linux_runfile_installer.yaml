@@ -106,7 +106,6 @@ jobs:
       PULL_TAG: ${{ inputs.pull_tag }}
       PULL_RUN_ID: ${{ inputs.pull_run_id }}
       PULL_PKG: ${{ inputs.pull_pkg }}
-      BUILD_TAG: ${{ inputs.pull_tag }}
       GFX_ARCHS: ${{ inputs.gfx_archs }}
       PULL_AMDGPU: ${{ inputs.pull_amdgpu }}
       PULL_TYPE: ${{ inputs.pull_type }}
@@ -157,7 +156,7 @@ jobs:
           echo "### Runfile Build Options" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          echo "\`bash build-runfile-installer.sh config=$RUNFILE_CONFIG pulltag=$PULL_TAG pullrunid=$PULL_RUN_ID pullrocmver=$ROCM_VERSION pullpkg=$PULL_PKG buildtag=$BUILD_TAG buildrunid=$BUILD_RUNID buildworkflow=$BUILD_WORKFLOW_NUM buildname=$PULL_TAG-$PULL_RUN_ID $ARGS\`" >> $GITHUB_STEP_SUMMARY
+          echo "\`bash build-runfile-installer.sh config=$RUNFILE_CONFIG pulltag=$PULL_TAG pullrunid=$PULL_RUN_ID pullrocmver=$ROCM_VERSION pullpkg=$PULL_PKG buildrunid=$BUILD_RUNID buildworkflow=$BUILD_WORKFLOW_NUM buildname=$PULL_TAG-$PULL_RUN_ID $ARGS\`" >> $GITHUB_STEP_SUMMARY
 
           docker run --rm \
             -v ${{ github.workspace }}:/workspace \
@@ -174,7 +173,7 @@ jobs:
             -e PULL_AMDGPU=${{ env.PULL_AMDGPU }} \
             -e ARGS="${{ env.ARGS }}" \
             ${{ env.BUILD_IMAGE }} \
-            bash build-runfile-installer.sh config=$RUNFILE_CONFIG pulltag=$PULL_TAG pullrunid=$PULL_RUN_ID pullrocmver=$ROCM_VERSION pullpkg=$PULL_PKG buildtag=$BUILD_TAG buildrunid=$BUILD_RUNID buildworkflow=$BUILD_WORKFLOW_NUM buildname=$PULL_TAG-$PULL_RUN_ID $ARGS
+            bash build-runfile-installer.sh config=$RUNFILE_CONFIG pulltag=$PULL_TAG pullrunid=$PULL_RUN_ID pullrocmver=$ROCM_VERSION pullpkg=$PULL_PKG buildrunid=$BUILD_RUNID buildworkflow=$BUILD_WORKFLOW_NUM buildname=$PULL_TAG-$PULL_RUN_ID $ARGS
 
       - name: Show .run file
         run: find . -name "*.run" -type f -exec ls -lctrh {} \;
