@@ -70,9 +70,9 @@ typedef struct _ROCM_MENU_CONFIG
     char rocm_paths[MAX_PATHS][LARGE_CHAR_SIZE];
     int  rocm_count;
 
-    char rocm_device[DEFAULT_CHAR_SIZE];
-    char rocm_device_gpu[DEFAULT_CHAR_SIZE];
-    char rocm_components[DEFAULT_CHAR_SIZE];
+    char rocm_device[DEFAULT_CHAR_SIZE];      // GFX architecture (e.g., "gfx94x", "gfx110x", "gfx120x")
+    char rocm_device_gpu[DEFAULT_CHAR_SIZE];  // GPU name (e.g., "AMD Instinct MI300X", "AMD Radeon RX 7900 XTX")
+    char rocm_components[DEFAULT_CHAR_SIZE];  // Component list (e.g., "core,runtime,hip")
 
     // Pointer to parent config for accessing version info
     struct _OFFLINE_INSTALL_CONFIG *pConfig;
@@ -104,6 +104,27 @@ typedef struct _POST_MENU_CONFIG
     bool rocm_post;
 }POST_MENU_CONFIG;
 
+/* GPU Detection Configuration ******************************************************************/
+
+#define MAX_GPUS 4
+
+// Structure for individual GPU information
+typedef struct _GPU_INFO
+{
+    char device_id[16];      // PCI device ID (e.g., "7448")
+    char revision[8];        // Revision ID (e.g., "00")
+    char gfx_arch[16];       // GFX architecture (e.g., "gfx110x")
+    char name[128];          // Device name (e.g., "AMD GPU" or "AMD Radeon RX 7900 XTX")
+} GPU_INFO;
+
+// Structure for GPU detection results
+typedef struct _GPU_DETECTION
+{
+    int num_gpus;            // Number of GPUs detected
+    GPU_INFO gpus[MAX_GPUS]; // Array of detected GPUs
+    int status;              // 0=success, 1=no GPU, 2=unknown, 3=mixed archs
+    bool detected;           // true if detection was attempted
+} GPU_DETECTION;
 
 /* Global Configuration ************************************************************************/
 
@@ -113,9 +134,9 @@ typedef struct _OFFLINE_INSTALL_CONFIG
     // Version info read from VERSION file at runtime
     char installerVersion[64];      // Line 1: INSTALLER_VERSION (e.g., "2.0.0")
     char rocmVersion[64];            // Line 2: ROCM_VER (e.g., "7.11.0")
-    char buildTag[64];               // Line 3: BUILD_TAG (e.g., "1", "rc1", "nightly")
-    char buildRunId[64];             // Line 4: BUILD_RUNID (e.g., "99999", "1")
-    char buildTagInfo[64];           // Line 5: BUILD_TAG_INFO (e.g., "20260219-22188089855")
+    char buildPullInfo[64];          // Line 3: BUILD_PULL_INFO (e.g., "nightly-22188089855", "1")
+    char buildRunId[64];             // Line 4: BUILD_RUNID (e.g., "1")
+    char buildWorkflowNum[64];       // Line 5: BUILD_WORKFLOW_NUM (e.g., "1")
     char amdgpuDkmsBuild[64];        // Line 6: AMDGPU_DKMS_BUILD_NUM (e.g., "6.18.4-2286447")
 
     // Runtime distro detection
@@ -130,6 +151,9 @@ typedef struct _OFFLINE_INSTALL_CONFIG
     ROCM_MENU_CONFIG    rocm_config;
     DRIVER_MENU_CONFIG  driver_config;
     POST_MENU_CONFIG    post_config;
+
+    // GPU detection results
+    GPU_DETECTION       gpu_detection;
 
     // global configuration
     bool                install;

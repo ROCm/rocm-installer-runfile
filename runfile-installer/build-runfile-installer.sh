@@ -41,9 +41,9 @@ SKIP_BUILD=0
 # Note: These may be pre-set by config files, so only initialize if not already set
 PULL_TAG="${PULL_TAG:-}"
 PULL_RUNID="${PULL_RUNID:-}"
-BUILD_TAG="${BUILD_TAG:-}"
+BUILD_NAME="${BUILD_NAME:-}"
 BUILD_RUNID="${BUILD_RUNID:-}"
-BUILD_TAG_INFO="${BUILD_TAG_INFO:-}"
+BUILD_WORKFLOW_NUM="${BUILD_WORKFLOW_NUM:-}"
 
 ###### Functions ###############################################################
 
@@ -84,7 +84,7 @@ This script performs a complete ROCm runfile installer build:
                             - prerelease: RC tag (e.g., rc0, rc1, rc2)
                             - release: "release" or version number
     pullrunid=<runid>     = Set ROCm component build run ID (required for all builds).
-                            Examples: pullrunid=21274498502 (nightly/dev), pullrunid=21843385957 (prerelease), pullrunid=99999 (release)
+                            Examples: pullrunid=21274498502 (nightly/dev), pullrunid=21843385957 (prerelease), pullrunid=1 (release)
     pullrocmver=<version> = Set ROCm version for package names (e.g., 7.12, 7.11).
     pullamdgpu=<format>   = Set AMDGPU config and version (required when pulling AMDGPU).
                             Formats:
@@ -117,9 +117,9 @@ This script performs a complete ROCm runfile installer build:
     norunfile             = Disable makeself build of installer runfile.
     nogui                 = Disable GUI building.
     noautodeps            = Disable automatic dependency resolution for RPM packages.
-    buildtag=<tag>        = Set the build tag (optional, defaults to pulltag value if not provided).
-    buildrunid=<id>       = Set the Runfile build run ID (default: 99999).
-    buildtaginfo=<tag>    = Set a tag/name for the builds package pull information (optional, auto-constructed as pulltag-pullrunid if not provided).
+    buildname=<name>      = Set a name for the build (default: local).
+    buildrunid=<id>       = Set the Runfile build run ID (default: 1).
+    buildworkflow=<num>   = Set the build workflow number (default: 1).
     mscomp=<mode>         = Makeself compression (build speed vs file size):
                             hybrid     = XZ-9 everything (slowest, ~50-55%, embedded xz, universal) [RECOMMENDED]
                             hybriddev  = XZ-3 everything (fast, ~70-75%, embedded xz, universal)
@@ -148,7 +148,7 @@ Examples:
     $0 pull=nightly pulltag=20260304 pullrunid=22655273671 pullrocmver=7.12.0        # Nightly (w/ gfx908/gfx90a)
     $0 pull=dev pulltag=20260219 pullrunid=22188089855 pullrocmver=7.12.0            # Dev
     $0 pull=prerelease pulltag=rc2 pullrunid=21843385957 pullrocmver=7.11.0          # Prerelease RC2
-    $0 pull=release pulltag=release pullrunid=99999 pullrocmver=7.11.0               # Release
+    $0 pull=release pulltag=release pullrunid=1 pullrocmver=7.11.0                   # Release
 
     # GPU architectures
     $0 rocm-archs=gfx110x,gfx94x                              # Specific GPU architectures
@@ -216,7 +216,6 @@ for arg in "$@"; do
             # (Child scripts will source the config themselves and get these directly)
             PULL_TAG="${PULL_CONFIG_TAG:-}"
             PULL_RUNID="${PULL_CONFIG_RUNID:-}"
-            # BUILD_TAG, BUILD_RUNID, BUILD_TAG_INFO already set by config directly
 
             echo "Configuration loaded. Command-line arguments will override config values."
             echo ""
@@ -261,8 +260,8 @@ while (($#)); do
         SETUP_ARGS+=("$1")
         shift
         ;;
-    buildtag=*)
-        BUILD_TAG="${1#*=}"
+    buildname=*)
+        BUILD_NAME="${1#*=}"
         BUILD_ARGS+=("$1")
         shift
         ;;
@@ -271,8 +270,8 @@ while (($#)); do
         BUILD_ARGS+=("$1")
         shift
         ;;
-    buildtaginfo=*)
-        BUILD_TAG_INFO="${1#*=}"
+    buildworkflow=*)
+        BUILD_WORKFLOW_NUM="${1#*=}"
         BUILD_ARGS+=("$1")
         shift
         ;;
@@ -381,16 +380,9 @@ if [ $SKIP_BUILD -eq 0 ]; then
     echo "------------------------------------------------------------------------"
     echo ""
 
-    # Set buildtag to value of pulltag if not already set
-    if [ -z "$BUILD_TAG" ]; then
-        BUILD_TAG="$PULL_TAG"
-        BUILD_ARGS+=("buildtag=$BUILD_TAG")
-    fi
-
-    # Construct buildtaginfo if not already provided
-    if [ -z "$BUILD_TAG_INFO" ]; then
-        BUILD_TAG_INFO="$PULL_TAG-$PULL_RUNID"
-        BUILD_ARGS+=("buildtaginfo=$BUILD_TAG_INFO")
+    # Construct and pass buildpullinfo from PULL_TAG and PULL_RUNID
+    if [ -n "$PULL_TAG" ] && [ -n "$PULL_RUNID" ]; then
+        BUILD_ARGS+=("buildpullinfo=$PULL_TAG-$PULL_RUNID")
     fi
 
     echo "Build Configuration:"

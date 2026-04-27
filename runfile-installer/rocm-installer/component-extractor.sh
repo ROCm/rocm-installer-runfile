@@ -64,6 +64,13 @@ EXIT STATUS:
 END_USAGE
 }
 
+format_duration() {
+    local duration=$1
+    local minutes=$((duration / 60))
+    local seconds=$((duration % 60))
+    echo "${minutes}m ${seconds}s (${duration} seconds)"
+}
+
 run_with_progress() {
     local message="$1"
     shift
@@ -141,7 +148,7 @@ if [[ "$archive_file" == "extract-all" ]]; then
     if [[ -d "component-amdgpu" ]]; then
         for archive in component-amdgpu/content-*.tar.*; do
             if [[ -f "$archive" ]]; then
-                if "$0" "$archive" "component-amdgpu/content" "$INSTALLER_DIR"; then
+                if "$0" "$archive" "component-amdgpu" "$INSTALLER_DIR"; then
                     extracted_count=$((extracted_count + 1))
                 else
                     failed_count=$((failed_count + 1))
@@ -150,18 +157,21 @@ if [[ "$archive_file" == "extract-all" ]]; then
         done
     fi
 
-    # Extract tests archive if present (located in component-rocm/)
-    # Note: tests.tar.xz contains paths like "component-rocm/content/gfx120x/...",
+    # Extract tests archives if present (located in component-rocm/)
+    # New format: tests-{gfx}.tar.xz (e.g., tests-base.tar.xz, tests-gfx94x.tar.xz)
+    # Note: Archives contain paths like "component-rocm/content/gfx*/...",
     # so extract to current directory (not component-rocm/)
-    for test_archive in component-rocm/tests.tar.xz component-rocm/tests.tar.gz; do
-        if [[ -f "$test_archive" ]]; then
-            if "$0" "$test_archive" "." "$INSTALLER_DIR"; then
-                extracted_count=$((extracted_count + 1))
-            else
-                failed_count=$((failed_count + 1))
+    if [[ -d "component-rocm" ]]; then
+        for test_archive in component-rocm/tests-*.tar.*; do
+            if [[ -f "$test_archive" ]]; then
+                if "$0" "$test_archive" "." "$INSTALLER_DIR"; then
+                    extracted_count=$((extracted_count + 1))
+                else
+                    failed_count=$((failed_count + 1))
+                fi
             fi
-        fi
-    done
+        done
+    fi
 
     echo ""
     echo "Extract-all complete: $extracted_count archive(s) extracted, $failed_count failed"
@@ -183,6 +193,9 @@ mkdir -p "$output_dir"
 # Detect archive type and extract
 archive_name=$(basename "$archive_file")
 echo "  Extracting: $archive_name"
+
+# Capture extraction start time
+extract_start_time=$(date +%s)
 
 success=0
 
@@ -214,7 +227,11 @@ if [[ $success -eq 0 ]]; then
     exit 1
 fi
 
+# Capture extraction end time and calculate duration
+extract_end_time=$(date +%s)
+extract_duration=$((extract_end_time - extract_start_time))
+
 # Clear any residual progress text before printing success message
 printf "\r\033[K"
-echo -e "  \e[32mExtracted : $archive_name\e[0m"
+echo -e "  \e[32mExtracted : $archive_name in $(format_duration "$extract_duration")\e[0m"
 exit 0

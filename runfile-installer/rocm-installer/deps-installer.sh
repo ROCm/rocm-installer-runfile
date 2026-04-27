@@ -23,6 +23,11 @@
 # THE SOFTWARE.
 # #############################################################################
 
+# Colour text
+YELLOW="\033[0;93m"
+GREEN='\033[0;32m'
+NC='\033[0m' # No Color
+
 DEPS_COUNT=0
 
 DEPS=
@@ -42,9 +47,14 @@ INSTALLABLE_PKG_CACHE=
 
 NO_CMD_OUTPUT="> /dev/null 2>&1"
 
+WGET_RETRY_COUNT=5
+
 GCC_TOOLSET_PACKAGES_OL=(gcc-toolset-11-gcc gcc-toolset-11-gcc-c++ gcc-toolset-11-gcc-gfortran gcc-toolset-11-libquadmath-devel gcc-toolset-11-libstdc++-devel gcc-toolset-11-gcc-gdb-plugin)
 
 declare -A SLES_PKG_CACHE
+
+# Debian kernel package URLs from snapshot.debian.org (package -> URL)
+declare -A DEBIAN_KERNEL_PKG_INFO
 
 EPEL_SETUP=1
 
@@ -284,6 +294,11 @@ cleanup() {
 
     if [[ "$DISTRO_NAME" = "rocky" ]]; then
         remove_rocky_kernel_repo
+    elif [[ "$DISTRO_NAME" = "debian" ]]; then
+        # delete block-headers file which may be added during debian 12 dependency install
+        if [[ -f /etc/apt/preferences.d/block-headers ]]; then
+            $SUDO rm /etc/apt/preferences.d/block-headers
+        fi
     fi
 
     echo Cleaning up...Complete.
@@ -344,6 +359,12 @@ is_pkg_installable_deb() {
     fi
 
     return $install_result
+}
+
+is_pkg_available_to_download_deb() {
+    local pkg="$1"
+    apt-cache policy "$pkg" | sed -n "/Version/,\$p" | grep -q http
+    return $?
 }
 
 get_dep_from_cache() {
@@ -1241,7 +1262,7 @@ EOF
     return 0
 }
 
-get_kernel_pacakges_repo_rocky() {
+get_kernel_packages_repo_rocky() {
     local package="kernel-headers-$KERNEL_VER.rpm"
 
     # Repo URL list for kernel packages
@@ -1313,7 +1334,7 @@ get_kernel_packages_rocky() {
         echo -e "\e[93mKernel Packages not available in the AppStream repositories.\e[0m"
 
         # check for legacy kernel headers
-    	if ! get_kernel_pacakges_repo_rocky; then
+    	if ! get_kernel_packages_repo_rocky; then
     	    echo -e "\e[93mKernel Packages not available in the repositories.  Using defaults.\e[0m"
     	fi
     fi
@@ -1517,6 +1538,119 @@ get_kernel_package_for_kernel_version() {
     done
 }
 
+get_kernel_packages_debian() {
+    echo Debian kernel packages...
+
+    local kernel_ver_sans_arch
+
+    kernel_ver_sans_arch="${KERNEL_VER/-amd64}"
+
+    # Associative array mapping package names to their expected architecture
+    # Example deb 12: linux-headers-6.1.0-29-amd64, linux-headers-6.1.0-29-common
+    # Example deb 13: linux-headers-6.12.38+deb13-amd64, linux-headers-6.12.38+deb13-common
+    declare -A linux_headers_to_download=(
+        ["linux-headers-$KERNEL_VER"]="amd64"
+        ["linux-headers-$kernel_ver_sans_arch-common"]="all"
+    )
+
+    if [[ $DISTRO_MAJOR_VER -eq 13 ]]; then
+        # Example deb13: linux-kbuild-6.12.38+deb13
+        linux_headers_to_download["linux-kbuild-$kernel_ver_sans_arch"]="amd64"
+    fi
+
+    # Clear any previous info
+    DEBIAN_KERNEL_PKG_INFO=()
+
+    for package in "${!linux_headers_to_download[@]}"; do
+        local expected_arch="${linux_headers_to_download[$package]}"
+        # Example URL: https://snapshot.debian.org/mr/binary/linux-headers-6.1.0-29-common/
+
+        if linux_headers_info=$(wget --quiet --tries $WGET_RETRY_COUNT -qO- "https://snapshot.debian.org/mr/binary/$package"); then
+            linux_headers_binary_version=$(jq -r '.result[0].binary_version' <<< "$linux_headers_info")
+
+            # Example URL: https://snapshot.debian.org/mr/binary/linux-headers-6.1.0-29-amd64/6.1.123-1/binfiles
+
+            if linux_headers_file_info=$(wget --quiet --tries $WGET_RETRY_COUNT -qO- "https://snapshot.debian.org/mr/binary/$package/$linux_headers_binary_version/binfiles"); then
+                # Find the hash for the expected architecture
+                linux_headers_hash_value=$(jq -r --arg arch "$expected_arch" '.result[] | select(.architecture == $arch) | .hash' <<< "$linux_headers_file_info")
+
+                # If expected architecture not found, skip this package
+                if [[ -z "$linux_headers_hash_value" ]]; then
+                    echo -e "${YELLOW}Architecture $expected_arch not found for $package, skipping${NC}"
+                    continue
+                fi
+
+                # Build and store the full download URL
+                local deb_filename="${package}_${linux_headers_binary_version}_${expected_arch}.deb"
+                DEBIAN_KERNEL_PKG_INFO["$package"]="https://snapshot.debian.org/file/${linux_headers_hash_value}/${deb_filename}"
+                echo "Found $package on snapshot.debian.org"
+            else
+                echo -e "${YELLOW}Failed to download metadata on kernel package $package from https://snapshot.debian.org ${NC}"
+                return 1
+            fi
+        else
+            echo -e "${YELLOW}Failed to find kernel package $package on https://snapshot.debian.org ${NC}"
+            return 1
+        fi
+    done
+
+    if [[ ${#DEBIAN_KERNEL_PKG_INFO[@]} -gt 0 ]]; then
+        for pkg in "${!DEBIAN_KERNEL_PKG_INFO[@]}"; do
+            KERNEL_PACKAGES+="$pkg "
+        done
+    fi
+
+    echo "Debian kernel packages discovery...Complete."
+    return 0
+}
+
+# Download and install Debian kernel packages from snapshot.debian.org
+# Called from install_dependencies() - uses info stored in DEBIAN_KERNEL_PKG_INFO
+install_kernel_packages_debian() {
+    print_str "--------------------------------"
+    print_str "Installing Debian kernel packages from snapshot.debian.org..."
+
+    local linux_headers_package_list=()
+
+    for package in "${!DEBIAN_KERNEL_PKG_INFO[@]}"; do
+        # Only install packages that are in DIRECT_DOWNLOAD_LIST (i.e., missing packages)
+        if [[ " $DIRECT_DOWNLOAD_LIST " != *" $package "* ]]; then
+            echo "Skipping $package (already installed or not needed)"
+            continue
+        fi
+
+        local url="${DEBIAN_KERNEL_PKG_INFO[$package]}"
+        local filename
+        filename=$(basename "$url")
+
+        echo "--------------------------"
+        echo "URL: $url"
+        echo "--------------------------"
+
+        echo "Downloading: $package"
+
+        if ! wget --quiet --tries $WGET_RETRY_COUNT "$url"; then
+            print_err "Failed to download $package from https://snapshot.debian.org"
+            exit 1
+        else
+            linux_headers_package_list+=("$(pwd)/$filename")
+        fi
+    done
+
+    if [[ ${#linux_headers_package_list[@]} -gt 0 ]]; then
+        echo "Installing downloaded packages: ${linux_headers_package_list[*]}"
+        if ! $SUDO apt-get install -qq -y "${linux_headers_package_list[@]}"; then
+            print_err "Failed to install kernel headers: ${linux_headers_package_list[*]}"
+            $SUDO rm -f "${linux_headers_package_list[@]}"
+            exit 1
+        fi
+        echo -e "${GREEN}Successfully installed kernel headers ${linux_headers_package_list[*]}${NC}"
+
+        # Clean up downloaded files
+        $SUDO rm -f "${linux_headers_package_list[@]}"
+    fi
+}
+
 get_kernel_packages() {
     echo "------------------------------------"
 
@@ -1529,7 +1663,12 @@ get_kernel_packages() {
 
     # set the kernel packages
     if [ $DISTRO_PACKAGE_MGR == "apt" ]; then
-        KERNEL_PACKAGES="linux-headers-$KERNEL_VER "
+        if is_pkg_available_to_download_deb "linux-headers-$KERNEL_VER"; then
+            echo "Package linux-headers-$KERNEL_VER available in repository"
+            KERNEL_PACKAGES="linux-headers-$KERNEL_VER "
+        elif [[ $DISTRO_NAME = "debian" ]]; then
+            get_kernel_packages_debian
+        fi
 
     elif [ $DISTRO_PACKAGE_MGR == "dnf" ]; then
 
@@ -1635,7 +1774,7 @@ build_dependencies_list_for_compo() {
         # Select the appropriate directory and dependency file based on package type
         if [ "$PACKAGE_TYPE" == "rpm" ]; then
             local deps_dir="$PWD/component-rocm"
-            DEPS_FILE="$deps_dir/rocm_required_deps_rpm.txt"
+            DEPS_FILE="$deps_dir/deps/rocm_required_deps_rpm.txt"
         else
             # For DEB packages, check if component-rocm-deb exists (chroot mode)
             # Otherwise fall back to component-rocm (native DEB system)
@@ -1644,7 +1783,7 @@ build_dependencies_list_for_compo() {
             else
                 local deps_dir="$PWD/component-rocm"
             fi
-            DEPS_FILE="$deps_dir/rocm_required_deps_deb.txt"
+            DEPS_FILE="$deps_dir/deps/rocm_required_deps_deb.txt"
         fi
 
         if [ ! -d "$deps_dir" ]; then
@@ -1783,11 +1922,36 @@ install_repos_el() {
     echo "------------------------------------"
 }
 
+block_kernel_meta_packages_debian12() {
+    # On Debian 12, installing dkms triggers installation of kernel meta-packages
+    # (linux-headers-amd64, linux-headers-686-pae, linux-headers-generic), which can
+    # upgrade the running kernel. To prevent unwanted kernel upgrades during DKMS install,
+    # block these meta-packages from installing if kernel headers for current kernel
+    # are already installed or if they will be installed.
+    if [[ $DISTRO_NAME == "debian" ]] && [[ $DISTRO_MAJOR_VER -eq 12 ]]; then
+        if [[ " $INSTALL_LIST " == *" dkms "* ]]; then
+            if [[ -n $KERNEL_PACKAGES ]]; then
+                if is_pkg_deb_installed "linux-headers-$KERNEL_VER" || grep "$KERNEL_PACKAGES" <<< "$INSTALL_LIST"; then
+                    echo "Add a temporary block to meta packages linux-headers-amd64, linux-headers-686-pae and linux-headers-generic to prevent kernel upgrades during DKMS install."
+cat <<EOF | $SUDO tee /etc/apt/preferences.d/block-headers
+Package: linux-headers-amd64 linux-headers-686-pae linux-headers-generic
+Pin: release *
+Pin-Priority: -1
+EOF
+                fi
+            fi
+        fi
+    fi
+
+}
+
 install_dependencies() {
     echo ==============================================================
     echo Installing Dependencies...
 
     INSTALL_LIST=
+    # Packages that are downloaded directly via wget.
+    DIRECT_DOWNLOAD_LIST=
 
     # remove trailing space
     MISSING_DEPS="${MISSING_DEPS% }"
@@ -1820,6 +1984,18 @@ install_dependencies() {
     IFS=',' read -ra package_array <<< "$MISSING_DEPS"
     for pkg in "${package_array[@]}"; do
         INSTALL_DEPS_COUNT=$((INSTALL_DEPS_COUNT+1))
+
+        # Skip packages that will be installed from snapshot.debian.org
+        local pkg_trimmed
+        # shellcheck disable=SC2001
+        pkg_trimmed=$(echo "$pkg" | sed 's/^ *//')
+        if [[ -n "${DEBIAN_KERNEL_PKG_INFO[$pkg_trimmed]+isset}" ]]; then
+            echo --------------------------------------------------------------
+            echo "Skipping apt check for $pkg_trimmed (will be installed from snapshot.debian.org)"
+            DIRECT_DOWNLOAD_LIST+="$pkg_trimmed "
+            continue
+        fi
+
         check_dep_installable "$pkg"
     done
 
@@ -1836,9 +2012,17 @@ install_dependencies() {
         echo -----------------------------------------------
     fi
 
+    # Some kernel headers for debian need to be downloaded and installed
+    # from snapshot.debian.org because they may not be available in the regular
+    # debian repos.
+    if [[ -n $DIRECT_DOWNLOAD_LIST ]]; then
+        install_kernel_packages_debian
+    fi
+
     if [[ -n $INSTALL_LIST ]]; then
         # install the dependent packages
         if [ $DISTRO_PACKAGE_MGR == "apt" ]; then
+            block_kernel_meta_packages_debian12
             $SUDO apt-get install "$installopt" $INSTALL_LIST
         elif [ $DISTRO_PACKAGE_MGR == "dnf" ]; then
             $SUDO dnf install "$installopt" $INSTALL_LIST

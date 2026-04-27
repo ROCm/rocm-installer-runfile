@@ -295,7 +295,8 @@ Usage:
     Information/Debug:
     ------------------
     findrocm = Search for an install of ROCm.
-    complist = List the version of ROCm components included in the installer.
+    manifest = List the version of all ROCm components included in the installer.
+    manifest=<gfx> = List components for specific gfx architecture (e.g., manifest=gfx110x, manifest=base).
     prompt   = Run the installer with user prompts.
     verbose  = Run installer with verbose logging
 

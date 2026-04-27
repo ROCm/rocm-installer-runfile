@@ -36,6 +36,7 @@ AMDGPU_INSTALLER_CURRENT_LOG="$AMDGPU_INSTALLER_LOG_DIR/install_amdgpu_$(date +%
 EXTRACT_AMDGPU_DIR="$PWD/component-amdgpu"
 TARGET_AMDGPU_DIR="/"
 COMPO_AMDGPU_FILE=""
+AMDGPU_VER_FILE="amdgpu-dkms-ver.txt"
 
 # Rsync options for AMDGPU installation
 RSYNC_OPTS_AMDGPU="-a --keep-dirlinks --no-perms --no-owner --no-group --omit-dir-times "
@@ -219,7 +220,7 @@ get_version() {
     # If AMDGPU build number wasn't in VERSION file (pre-build state),
     # try reading from component-amdgpu directory
     if [[ -z "$AMDGPU_DKMS_BUILD_NUM" || "$AMDGPU_DKMS_BUILD_NUM" == "" ]]; then
-        local amdgpu_ver_file="./component-amdgpu/amdgpu-dkms-ver.txt"
+        local amdgpu_ver_file="./component-amdgpu/$AMDGPU_VER_FILE"
         if [ -f "$amdgpu_ver_file" ]; then
             AMDGPU_DKMS_BUILD_NUM=$(tr -d '[:space:]' < "$amdgpu_ver_file")
         else
@@ -452,6 +453,14 @@ extract_amdgpu_if_needed() {
 
     local archive="$INSTALLER_DIR/component-amdgpu/content-amdgpu.tar.xz"
     local extract_dir="$INSTALLER_DIR/component-amdgpu"
+
+    # Check if content directory already exists from a previous extraction
+    # The content directory contains distro-specific subdirectories (e.g., ub22, el9)
+    if [[ -d "$extract_dir/content" ]]; then
+        echo "AMDGPU content already extracted, skipping extraction"
+        AMDGPU_EXTRACTED=1
+        return 0
+    fi
 
     if [[ ! -f "$archive" ]]; then
         echo -e "\e[31mERROR: AMDGPU content archive not found: $archive\e[0m"
@@ -753,6 +762,9 @@ uninstall_amdgpu() {
     echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
     echo -e "\e[95mUNINSTALL amdgpu\e[0m"
     echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+
+    # Extract AMDGPU component if needed
+    extract_amdgpu_if_needed
 
     # Set up AMDGPU paths based on distro
     setup_amdgpu_paths

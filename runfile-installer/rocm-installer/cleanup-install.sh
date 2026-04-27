@@ -26,7 +26,7 @@ ROCM_COMP_DIR=component-rocm
 ROCM_COMP_DEB_DIR=component-rocm-deb
 AMDGPU_COMP_DIR=component-amdgpu
 
-CLEAN_SCRIPT_LIST=(install-init.sh rocm-installer.sh amdgpu-installer.sh deps-installer.sh component-extractor.sh cleanup-install.sh)
+CLEAN_SCRIPT_LIST=(install-init.sh rocm-installer.sh amdgpu-installer.sh deps-installer.sh component-extractor.sh cleanup-install.sh detect-gpu-gfx.sh)
 
 ###### Functions ###############################################################
 
@@ -95,6 +95,15 @@ cleanup_install() {
         print_msg "Cleaning up bin directory..."
         $SUDO rm -rf bin
         print_msg "Cleaning up bin directory...Complete"
+    fi
+
+    # Remove block-headers file that gets created during deb 12 dependency install
+    if [[ -f /etc/apt/preferences.d/block-headers ]]; then
+        print_msg "Cleaning up file /etc/apt/preferences.d/block-headers..."
+
+        $SUDO rm /etc/apt/preferences.d/block-headers
+
+        print_msg "Cleaning up file /etc/apt/preferences.d/block-headers...Complete"
     fi
 }
 

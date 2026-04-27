@@ -36,8 +36,8 @@
 #include <sys/utsname.h>
 #include <sys/stat.h>
 
-#define MAIN_MENU_ITEM_START_Y          7   // minimum starting y/row
-#define MAIN_MENU_ITEM_START_X          1   // minimum starting x/col
+#define MAIN_MENU_ITEM_START_Y          10   // minimum starting y/row
+#define MAIN_MENU_ITEM_START_X          1    // minimum starting x/col
 
 // rocm menu indices
 #define MAIN_MENU_ITEM_PRE_INDEX        0
@@ -187,6 +187,98 @@ int get_os_info()
 }
 
 /**
+ * detect_gpus - Detect AMD GPUs using detect-gpu-gfx.sh script
+ * @gpu_detect: Pointer to GPU_DETECTION structure to populate
+ *
+ * Calls detect-gpu-gfx.sh once with --output all --unique to get unique GPU info:
+ *   - Device names (e.g., "AMD GPU" or "AMD Radeon RX 7900 XTX")
+ *   - PCI device IDs (e.g., 7448)
+ *   - Revision IDs (e.g., 00)
+ *   - GFX architectures (e.g., gfx110x)
+ *
+ * Output format (tab-separated): name<TAB>device-id<TAB>revision<TAB>gfx
+ *
+ * Returns: 0 on success (GPU detected), -1 on failure
+ *   Exit status stored in gpu_detect->status:
+ *   0 = Successfully detected
+ *   1 = No AMD GPU detected
+ *   2 = AMD GPU detected but unknown architecture
+ *   3 = Multiple different GFX architectures detected
+ */
+int detect_gpus(GPU_DETECTION *gpu_detect)
+{
+    FILE *fp;
+    char line[512];
+
+    // Initialize detection structure
+    gpu_detect->detected = true;
+    gpu_detect->num_gpus = 0;
+    gpu_detect->status = 0;
+
+    // Get all GPU info in one call (tab-separated: name, device-id, revision, gfx)
+    fp = popen("./detect-gpu-gfx.sh --output all --unique 2>/dev/null", "r");
+    if (fp == NULL)
+    {
+        gpu_detect->status = 1;
+        gpu_detect->detected = false;
+        return -1;
+    }
+
+    int gpu_idx = 0;
+    while (fgets(line, sizeof(line), fp) != NULL && gpu_idx < MAX_GPUS)
+    {
+        line[strcspn(line, "\n")] = 0;  // Remove newline
+        if (strlen(line) == 0)
+            continue;
+
+        // Parse tab-separated fields: name<TAB>device-id<TAB>revision<TAB>gfx
+        char *name = strtok(line, "\t");
+        char *device_id = strtok(NULL, "\t");
+        char *revision = strtok(NULL, "\t");
+        char *gfx = strtok(NULL, "\t");
+
+        // Store each field (with validation)
+        if (name != NULL)
+        {
+            strncpy(gpu_detect->gpus[gpu_idx].name, name, sizeof(gpu_detect->gpus[gpu_idx].name) - 1);
+            gpu_detect->gpus[gpu_idx].name[sizeof(gpu_detect->gpus[gpu_idx].name) - 1] = '\0';
+        }
+
+        if (device_id != NULL)
+        {
+            strncpy(gpu_detect->gpus[gpu_idx].device_id, device_id, sizeof(gpu_detect->gpus[gpu_idx].device_id) - 1);
+            gpu_detect->gpus[gpu_idx].device_id[sizeof(gpu_detect->gpus[gpu_idx].device_id) - 1] = '\0';
+        }
+
+        if (revision != NULL)
+        {
+            strncpy(gpu_detect->gpus[gpu_idx].revision, revision, sizeof(gpu_detect->gpus[gpu_idx].revision) - 1);
+            gpu_detect->gpus[gpu_idx].revision[sizeof(gpu_detect->gpus[gpu_idx].revision) - 1] = '\0';
+        }
+
+        if (gfx != NULL)
+        {
+            strncpy(gpu_detect->gpus[gpu_idx].gfx_arch, gfx, sizeof(gpu_detect->gpus[gpu_idx].gfx_arch) - 1);
+            gpu_detect->gpus[gpu_idx].gfx_arch[sizeof(gpu_detect->gpus[gpu_idx].gfx_arch) - 1] = '\0';
+        }
+
+        gpu_idx++;
+    }
+
+    int exit_status = pclose(fp);
+    gpu_detect->num_gpus = gpu_idx;
+    gpu_detect->status = WEXITSTATUS(exit_status);
+
+    // If no GPUs detected or error, return error code
+    if (gpu_detect->status != 0 || gpu_detect->num_gpus == 0)
+    {
+        return gpu_detect->status;
+    }
+
+    return 0;
+}
+
+/**
  * read_version_file - Read installer version information from VERSION file
  * @pConfig: Pointer to configuration structure to populate
  *
@@ -237,16 +329,16 @@ int read_version_file()
                 g_pConfig->rocmVersion[sizeof(g_pConfig->rocmVersion) - 1] = '\0';
                 break;
             case 2:
-                strncpy(g_pConfig->buildTag, line, sizeof(g_pConfig->buildTag) - 1);
-                g_pConfig->buildTag[sizeof(g_pConfig->buildTag) - 1] = '\0';
+                strncpy(g_pConfig->buildPullInfo, line, sizeof(g_pConfig->buildPullInfo) - 1);
+                g_pConfig->buildPullInfo[sizeof(g_pConfig->buildPullInfo) - 1] = '\0';
                 break;
             case 3:
                 strncpy(g_pConfig->buildRunId, line, sizeof(g_pConfig->buildRunId) - 1);
                 g_pConfig->buildRunId[sizeof(g_pConfig->buildRunId) - 1] = '\0';
                 break;
             case 4:
-                strncpy(g_pConfig->buildTagInfo, line, sizeof(g_pConfig->buildTagInfo) - 1);
-                g_pConfig->buildTagInfo[sizeof(g_pConfig->buildTagInfo) - 1] = '\0';
+                strncpy(g_pConfig->buildWorkflowNum, line, sizeof(g_pConfig->buildWorkflowNum) - 1);
+                g_pConfig->buildWorkflowNum[sizeof(g_pConfig->buildWorkflowNum) - 1] = '\0';
                 break;
             case 5:
                 strncpy(g_pConfig->amdgpuDkmsBuild, line, sizeof(g_pConfig->amdgpuDkmsBuild) - 1);
@@ -266,13 +358,14 @@ void main_menu_install_draw(MENU_DATA *pMenuData)
 {
     WINDOW *pMenuWindow = pMenuData->pMenuWindow;
     char drawName[DEFAULT_CHAR_SIZE];
-    int start_row = 14;
+    int start_row = MAIN_MENU_ITEM_START_Y;
+    int start_col = 50;
 
     // Draw the current install configuration
     if (g_pRocmConfig->install_rocm || (g_pDriverConfig->install_driver))
     {
         wattron(pMenuWindow, WHITE | A_ITALIC | A_UNDERLINE | A_BOLD);
-        mvwprintw(pMenuWindow, start_row, 50, "Install Configuration");
+        mvwprintw(pMenuWindow, start_row, start_col, "Install Configuration");
         wattroff(pMenuWindow, WHITE | A_ITALIC | A_UNDERLINE | A_BOLD);
         start_row +=2;
     }
@@ -281,21 +374,21 @@ void main_menu_install_draw(MENU_DATA *pMenuData)
     if (g_pRocmConfig->install_rocm)
     {
         wattron(pMenuWindow, WHITE | A_ITALIC );
-        mvwprintw(pMenuWindow, start_row, 52, "ROCm Install:");
+        mvwprintw(pMenuWindow, start_row, start_col+2, "ROCm Install:");
         wattroff(pMenuWindow, WHITE | A_ITALIC );
-        menu_info_draw_bool(pMenuData, start_row, 66, g_pRocmConfig->install_rocm);
+        menu_info_draw_bool(pMenuData, start_row, start_col+16, g_pRocmConfig->install_rocm);
 
         // ROCm device
         if (strlen(g_pRocmConfig->rocm_device) > 0)
         {
             wattron(pMenuWindow, GREEN | A_BOLD);
-            mvwprintw(pMenuWindow, start_row+1, 58, "Device: %s", g_pRocmConfig->rocm_device);
+            mvwprintw(pMenuWindow, start_row+1, start_col+8, "Device: %s", g_pRocmConfig->rocm_device);
             wattroff(pMenuWindow, GREEN | A_BOLD);
         }
         else
         {
             wattron(pMenuWindow, RED | A_BOLD);
-            mvwprintw(pMenuWindow, start_row+1, 58, "Device: not selected.");
+            mvwprintw(pMenuWindow, start_row+1, start_col+8, "Device: not selected");
             wattroff(pMenuWindow, RED | A_BOLD);
         }
 
@@ -306,13 +399,13 @@ void main_menu_install_draw(MENU_DATA *pMenuData)
             field_trim(g_pRocmConfig->rocm_components, drawName, 17);
 
             wattron(pMenuWindow, GREEN | A_BOLD);
-            mvwprintw(pMenuWindow, start_row+2, 54, "Components: %s", drawName);
+            mvwprintw(pMenuWindow, start_row+2, start_col+4, "Components: %s", drawName);
             wattroff(pMenuWindow, GREEN | A_BOLD);
         }
         else
         {
             wattron(pMenuWindow, RED | A_BOLD);
-            mvwprintw(pMenuWindow, start_row+2, 54, "Components: not selected.");
+            mvwprintw(pMenuWindow, start_row+2, start_col+4, "Components: not selected");
             wattroff(pMenuWindow, RED | A_BOLD);
         }
 
@@ -323,13 +416,13 @@ void main_menu_install_draw(MENU_DATA *pMenuData)
             field_trim(g_pRocmConfig->rocm_install_path, drawName, 17);
 
             wattron(pMenuWindow, GREEN | A_BOLD);
-            mvwprintw(pMenuWindow, start_row+3, 52, "Install Path: %s", drawName);
+            mvwprintw(pMenuWindow, start_row+3, start_col+2, "Install Path: %s", drawName);
             wattroff(pMenuWindow, GREEN | A_BOLD);
         }
         else
         {
             wattron(pMenuWindow, RED | A_BOLD);
-            mvwprintw(pMenuWindow, start_row+3, 52, "Install Path: Invalid.");
+            mvwprintw(pMenuWindow, start_row+3, start_col+2, "Install Path: invalid");
             wattroff(pMenuWindow, RED | A_BOLD);
         }
 
@@ -343,6 +436,51 @@ void main_menu_install_draw(MENU_DATA *pMenuData)
         mvwprintw(pMenuWindow, start_row, 50, "Driver Install: %d", g_pDriverConfig->install_driver);
         wattroff(pMenuWindow, WHITE | A_ITALIC );
         menu_info_draw_bool(pMenuData, start_row, 66, g_pDriverConfig->install_driver);
+    }
+}
+
+void main_menu_gpu_draw(MENU_DATA *pMenuData, int start_row)
+{
+    int gpu_info_row = start_row;
+
+    if (g_pConfig->gpu_detection.detected && g_pConfig->gpu_detection.num_gpus > 0)
+    {
+        if (g_pConfig->gpu_detection.num_gpus == 1)
+        {
+            // Single GPU - show on one line
+            char gpu_info[DEFAULT_CHAR_SIZE];
+            snprintf(gpu_info, sizeof(gpu_info), "%s (Device: 0x%s, GFX: %s)",
+                     g_pConfig->gpu_detection.gpus[0].name,
+                     g_pConfig->gpu_detection.gpus[0].device_id,
+                     g_pConfig->gpu_detection.gpus[0].gfx_arch);
+            print_menu_item_title(pMenuData, gpu_info_row, 2, gpu_info, MAGENTA);
+        }
+        else
+        {
+            // Multiple GPUs - show count and list
+            char gpu_count[64];
+            snprintf(gpu_count, sizeof(gpu_count), "GPUs: %d detected", g_pConfig->gpu_detection.num_gpus);
+            print_menu_item_title(pMenuData, gpu_info_row, 2, gpu_count, MAGENTA);
+            gpu_info_row++;
+
+            // List each GPU
+            for (int i = 0; i < g_pConfig->gpu_detection.num_gpus && i < MAX_GPUS; i++)
+            {
+                char gpu_line[DEFAULT_CHAR_SIZE];
+                snprintf(gpu_line, sizeof(gpu_line), "  GPU %d: %s (0x%s, %s)",
+                         i + 1,
+                         g_pConfig->gpu_detection.gpus[i].name,
+                         g_pConfig->gpu_detection.gpus[i].device_id,
+                         g_pConfig->gpu_detection.gpus[i].gfx_arch);
+                print_menu_item_title(pMenuData, gpu_info_row, 2, gpu_line, MAGENTA);
+                gpu_info_row++;
+            }
+        }
+    }
+    else if (g_pConfig->gpu_detection.detected)
+    {
+        // Detection ran but no GPU found
+        print_menu_item_title(pMenuData, gpu_info_row, 2, "No AMD GPU detected", YELLOW);
     }
 }
 
@@ -360,6 +498,9 @@ void main_menu_draw(MENU_DATA *pMenuData)
 
     print_menu_title(pMenuData, MENU_TITLE_Y, MENU_TITLE_X, WIN_WIDTH_COLS, "ROCm Runfile Installer", CYAN);
     print_menu_item_title(pMenuData, 3, 2, installer_build, MAGENTA);
+
+    // Display GPU detection info
+    main_menu_gpu_draw(pMenuData, 4);
 
     print_menu_control_msg(pMenuData);
 
@@ -580,6 +721,9 @@ int main()
         fprintf(stderr, "ERROR: Failed to detect OS information. Exiting.\n");
         return 1;
     }
+
+    // Detect AMD GPUs
+    detect_gpus(&g_pConfig->gpu_detection);
 
     // Set TERMINFO path for static ncurses compatibility across distros
     // Static ncurses built on AlmaLinux 8.10 looks for terminfo in /usr/share/terminfo
