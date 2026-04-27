@@ -74,39 +74,30 @@ else()
 endif()
 
 # Set the script directory for the distro
-# Note: DISTRO_BUILD_STRING is no longer passed to UI (reads VERSION file at runtime)
 if(${DISTRO} STREQUAL "ubuntu")
     message(STATUS "Building for Ubuntu")
     set(INSTALLER_DIRECTORY ${CMAKE_SOURCE_DIR}/../rocm-installer)
-    # set(DISTRO_BUILD_STRING "Ubuntu ${DISTRO_VERSION}")  # No longer used by UI
 elseif(${DISTRO} STREQUAL "debian")
     message(STATUS "Building for Debian")
     set(INSTALLER_DIRECTORY ${CMAKE_SOURCE_DIR}/../rocm-installer)
-    # set(DISTRO_BUILD_STRING "Debian ${DISTRO_VERSION}")  # No longer used by UI
 elseif(${DISTRO} STREQUAL "rhel")
     message(STATUS "Building for RHEL")
     set(INSTALLER_DIRECTORY ${CMAKE_SOURCE_DIR}/../rocm-installer)
-    # set(DISTRO_BUILD_STRING "Red Hat Enterprise Linux ${DISTRO_VERSION}")  # No longer used by UI
 elseif(${DISTRO} STREQUAL "ol")
     message(STATUS "Building for Oracle Linux")
     set(INSTALLER_DIRECTORY ${CMAKE_SOURCE_DIR}/../rocm-installer)
-    # set(DISTRO_BUILD_STRING "Oracle Linux ${DISTRO_VERSION}")  # No longer used by UI
 elseif(${DISTRO} STREQUAL "rocky")
     message(STATUS "Building for Rocky Linux")
     set(INSTALLER_DIRECTORY ${CMAKE_SOURCE_DIR}/../rocm-installer)
-    # set(DISTRO_BUILD_STRING "Rocky Linux ${DISTRO_VERSION}")  # No longer used by UI
 elseif(${DISTRO} STREQUAL "sles" OR ${DISTRO} STREQUAL "sled")
     message(STATUS "Building for Suse")
     set(INSTALLER_DIRECTORY ${CMAKE_SOURCE_DIR}/../rocm-installer)
-    # set(DISTRO_BUILD_STRING "SUSE Linux Enterprise Server ${DISTRO_VERSION}")  # No longer used by UI
 elseif(${DISTRO} STREQUAL "amzn")
     message(STATUS "Building for Amazon")
     set(INSTALLER_DIRECTORY ${CMAKE_SOURCE_DIR}/../rocm-installer)
-    # set(DISTRO_BUILD_STRING "Amazon Linux ${DISTRO_VERSION}")  # No longer used by UI
 elseif(${DISTRO} STREQUAL "almalinux")
     message(STATUS "Building for Almalinux")
     set(INSTALLER_DIRECTORY ${CMAKE_SOURCE_DIR}/../rocm-installer)
-    # set(DISTRO_BUILD_STRING "Almalnux ${DISTRO_VERSION}")  # No longer used by UI
 else()
     message(FATAL_ERROR "Unsupported Distro : ${DISTRO}")
 endif()
@@ -122,11 +113,6 @@ add_custom_target(rocm_installer ALL
                   COMMAND echo "Copying version file"
                   COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/VERSION ${INSTALLER_DIRECTORY}/
                   COMMAND echo "Building rocm_installer")
-                  #COMMAND ${CMAKE_SOURCE_DIR}/build-installer.sh)
-#COMMAND makeself ${MAKESELF_OPTIONS} --nox11 ${INSTALLER_DIRECTORY} ${PACKAGE_NAME}.run "ROCm Runfile Installer" ./install_init.sh)
 
 # UI
 add_subdirectory(../UI UI)
-
-# Testing
-#add_subdirectory(tests)

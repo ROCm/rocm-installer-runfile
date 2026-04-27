@@ -322,6 +322,9 @@ write_version() {
         echo "$AMDGPU_DKMS_BUILD_NUM"
     } > "$VERSION_FILE"
 
+    # Copy VERSION file to rocm-installer directory for makeself --help-header
+    cp "$VERSION_FILE" "$EXTRACT_DIR/VERSION"
+
     echo "Installer name: $BUILD_INSTALLER_NAME"
 }
 
