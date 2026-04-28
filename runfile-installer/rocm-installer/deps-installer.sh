@@ -34,6 +34,10 @@ DEPS=
 
 USE_ROCM=0
 USE_AMDGPU=0
+USE_GRAPHICS=0      # Flag for graphics use case (amdgpu-lib)
+
+# GFX-specific and graphics dependencies
+INSTALL_GFX=""      # GFX architecture for kernel deps (e.g., gfx1150)
 
 MISSING_DEPS=
 MISSING_DEPS_COUNT=0
@@ -131,7 +135,46 @@ os_release() {
 
     DISTRO_VER=$(awk -F= '/^VERSION_ID=/{print $2}' /etc/os-release | tr -d '"')
     DISTRO_MAJOR_VER=${DISTRO_VER%.*}
+}
 
+get_os_codename() {
+    # Get Ubuntu codename for graphics repo
+    # Note: Debian uses Ubuntu repos - Debian 12 → jammy, Debian 13 → noble
+    # Supported: Ubuntu 22.04 (jammy), Ubuntu 24.04 (noble)
+
+    case "$DISTRO_NAME" in
+        ubuntu)
+            # For Ubuntu, use the actual codename
+            if [[ -r /etc/os-release ]]; then
+                local codename
+                codename=$(awk -F= '/^VERSION_CODENAME=/{print $2}' /etc/os-release | tr -d '"')
+                if [[ -n "$codename" ]]; then
+                    echo "$codename"
+                    return 0
+                fi
+            fi
+            # Fallback for Ubuntu based on version
+            case "$DISTRO_VER" in
+                24.04) echo "noble" ;;
+                22.04) echo "jammy" ;;
+                *) echo "unknown" ;;
+            esac
+            ;;
+        debian)
+            # Debian uses Ubuntu repos - map Debian version to Ubuntu codename
+            case "$DISTRO_MAJOR_VER" in
+                13) echo "noble" ;;   # Debian 13 → Ubuntu 24.04/noble
+                12) echo "jammy" ;;   # Debian 12 → Ubuntu 22.04/jammy
+                *) echo "unknown" ;;
+            esac
+            ;;
+        *)
+            echo "unknown"
+            ;;
+    esac
+}
+
+os_checks() {
     # Rocky 9 support only
     if [[ $DISTRO_VER != 9* ]] && [[ "$DISTRO_NAME" = "rocky" ]]; then
         echo "$DISTRO_NAME $DISTRO_VER is not a supported OS"
@@ -1078,6 +1121,33 @@ check_installed_kernel_packages() {
     echo Checking Kernel Packages...Complete.
 }
 
+check_installed_graphics_packages() {
+    local graphics_deps_file="$1"
+
+    echo "------------------------------------"
+    echo Checking Graphics Packages...
+
+    while IFS= read -r pkg; do
+        if [[ -n "$pkg" ]]; then
+            check_dep_version_installed "$pkg"
+            status=$?
+
+            if [ $status -eq 0 ]; then
+                echo -e "$pkg : \e[32mINSTALLED\e[0m"
+            else
+                if [[ "$MISSING_DEPS" != *"$pkg"* ]]; then
+                    echo -e "$pkg : \e[31mNOT INSTALLED\e[0m"
+                    MISSING_DEPS+="$pkg, "
+                    MISSING_DEPS_COUNT=$((MISSING_DEPS_COUNT+1))
+                fi
+            fi
+            DEPS_COUNT=$((DEPS_COUNT+1))
+        fi
+    done < "$graphics_deps_file"
+
+    echo Checking Graphics Packages...Complete.
+}
+
 check_installed_dep_packages() {
     # Check if each package dep in dependency file is installed on the system
     while IFS= read -r pkg; do
@@ -1127,9 +1197,6 @@ check_installed_dep_packages() {
             MISSING_DEPS_COUNT=$((MISSING_DEPS_COUNT+1))
         fi
     done < "$DEPS_FILE"
-
-    # Check if any kernel packages are installed on the system (if required)
-    check_installed_kernel_packages
 }
 
 remove_deps_duplicates() {
@@ -1763,6 +1830,205 @@ read_deps() {
     print_str "Read Dependency Configuration...Complete."
 }
 
+setup_graphics_repo() {
+    echo "------------------------------------"
+    echo "Setting up Graphics repo..."
+
+    # Read graphics version from file created by package extractor
+    local graphics_version_file="$PWD/component-rocm${CHROOT_SUFFIX}/deps/graphics/graphics_version.txt"
+
+    if [[ ! -f "$graphics_version_file" ]]; then
+        print_err "Graphics version file not found: $graphics_version_file"
+        return 1
+    fi
+
+    local graphics_version
+    graphics_version=$(cat "$graphics_version_file")
+    echo "Graphics version: $graphics_version"
+
+    if [[ $PACKAGE_TYPE == "deb" ]]; then
+        # Ubuntu/Debian setup
+        # Supported: Ubuntu 22.04 (jammy), Ubuntu 24.04 (noble), Debian 12 (jammy), Debian 13 (noble)
+
+        # Check for unsupported versions
+        case "$DISTRO_NAME" in
+            ubuntu)
+                case "$DISTRO_VER" in
+                    22.04|24.04)
+                        # Supported versions
+                        ;;
+                    *)
+                        print_err "Graphics support is not available for Ubuntu ${DISTRO_VER}"
+                        return 1
+                        ;;
+                esac
+                ;;
+            debian)
+                case "$DISTRO_MAJOR_VER" in
+                    12|13)
+                        # Supported versions
+                        ;;
+                    *)
+                        print_err "Graphics support is not available for Debian ${DISTRO_MAJOR_VER}"
+                        return 1
+                        ;;
+                esac
+                ;;
+        esac
+
+        # Get codename (noble, jammy, etc.)
+        local distro_codename
+        distro_codename=$(get_os_codename)
+
+        echo "Installing GPG key..."
+        $SUDO mkdir -p --mode=0755 /etc/apt/keyrings
+        wget https://repo.radeon.com/rocm/rocm.gpg.key -O - 2>/dev/null | gpg --dearmor | $SUDO tee /etc/apt/keyrings/rocm.gpg > /dev/null
+
+        echo "Creating graphics repository file..."
+        $SUDO tee /etc/apt/sources.list.d/amdgpu-graphics.list > /dev/null <<EOF
+deb [arch=amd64 signed-by=/etc/apt/keyrings/rocm.gpg] https://repo.radeon.com/graphics/${graphics_version}/ubuntu ${distro_codename} main
+EOF
+
+        echo "Updating package lists..."
+        $SUDO apt-get update > /dev/null 2>&1
+
+    elif [[ $PACKAGE_TYPE == "rpm" ]]; then
+        # RPM-based setup (RHEL, Rocky, AlmaLinux, SLES, Amazon Linux)
+        local distro_type
+        local distro_path
+
+        # Determine distro type and path based on distribution
+        case "$DISTRO_NAME" in
+            sles)
+                # SLES 15 uses: sle/15.7
+                # SLES 16+ not supported (dependency conflicts)
+                distro_type="sle"
+                case "$DISTRO_MAJOR_VER" in
+                    15)
+                        distro_path="${distro_type}/15.7"
+                        ;;
+                    *)
+                        # SLES 16 and newer not supported
+                        print_err "Graphics support is not available for SLES ${DISTRO_MAJOR_VER}"
+                        return 1
+                        ;;
+                esac
+                ;;
+            amzn)
+                # Amazon Linux uses: amzn/23
+                distro_type="amzn"
+                distro_path="${distro_type}/${DISTRO_MAJOR_VER}"
+                ;;
+            rhel|centos|ol|rocky|almalinux|anolis|tencentos|alinux)
+                # EL-based distros
+                distro_type="el"
+                case "$DISTRO_MAJOR_VER" in
+                    8)
+                        # EL 8 uses: el/8.10
+                        distro_path="${distro_type}/8.10"
+                        ;;
+                    10)
+                        # EL 10 uses: el/10
+                        distro_path="${distro_type}/10"
+                        ;;
+                    9)
+                        # EL 9 uses: el/9.<minor> (e.g., el/9.4, el/9.6, el/9.7)
+                        distro_path="${distro_type}/${DISTRO_VER}"
+                        ;;
+                    *)
+                        # Default fallback
+                        distro_path="${distro_type}/${DISTRO_VER}"
+                        ;;
+                esac
+                ;;
+            *)
+                print_err "Unsupported distribution for graphics repo: $DISTRO_NAME"
+                return 1
+                ;;
+        esac
+
+        # Setup repo based on package manager (dnf vs zypper)
+        if [ "$DISTRO_PACKAGE_MGR" == "dnf" ]; then
+            # DNF-based (RHEL, Rocky, Oracle, Amazon Linux) use /etc/yum.repos.d/
+            echo "Creating graphics repository file..."
+            $SUDO tee /etc/yum.repos.d/amdgpu-graphics.repo > /dev/null <<EOF
+[amdgraphics]
+name=AMD Graphics ${graphics_version} repository
+baseurl=https://repo.radeon.com/graphics/${graphics_version}/${distro_path}/main/x86_64/
+enabled=1
+priority=50
+gpgcheck=1
+gpgkey=https://repo.radeon.com/rocm/rocm.gpg.key
+EOF
+
+            echo "Cleaning package cache..."
+            $SUDO dnf clean all > /dev/null 2>&1
+        else
+            # SLES uses zypper with repos in /etc/zypp/repos.d/
+            echo "Creating graphics repository file..."
+            $SUDO tee /etc/zypp/repos.d/amdgpu-graphics.repo > /dev/null <<EOF
+[amdgraphics]
+name=AMD Graphics ${graphics_version} repository
+baseurl=https://repo.radeon.com/graphics/${graphics_version}/${distro_path}/main/x86_64/
+enabled=1
+priority=50
+gpgcheck=1
+gpgkey=https://repo.radeon.com/rocm/rocm.gpg.key
+type=rpm-md
+EOF
+
+            echo "Cleaning package cache..."
+            $SUDO zypper --gpg-auto-import-keys refresh > /dev/null 2>&1
+        fi
+    fi
+
+    echo "Graphics repo setup complete."
+    echo "------------------------------------"
+}
+
+cleanup_graphics_repo() {
+    echo "------------------------------------"
+    echo "Cleaning up Graphics repo..."
+
+    if [[ $PACKAGE_TYPE == "deb" ]]; then
+        # Remove repo list file
+        if [[ -f /etc/apt/sources.list.d/amdgpu-graphics.list ]]; then
+            echo "Removing graphics repo list..."
+            $SUDO rm /etc/apt/sources.list.d/amdgpu-graphics.list
+        fi
+
+        # Note: We don't remove the GPG key as it might be used by other ROCm repos
+
+        echo "Updating package lists..."
+        $SUDO apt-get update > /dev/null 2>&1
+
+    elif [[ $PACKAGE_TYPE == "rpm" ]]; then
+        # Remove repo file based on package manager
+        if [ "$DISTRO_PACKAGE_MGR" == "dnf" ]; then
+            # DNF-based (RHEL, Rocky, Oracle, Amazon Linux)
+            if [[ -f /etc/yum.repos.d/amdgpu-graphics.repo ]]; then
+                echo "Removing graphics repo file..."
+                $SUDO rm /etc/yum.repos.d/amdgpu-graphics.repo
+            fi
+
+            echo "Cleaning package cache..."
+            $SUDO dnf clean all > /dev/null 2>&1
+        else
+            # SLES uses zypper with repos in /etc/zypp/repos.d/
+            if [[ -f /etc/zypp/repos.d/amdgpu-graphics.repo ]]; then
+                echo "Removing graphics repo file..."
+                $SUDO rm /etc/zypp/repos.d/amdgpu-graphics.repo
+            fi
+
+            echo "Cleaning package cache..."
+            $SUDO zypper refresh > /dev/null 2>&1
+        fi
+    fi
+
+    echo "Graphics repo cleanup complete."
+    echo "------------------------------------"
+}
+
 build_dependencies_list_for_compo() {
     local compo_type=$1
     echo "------------------------------------"
@@ -1822,11 +2088,44 @@ build_dependencies_list_for_compo() {
        exit 1
     fi
 
+    # Read base dependencies
     if [[ $DEPS_LIST_ONLY == 1 ]]; then
         read_deps
     else
         # Build the the list of dependencies that are missing and require install
         check_installed_dep_packages
+    fi
+
+    # Add GFX-specific kernel dependencies if gfx= parameter was provided
+    # Note: OEM kernel (for APU GFX architectures) is only supported on Ubuntu 24.04
+    if [[ -n "$INSTALL_GFX" && "$compo_type" == "rocm" ]]; then
+        local gfx_deps_file="$deps_dir/deps/$INSTALL_GFX/required_deps_${INSTALL_GFX}.txt"
+
+        if [[ -f "$gfx_deps_file" ]]; then
+            # Check if this is Ubuntu 24.04 for OEM kernel support
+            if [[ "$DISTRO_NAME" == "ubuntu" && "$DISTRO_VER" == "24.04" ]]; then
+                print_str "GFX_DEPS_FILE = $gfx_deps_file"
+                DEPS_FILE="$gfx_deps_file"
+
+                if [[ $DEPS_LIST_ONLY == 1 ]]; then
+                    read_deps
+                else
+                    check_installed_dep_packages
+                fi
+            else
+                # OEM kernel only supported on Ubuntu 24.04 - show message to user
+                echo "GFX-specific kernel dependencies (OEM kernel) only supported on Ubuntu 24.04"
+                echo "Current OS: $DISTRO_NAME $DISTRO_VER - skipping kernel dependencies"
+            fi
+        else
+            # No GFX-specific deps for this architecture - this is normal
+            print_str "No GFX-specific dependencies for $INSTALL_GFX (file not found: $gfx_deps_file)"
+        fi
+    fi
+
+    # Check kernel packages only for AMDGPU component (not ROCm)
+    if [[ $DEPS_LIST_ONLY == 0 && "$compo_type" == "amdgpu" ]]; then
+        check_installed_kernel_packages
     fi
 }
 
@@ -1850,6 +2149,55 @@ build_dependencies_list() {
 
         # filter out any duplicate packages
         remove_deps_duplicates
+    fi
+
+    # build the list of missing deps for graphics packages
+    if [[ $USE_GRAPHICS -eq 1 ]]; then
+        echo "------------------------------------"
+        print_str "Building Dependency List for: graphics"
+
+        # Determine the graphics deps directory and file using same logic as ROCm components
+        local graphics_deps_dir
+        local graphics_deps_suffix
+        local graphics_deps_file
+
+        if [ "$PACKAGE_TYPE" == "rpm" ]; then
+            # For RPM packages, always use component-rocm
+            graphics_deps_dir="$PWD/component-rocm"
+            graphics_deps_suffix="rpm"
+        else
+            # For DEB packages, check if component-rocm-deb exists (chroot mode)
+            # Otherwise fall back to component-rocm (native DEB system)
+            if [ -d "$PWD/component-rocm-deb" ]; then
+                graphics_deps_dir="$PWD/component-rocm-deb"
+            else
+                graphics_deps_dir="$PWD/component-rocm"
+            fi
+            graphics_deps_suffix="deb"
+        fi
+
+        graphics_deps_file="$graphics_deps_dir/deps/graphics/graphics_required_deps_${graphics_deps_suffix}.txt"
+
+        if [[ -f "$graphics_deps_file" ]]; then
+            print_str "GRAPHICS_DEPS_FILE = $graphics_deps_file"
+
+            # Setup graphics repository only when actually installing (not for list/validate)
+            if [[ $INSTALL_DEPS -eq 1 ]]; then
+                setup_graphics_repo
+            fi
+
+            if [[ $DEPS_LIST_ONLY == 1 ]]; then
+                # Just read and display graphics deps for list mode
+                DEPS_FILE="$graphics_deps_file"
+                read_deps
+            else
+                # Check graphics package installation status
+                check_installed_graphics_packages "$graphics_deps_file"
+            fi
+        else
+            print_err "Graphics dependencies file not found: $graphics_deps_file"
+            exit 1
+        fi
     fi
 
     print_deps
@@ -2031,6 +2379,11 @@ install_dependencies() {
         fi
     fi
 
+    # Cleanup graphics repo if it was set up
+    if [[ $USE_GRAPHICS -eq 1 ]]; then
+        cleanup_graphics_repo
+    fi
+
     cleanup
 
     print_no_err "Dependencies Installed."
@@ -2059,6 +2412,7 @@ SUDO=""
 [[ $(id -u) -ne 0 ]] && SUDO="sudo"
 
 os_release
+os_checks
 
 if [ "$#" -lt 1 ]; then
    echo Missing argument
@@ -2109,6 +2463,16 @@ do
         NO_CMD_OUTPUT=""
         shift
         ;;
+    gfx=*)
+        INSTALL_GFX="${1#*=}"
+        echo "Using GFX architecture: $INSTALL_GFX"
+        shift
+        ;;
+    graphics)
+        echo "Enabling graphics support (amdgpu-lib)"
+        USE_GRAPHICS=1
+        shift
+        ;;
     *)
         shift
         ;;
@@ -2122,7 +2486,7 @@ if [[ -n $DEPS_FILE ]]; then
     exit 0
 fi
 
-if [[ $USE_AMDGPU == 0 ]] && [[ $USE_ROCM == 0 ]]; then
+if [[ $USE_AMDGPU == 0 ]] && [[ $USE_ROCM == 0 ]] && [[ $USE_GRAPHICS == 0 ]]; then
     print_err "Missing argument for components directory."
     exit 1
 fi

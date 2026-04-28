@@ -54,6 +54,16 @@ EXTRACT_GLOBAL_DEPS_FILE="global_deps.txt"         # list all extracted dependen
 EXTRA_DEPS=(python3-yaml)
 INSTALLER_DEPS=(rsync)
 
+# Kernel dependencies for specific GFX architectures (APUs requiring OEM kernel)
+# Note: OEM kernel is only required for Ubuntu 24.04 with Ryzen APUs
+EXTRA_KERNEL_DEPS=(linux-image-6.14.0-1018-oem)
+EXTRA_KERNEL_GFX=(gfx1103 gfx1150 gfx1151 gfx1152 gfx1153)
+
+# Graphics dependencies (Mesa/amdgpu-lib for graphics use case)
+# Note: Only 64-bit library included. 32-bit (amdgpu-lib32) only needed for 32-bit app support.
+EXTRA_GRAPHICS_DEPS=(amdgpu-lib)
+EXTRA_GRAPHICS_VER="7.2.1"
+
 # Logs
 EXTRACT_LOGS_DIR="$PWD/logs"
 EXTRACT_CURRENT_LOG="$EXTRACT_LOGS_DIR/extract_$(date +%s).log"
@@ -694,6 +704,83 @@ add_extra_deps() {
     echo ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 }
 
+add_kernel_deps() {
+    echo ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    echo Kernel Dependencies for GFX Architectures...
+
+    # Create GFX-specific kernel dependency files for APUs requiring OEM kernel
+    # Only create for GFX architectures that were actually extracted
+    for gfx_arch in "${EXTRA_KERNEL_GFX[@]}"; do
+        local gfx_deps_dir="$EXTRACT_DEPS_DIR/$gfx_arch"
+
+        # Check if this GFX architecture was actually extracted
+        if [[ ! -d "$gfx_deps_dir" ]]; then
+            echo "Skipping $gfx_arch (not extracted)"
+            continue
+        fi
+
+        local gfx_deps_file="$gfx_deps_dir/required_deps_${gfx_arch}.txt"
+
+        echo "Creating kernel dependencies for $gfx_arch"
+
+        # Write kernel dependencies to GFX-specific file
+        true > "$gfx_deps_file"  # Clear file
+        for pkg in "${EXTRA_KERNEL_DEPS[@]}"; do
+            echo "    $gfx_arch: $pkg"
+            echo "$pkg" >> "$gfx_deps_file"
+        done
+    done
+
+    # Create OEM kernel architectures metadata file
+    local oem_archs_file="$EXTRACT_DEPS_DIR/oem-kernel-archs.txt"
+    echo "Creating OEM kernel architectures metadata file: $oem_archs_file"
+
+    cat > "$oem_archs_file" << 'EOF'
+# OEM Kernel Architectures
+# These AMD Ryzen APU architectures use in-box OEM kernels instead of AMDGPU driver
+# Supported only on Ubuntu 24.04 with kernel 6.14.0-1018-oem
+#
+# Format: One architecture per line (gfxXYZ)
+# This file is auto-generated during package extraction
+
+EOF
+
+    # Add each OEM kernel architecture from EXTRA_KERNEL_GFX array
+    for gfx_arch in "${EXTRA_KERNEL_GFX[@]}"; do
+        echo "$gfx_arch" >> "$oem_archs_file"
+        echo "    Added $gfx_arch to OEM kernel metadata"
+    done
+
+    echo Kernel Dependencies...Complete.
+    echo ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+}
+
+add_graphics_deps() {
+    echo ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    echo Graphics Dependencies...
+
+    local graphics_deps_dir="$EXTRACT_DEPS_DIR/graphics"
+    local graphics_deps_file="$graphics_deps_dir/graphics_required_deps_deb.txt"
+    local graphics_version_file="$graphics_deps_dir/graphics_version.txt"
+
+    echo "Creating graphics dependencies directory"
+    mkdir -p "$graphics_deps_dir"
+
+    # Write graphics dependencies (amdgpu-lib packages)
+    true > "$graphics_deps_file"  # Clear file
+    for pkg in "${EXTRA_GRAPHICS_DEPS[@]}"; do
+        echo "    $pkg"
+        echo "$pkg" >> "$graphics_deps_file"
+    done
+
+    # Write graphics version for deps-installer to use in repo setup
+    echo "$EXTRA_GRAPHICS_VER" > "$graphics_version_file"
+    echo "Graphics version: $EXTRA_GRAPHICS_VER"
+
+    echo Graphics Dependencies...Complete.
+    echo ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+}
+
 check_package_owner() {
     AMDPKG=0
 
@@ -1178,7 +1265,7 @@ extract_rocm_debs() {
             extract_package
         done
 
-        add_extra_deps
+        add_kernel_deps
 
         write_extract_info
         filter_deps_version
@@ -1196,6 +1283,11 @@ extract_rocm_debs() {
     # Combine dependencies from all component-rocm subdirectories
     echo ""
     combine_deps
+
+    # Add extra and graphics dependencies (not GFX-specific)
+    echo ""
+    add_extra_deps
+    add_graphics_deps
 
     # Combine components list from all component-rocm subdirectories
     echo ""

@@ -36,9 +36,10 @@
 // config menu indices
 #define PRE_MENU_ITEM_DEPS_ROCM_INDEX        0
 #define PRE_MENU_ITEM_DEPS_DRIVER_INDEX      1
-#define PRE_MENU_ITEM_DEPS_LIST_INDEX        3
-#define PRE_MENU_ITEM_DEPS_VALIDATE_INDEX    4
-#define PRE_MENU_ITEM_DEPS_INSTALL_INDEX     5
+#define PRE_MENU_ITEM_DEPS_GRAPHICS_INDEX    2
+#define PRE_MENU_ITEM_DEPS_LIST_INDEX        4
+#define PRE_MENU_ITEM_DEPS_VALIDATE_INDEX    5
+#define PRE_MENU_ITEM_DEPS_INSTALL_INDEX     6
 
 // Dependency settings
 #define DEPS_OUT_FILE       "deps_list.txt"

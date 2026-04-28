@@ -7,6 +7,11 @@
   Enabled/Disable amdgpu Driver required dependencies for
   display/validate/install.
 
+[H2]Graphics
+  Enable/Disable graphics libraries (Mesa/amdgpu-lib) required dependencies
+  for display/validate/install. Intended for desktop GPUs (non-Instinct) with
+  graphical environments. Not needed for headless compute workloads.
+
 [H1]Dependency Management:
 
 [H2]Display Dependencies

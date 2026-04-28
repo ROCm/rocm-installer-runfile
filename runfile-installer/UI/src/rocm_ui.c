@@ -279,6 +279,35 @@ int detect_gpus(GPU_DETECTION *gpu_detect)
 }
 
 /**
+ * detect_oem_kernel_arch - Detect if GPU requires OEM kernel
+ * @gpu_detect: Pointer to GPU detection structure
+ *
+ * Checks if the detected GPU architecture requires OEM kernel by looking
+ * for the existence of required_deps_gfxXYZ.txt file.
+ */
+void detect_oem_kernel_arch(GPU_DETECTION *gpu_detect)
+{
+    gpu_detect->is_oem_kernel_arch = false;
+
+    if (!gpu_detect->detected || gpu_detect->num_gpus == 0)
+    {
+        return;
+    }
+
+    const char *gfx_arch = gpu_detect->gpus[0].gfx_arch;
+
+    // Check for OEM kernel dependencies file
+    char oem_deps_file[512];
+    snprintf(oem_deps_file, sizeof(oem_deps_file),
+             "./component-rocm/deps/%s/required_deps_%s.txt", gfx_arch, gfx_arch);
+
+    if (access(oem_deps_file, F_OK) == 0)
+    {
+        gpu_detect->is_oem_kernel_arch = true;
+    }
+}
+
+/**
  * read_version_file - Read installer version information from VERSION file
  * @pConfig: Pointer to configuration structure to populate
  *
@@ -724,6 +753,9 @@ int main()
 
     // Detect AMD GPUs
     detect_gpus(&g_pConfig->gpu_detection);
+
+    // Detect if GPU requires OEM kernel
+    detect_oem_kernel_arch(&g_pConfig->gpu_detection);
 
     // Set TERMINFO path for static ncurses compatibility across distros
     // Static ncurses built on AlmaLinux 8.10 looks for terminfo in /usr/share/terminfo

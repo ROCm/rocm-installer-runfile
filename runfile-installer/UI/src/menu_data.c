@@ -1629,7 +1629,7 @@ void draw_progress_bar(WINDOW *win, int percentage, int show)
     {
         if (i < bar_width)
         {
-            waddch(win, '=');
+            waddch(win, '#');
         }
         else
         {

@@ -13,6 +13,8 @@
 #   gfx110x - RX 7900/7800/7700/7600, Ryzen 7000 APU (RDNA3)
 #   gfx1150 - Ryzen AI 300 Strix Point (Radeon 880M/890M)
 #   gfx1151 - Ryzen AI Max Strix Halo (RDNA3.5)
+#   gfx1152 - Krackan1 APU (RDNA3.5)
+#   gfx1153 - Krackan2 APU (RDNA3.5)
 #   gfx120x - RX 9070 series (RDNA4)
 #
 # Detection Methods (in priority order):
@@ -214,6 +216,8 @@ map_gfx_to_package_group() {
         gfx1100|gfx1101|gfx1102|gfx1103) echo "gfx110x" ;;  # RX 7000 series
         gfx1150)               echo "gfx1150" ;;  # Ryzen AI 300
         gfx1151)               echo "gfx1151" ;;  # Ryzen AI Max
+        gfx1152)               echo "gfx1152" ;;  # Krackan1 APU
+        gfx1153)               echo "gfx1153" ;;  # Krackan2 APU
 
         # RDNA4
         gfx1200|gfx1201)       echo "gfx120x" ;;  # RX 9070 series
@@ -284,8 +288,12 @@ map_device_id_to_gfx() {
         150e) echo "gfx1150" ;;
         # APU - Ryzen AI Max Strix Halo (RDNA3.5)
         1586) echo "gfx1151" ;;
-        # APU - Future variant
+        # APU - Krackan (RDNA3.5) - Note: 0x17f0 from XDNA/NPU reference
+        17f0) echo "gfx1152" ;;
         1114) echo "gfx1152" ;;
+        # APU - Krackan2 variant (RDNA3.5)
+        # Note: No known PCI device ID yet - using placeholder
+        # <placeholder>) echo "gfx1153" ;;
 
         # APU - Ryzen 6000 (RDNA2)
         164d|1681) echo "gfx1035" ;;
@@ -800,8 +808,38 @@ if [[ -n "$OUTPUT_FORMAT" ]]; then
 
     case "$OUTPUT_FORMAT" in
         all|gfx|device-id|revision|name)
+            # Output the results
             output_results "$OUTPUT_FORMAT"
-            exit $?
+
+            # Determine correct exit code based on unique GFX architectures
+            unique_gfx=()
+            for gfx in "${GPU_GFX[@]}"; do
+                # Check for unknown/unsupported architectures
+                if [[ "$gfx" == "unknown" ]]; then
+                    exit 2  # AMD GPU detected but architecture unknown
+                fi
+
+                # Build unique GFX list
+                if [[ $DEDUPLICATE == 1 ]]; then
+                    # With --unique, we already deduplicated in output, so check the actual unique count
+                    pattern=" $gfx "
+                    if [[ ! " ${unique_gfx[*]} " =~ $pattern ]]; then
+                        unique_gfx+=("$gfx")
+                    fi
+                else
+                    # Without --unique, count all GPUs
+                    unique_gfx+=("$gfx")
+                fi
+            done
+
+            # Determine exit code
+            if [[ ${#unique_gfx[@]} -eq 0 ]]; then
+                exit 1  # No GPU detected
+            elif [[ $DEDUPLICATE == 1 && ${#unique_gfx[@]} -gt 1 ]]; then
+                exit 3  # Multiple different architectures (after deduplication)
+            else
+                exit 0  # Success (single unique arch, or multiple GPUs without deduplication)
+            fi
             ;;
         *)
             print_error "Unknown output format: $OUTPUT_FORMAT"

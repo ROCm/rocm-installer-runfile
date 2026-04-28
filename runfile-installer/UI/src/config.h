@@ -51,6 +51,7 @@ typedef struct _PRE_MENU_CONFIG
 {
     bool rocm_deps;
     bool driver_deps;
+    bool graphics_deps;
 }PRE_MENU_CONFIG;
 
 /* ROCm Menu Configuration **********************************************************************/
@@ -124,6 +125,7 @@ typedef struct _GPU_DETECTION
     GPU_INFO gpus[MAX_GPUS]; // Array of detected GPUs
     int status;              // 0=success, 1=no GPU, 2=unknown, 3=mixed archs
     bool detected;           // true if detection was attempted
+    bool is_oem_kernel_arch; // true if GPU requires OEM kernel (APU archs)
 } GPU_DETECTION;
 
 /* Global Configuration ************************************************************************/

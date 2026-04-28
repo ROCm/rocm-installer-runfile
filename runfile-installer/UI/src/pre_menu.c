@@ -26,8 +26,9 @@
 
 // Pre Install Menu Setup
 char *preMenuOps[] = {
-    "ROCm   [ ]",
-    "Driver [ ]",
+    "ROCm     [ ]",
+    "Driver   [ ]",
+    "Graphics [ ]",
     SKIPPABLE_MENU_ITEM,
     "    Display  Dependencies",
     "    Validate Dependencies",
@@ -41,6 +42,7 @@ char *preMenuOps[] = {
 char *preMenuDesc[] = {
     "Select for ROCm dependencies.",
     "Select for amdgpu dependencies.",
+    "Select for graphics libs (Mesa) dependencies.",
     " ",
     "Display a list of all required dependencies.",
     "Validate required dependencies.",
@@ -145,20 +147,73 @@ void draw_deps_selections()
 
     if (g_pPreConfig->rocm_deps)
     {
-        mvwprintw(pWin, PRE_MENU_ITEM_START_Y+0, PRE_MENU_ITEM_START_X+11, "%s", "X");
+        mvwprintw(pWin, PRE_MENU_ITEM_START_Y+0, PRE_MENU_ITEM_START_X+13, "%s", "X");
     }
     else
     {
-        mvwprintw(pWin, PRE_MENU_ITEM_START_Y+0, PRE_MENU_ITEM_START_X+11, "%s", " ");
+        mvwprintw(pWin, PRE_MENU_ITEM_START_Y+0, PRE_MENU_ITEM_START_X+13, "%s", " ");
     }
 
     if (g_pPreConfig->driver_deps)
     {
-        mvwprintw(pWin, PRE_MENU_ITEM_START_Y+1, PRE_MENU_ITEM_START_X+11, "%s", "X");
+        mvwprintw(pWin, PRE_MENU_ITEM_START_Y+1, PRE_MENU_ITEM_START_X+13, "%s", "X");
     }
     else
     {
-        mvwprintw(pWin, PRE_MENU_ITEM_START_Y+1, PRE_MENU_ITEM_START_X+11, "%s", " ");
+        mvwprintw(pWin, PRE_MENU_ITEM_START_Y+1, PRE_MENU_ITEM_START_X+13, "%s", " ");
+    }
+
+    if (g_pPreConfig->graphics_deps)
+    {
+        mvwprintw(pWin, PRE_MENU_ITEM_START_Y+2, PRE_MENU_ITEM_START_X+13, "%s", "X");
+    }
+    else
+    {
+        mvwprintw(pWin, PRE_MENU_ITEM_START_Y+2, PRE_MENU_ITEM_START_X+13, "%s", " ");
+    }
+}
+
+void draw_oem_kernel_info()
+{
+    WINDOW *pWin = menuPre.pMenuWindow;
+
+    // Only show OEM kernel info for GPUs with OEM kernel dependencies
+    if (!g_pConfig->gpu_detection.is_oem_kernel_arch)
+    {
+        return;  // Not an OEM kernel arch, nothing to display
+    }
+
+    const char *gfx_arch = g_pConfig->gpu_detection.gpus[0].gfx_arch;
+    bool is_ubuntu_2404 = (strcmp(g_pConfig->distroID, "ubuntu") == 0 &&
+                           strcmp(g_pConfig->distroVersion, "24.04") == 0);
+
+    int info_y = WIN_NUM_LINES - 7;  // Position above bottom of window
+
+    // Clear the OEM kernel message area first (use spaces to avoid clearing box border)
+    mvwprintw(pWin, info_y, 3, "%*s", WIN_WIDTH_COLS - 5, "");
+    mvwprintw(pWin, info_y+1, 3, "%*s", WIN_WIDTH_COLS - 5, "");
+
+    // Show green message when ROCm is selected on Ubuntu 24.04
+    if (is_ubuntu_2404 && g_pPreConfig->rocm_deps)
+    {
+        wattron(pWin, GREEN);
+        mvwprintw(pWin, info_y, 3, "OEM kernel 6.14.0-1018-oem for %s included in ROCm dependencies.", gfx_arch);
+        wattroff(pWin, GREEN);
+    }
+    // Show warning when ROCm is selected on non-Ubuntu 24.04
+    else if (!is_ubuntu_2404 && g_pPreConfig->rocm_deps)
+    {
+        wattron(pWin, YELLOW);
+        mvwprintw(pWin, info_y, 3, "WARNING: %s requires Ubuntu 24.04. OEM kernel will not be installed.", gfx_arch);
+        wattroff(pWin, YELLOW);
+    }
+
+    // Show warning when Driver is selected (OEM kernel archs don't support AMDGPU install)
+    if (g_pPreConfig->driver_deps)
+    {
+        wattron(pWin, YELLOW);
+        mvwprintw(pWin, info_y+1, 3, "WARNING: Driver installation not supported for %s architecture.", gfx_arch);
+        wattroff(pWin, YELLOW);
     }
 }
 
@@ -192,6 +247,8 @@ void pre_menu_draw()
     menu_draw(&menuPre);
 
     draw_deps_selections();
+
+    draw_oem_kernel_info();
 }
 
 void do_pre_menu()
@@ -237,7 +294,7 @@ void draw_window_title(WINDOW *pWin, char *pTitle)
     wrefresh(pWin);
 }
 
-int execute_cmd_with_progress(const char *script, const char *arg1, const char *arg2, const char *arg3)
+int execute_cmd_with_progress(const char *script, const char *arg1, const char *arg2, const char *arg3, const char *arg4)
 {
     int height = 3;
     int width = PROGRESS_BAR_WIDTH + 5;
@@ -262,7 +319,7 @@ int execute_cmd_with_progress(const char *script, const char *arg1, const char *
 
         dup2(fd, 1);
 
-        execl("/bin/bash", "bash", script, arg1, arg2, arg3, NULL);
+        execl("/bin/bash", "bash", script, arg1, arg2, arg3, arg4, NULL);
 
         exit(1); // exit if execl fails
     }
@@ -346,34 +403,68 @@ void process_pre_menu()
             g_pPreConfig->rocm_deps = !g_pPreConfig->rocm_deps;
             draw_deps_selections();
 
-            pre_menu_toggle_grey_items( (g_pPreConfig->rocm_deps | g_pPreConfig->driver_deps) );
+            pre_menu_toggle_grey_items( (g_pPreConfig->rocm_deps | g_pPreConfig->driver_deps | g_pPreConfig->graphics_deps) );
         }
         else if (index == PRE_MENU_ITEM_DEPS_DRIVER_INDEX)
         {
             g_pPreConfig->driver_deps = !g_pPreConfig->driver_deps;
             draw_deps_selections();
 
-            pre_menu_toggle_grey_items( (g_pPreConfig->rocm_deps | g_pPreConfig->driver_deps) );
+            pre_menu_toggle_grey_items( (g_pPreConfig->rocm_deps | g_pPreConfig->driver_deps | g_pPreConfig->graphics_deps) );
+        }
+        else if (index == PRE_MENU_ITEM_DEPS_GRAPHICS_INDEX)
+        {
+            g_pPreConfig->graphics_deps = !g_pPreConfig->graphics_deps;
+            draw_deps_selections();
+
+            pre_menu_toggle_grey_items( (g_pPreConfig->rocm_deps | g_pPreConfig->driver_deps | g_pPreConfig->graphics_deps) );
         }
         else if (index == PRE_MENU_ITEM_DEPS_LIST_INDEX) // list
         {
-            char *pTitle;
+            char *pTitle = "Dependencies";
 
             // set the components to list
             if (g_pPreConfig->rocm_deps)
             {
                 strncat(components, "rocm ", SMALL_CHAR_SIZE - strlen(components) - 1);
-                pTitle = "ROCm Dependencies";
             }
             if (g_pPreConfig->driver_deps)
             {
-                strncat(components, "amdgpu", SMALL_CHAR_SIZE - strlen(components) - 1);
-                pTitle = "amdgpu driver Dependencies";
+                strncat(components, "amdgpu ", SMALL_CHAR_SIZE - strlen(components) - 1);
+            }
+            if (g_pPreConfig->graphics_deps)
+            {
+                strncat(components, "graphics ", SMALL_CHAR_SIZE - strlen(components) - 1);
             }
 
-            if (g_pPreConfig->rocm_deps && g_pPreConfig->driver_deps)
+            // Build descriptive title based on selections
+            if (g_pPreConfig->rocm_deps && !g_pPreConfig->driver_deps && !g_pPreConfig->graphics_deps)
+            {
+                pTitle = "ROCm Dependencies";
+            }
+            else if (!g_pPreConfig->rocm_deps && g_pPreConfig->driver_deps && !g_pPreConfig->graphics_deps)
+            {
+                pTitle = "amdgpu driver Dependencies";
+            }
+            else if (!g_pPreConfig->rocm_deps && !g_pPreConfig->driver_deps && g_pPreConfig->graphics_deps)
+            {
+                pTitle = "Graphics Dependencies";
+            }
+            else if (g_pPreConfig->rocm_deps && g_pPreConfig->driver_deps && !g_pPreConfig->graphics_deps)
             {
                 pTitle = "ROCm and amdgpu driver Dependencies";
+            }
+            else if (g_pPreConfig->rocm_deps && !g_pPreConfig->driver_deps && g_pPreConfig->graphics_deps)
+            {
+                pTitle = "ROCm and Graphics Dependencies";
+            }
+            else if (!g_pPreConfig->rocm_deps && g_pPreConfig->driver_deps && g_pPreConfig->graphics_deps)
+            {
+                pTitle = "amdgpu driver and Graphics Dependencies";
+            }
+            else if (g_pPreConfig->rocm_deps && g_pPreConfig->driver_deps && g_pPreConfig->graphics_deps)
+            {
+                pTitle = "ROCm, amdgpu driver, and Graphics Dependencies";
             }
 
             sprintf(args, "deps=list %s", components);
@@ -393,37 +484,56 @@ void process_pre_menu()
 
             draw_window_title(pWin, "Validate Dependencies");
 
-            char arg1[SMALL_CHAR_SIZE];
-            char arg2[SMALL_CHAR_SIZE];
-            clear_str(arg1);
-            clear_str(arg2);
+            char arg1[SMALL_CHAR_SIZE] = {0};
+            char arg2[SMALL_CHAR_SIZE] = {0};
+            char arg3[SMALL_CHAR_SIZE] = {0};
 
             char *pArg1 = NULL;
             char *pArg2 = NULL;
+            char *pArg3 = NULL;
 
             // set the components to validate
             if (g_pPreConfig->rocm_deps)
             {
-                strncat(arg1, "rocm", SMALL_CHAR_SIZE - strlen(arg1) - 1);
+                strncpy(arg1, "rocm", SMALL_CHAR_SIZE - 1);
                 pArg1 = arg1;
             }
 
             if (g_pPreConfig->driver_deps)
             {
-                if (strlen(arg1) > 0)
+                if (pArg1 != NULL)
                 {
-                    strncat(arg2, "amdgpu", SMALL_CHAR_SIZE - strlen(arg2) - 1);
+                    strncpy(arg2, "amdgpu", SMALL_CHAR_SIZE - 1);
                     pArg2 = arg2;
                 }
                 else
                 {
-                    strncat(arg1, "amdgpu", SMALL_CHAR_SIZE - strlen(arg1) - 1);
+                    strncpy(arg1, "amdgpu", SMALL_CHAR_SIZE - 1);
+                    pArg1 = arg1;
+                }
+            }
+
+            if (g_pPreConfig->graphics_deps)
+            {
+                if (pArg1 != NULL && pArg2 != NULL)
+                {
+                    strncpy(arg3, "graphics", SMALL_CHAR_SIZE - 1);
+                    pArg3 = arg3;
+                }
+                else if (pArg1 != NULL)
+                {
+                    strncpy(arg2, "graphics", SMALL_CHAR_SIZE - 1);
+                    pArg2 = arg2;
+                }
+                else
+                {
+                    strncpy(arg1, "graphics", SMALL_CHAR_SIZE - 1);
                     pArg1 = arg1;
                 }
             }
 
             // run the dependency validate command
-            if (execute_cmd_with_progress("./rocm-installer.sh", "deps=validate", pArg1, pArg2) == 0)
+            if (execute_cmd_with_progress("./rocm-installer.sh", "deps=validate", pArg1, pArg2, pArg3) == 0)
             {
                 if (display_scroll_window("Validate Dependencies", "Missing:", DEPS_OUT_FILE, &numDeps) != 0)
                 {
@@ -444,8 +554,10 @@ void process_pre_menu()
         else if (index == PRE_MENU_ITEM_DEPS_INSTALL_INDEX) // Install
         {
             // set the components to install
+            clear_str(components);
             if (g_pPreConfig->rocm_deps) strncat(components, "rocm ", SMALL_CHAR_SIZE - strlen(components) - 1);
-            if (g_pPreConfig->driver_deps) strncat(components, "amdgpu", SMALL_CHAR_SIZE - strlen(components) - 1);
+            if (g_pPreConfig->driver_deps) strncat(components, "amdgpu ", SMALL_CHAR_SIZE - strlen(components) - 1);
+            if (g_pPreConfig->graphics_deps) strncat(components, "graphics ", SMALL_CHAR_SIZE - strlen(components) - 1);
             sprintf(args, "deps=install-only %s", components);
 
             // run the dependency install command

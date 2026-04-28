@@ -241,9 +241,30 @@ void driver_status_draw()
 
 void driver_menu_draw()
 {
+    WINDOW *pMenuWindow = menuDriver.pMenuWindow;
 
     menu_info_draw_bool(&menuDriver, DRIVER_MENU_ITEM_INSTALL_DRIVER_ROW, DRIVER_MENU_FORM_COL, g_pDriverConfig->install_driver);
     menu_info_draw_bool(&menuDriver, DRIVER_MENU_ITEM_START_DRIVER_ROW, DRIVER_MENU_FORM_COL, g_pDriverConfig->start_driver);
+
+    // Show OEM kernel warning if applicable
+    if (g_pConfig->gpu_detection.is_oem_kernel_arch && g_pDriverConfig->install_driver)
+    {
+        const char *gfx_arch = g_pConfig->gpu_detection.gpus[0].gfx_arch;
+        int warn_y = WIN_NUM_LINES - 6;
+
+        // Clear warning area
+        mvwprintw(pMenuWindow, warn_y, 3, "%*s", WIN_WIDTH_COLS - 5, "");
+
+        wattron(pMenuWindow, YELLOW);
+        mvwprintw(pMenuWindow, warn_y, 3, "WARNING: Driver installation not supported for %s architecture.", gfx_arch);
+        wattroff(pMenuWindow, YELLOW);
+    }
+    else
+    {
+        // Clear warning area when driver install is disabled
+        int warn_y = WIN_NUM_LINES - 6;
+        mvwprintw(pMenuWindow, warn_y, 3, "%*s", WIN_WIDTH_COLS - 5, "");
+    }
 
     menu_draw(&menuDriver);
 }

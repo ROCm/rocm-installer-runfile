@@ -521,6 +521,32 @@ void rocm_menu_draw()
 
     rocm_status_draw();
 
+    // Show OEM kernel warning if applicable
+    if (g_pConfig->gpu_detection.is_oem_kernel_arch && g_pRocmConfig->install_rocm)
+    {
+        const char *gfx_arch = g_pConfig->gpu_detection.gpus[0].gfx_arch;
+        bool is_ubuntu_2404 = (strcmp(g_pConfig->distroID, "ubuntu") == 0 &&
+                               strcmp(g_pConfig->distroVersion, "24.04") == 0);
+
+        int warn_y = WIN_NUM_LINES - 6;
+
+        // Clear warning area
+        mvwprintw(pMenuWindow, warn_y, 3, "%*s", WIN_WIDTH_COLS - 5, "");
+
+        if (!is_ubuntu_2404)
+        {
+            wattron(pMenuWindow, YELLOW);
+            mvwprintw(pMenuWindow, warn_y, 3, "WARNING: %s requires Ubuntu 24.04. ROCm will not be installed.", gfx_arch);
+            wattroff(pMenuWindow, YELLOW);
+        }
+    }
+    else
+    {
+        // Clear warning area if install_rocm is false
+        int warn_y = WIN_NUM_LINES - 6;
+        mvwprintw(pMenuWindow, warn_y, 3, "%*s", WIN_WIDTH_COLS - 5, "");
+    }
+
     menu_draw(&menuROCm);
 }
 
