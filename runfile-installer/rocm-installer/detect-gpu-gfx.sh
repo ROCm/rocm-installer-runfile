@@ -14,7 +14,6 @@
 #   gfx1150 - Ryzen AI 300 Strix Point (Radeon 880M/890M)
 #   gfx1151 - Ryzen AI Max Strix Halo (RDNA3.5)
 #   gfx1152 - Krackan1 APU (RDNA3.5)
-#   gfx1153 - Krackan2 APU (RDNA3.5)
 #   gfx120x - RX 9070 series (RDNA4)
 #
 # Detection Methods (in priority order):
@@ -217,7 +216,6 @@ map_gfx_to_package_group() {
         gfx1150)               echo "gfx1150" ;;  # Ryzen AI 300
         gfx1151)               echo "gfx1151" ;;  # Ryzen AI Max
         gfx1152)               echo "gfx1152" ;;  # Krackan1 APU
-        gfx1153)               echo "gfx1153" ;;  # Krackan2 APU
 
         # RDNA4
         gfx1200|gfx1201)       echo "gfx120x" ;;  # RX 9070 series
@@ -291,9 +289,6 @@ map_device_id_to_gfx() {
         # APU - Krackan (RDNA3.5) - Note: 0x17f0 from XDNA/NPU reference
         17f0) echo "gfx1152" ;;
         1114) echo "gfx1152" ;;
-        # APU - Krackan2 variant (RDNA3.5)
-        # Note: No known PCI device ID yet - using placeholder
-        # <placeholder>) echo "gfx1153" ;;
 
         # APU - Ryzen 6000 (RDNA2)
         164d|1681) echo "gfx1035" ;;
