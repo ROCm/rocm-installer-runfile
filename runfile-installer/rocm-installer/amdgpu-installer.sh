@@ -327,7 +327,7 @@ install_postinst_scriptlet() {
             cat "$postinst_scriptlet"
         fi
 
-        $SUDO_OPTS "$postinst_scriptlet" "$INSTALL_SCRIPTLET_ARG"
+        $SUDO_OPTS bash "$postinst_scriptlet" "$INSTALL_SCRIPTLET_ARG"
 
         echo -e "\e[92mComplete: $?\e[0m"
     fi
@@ -372,7 +372,7 @@ uninstall_postrm_scriptlet() {
             cat "$postrm_scriptlet"
         fi
 
-        $SUDO_OPTS "$postrm_scriptlet" "$UNINSTALL_SCRIPTLET_ARG"
+        $SUDO_OPTS bash "$postrm_scriptlet" "$UNINSTALL_SCRIPTLET_ARG"
 
         echo -e "\e[92mComplete: $?\e[0m"
     fi
@@ -509,7 +509,7 @@ uninstall_prerm_scriptlet_amdgpu() {
             cat "$prerm_scriptlet"
         fi
 
-        $SUDO_OPTS "$prerm_scriptlet" "$UNINSTALL_SCRIPTLET_ARG"
+        $SUDO_OPTS bash "$prerm_scriptlet" "$UNINSTALL_SCRIPTLET_ARG"
 
         echo -e "\e[92mComplete: $?\e[0m"
 

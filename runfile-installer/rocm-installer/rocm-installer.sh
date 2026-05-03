@@ -1471,9 +1471,10 @@ set_prefix_scriptlet() {
         echo "Setting PREFIX0 = $rocm_ver_dir"
         export RPM_INSTALL_PREFIX0="$rocm_ver_dir"
 
-        # Ensure sudo preserves environment variables for both RPM and DEB systems
+        # Note: Environment variables are passed explicitly to scriptlets,
+        # so sudo -E is not needed (and is rejected by Ubuntu 26.04+)
         if [[ -n $SUDO_OPTS ]]; then
-            SUDO_OPTS="$SUDO -E"
+            SUDO_OPTS="$SUDO"
         fi
         echo SUDO_OPTS = "$SUDO_OPTS"
     fi
@@ -1522,9 +1523,9 @@ install_postinst_scriptlet() {
         if [[ ! $TARGET_DIR == "/" ]]; then
             print_str "Running Reloc."
             configure_scriptlet "$postinst_scriptlet"
-            $SUDO_OPTS "$postinst_scriptlet-reloc" "$INSTALL_SCRIPTLET_ARG"
+            $SUDO_OPTS RPM_INSTALL_PREFIX0="$RPM_INSTALL_PREFIX0" bash "$postinst_scriptlet-reloc" "$INSTALL_SCRIPTLET_ARG"
         else
-            $SUDO_OPTS "$postinst_scriptlet" "$INSTALL_SCRIPTLET_ARG"
+            $SUDO_OPTS RPM_INSTALL_PREFIX0="$RPM_INSTALL_PREFIX0" bash "$postinst_scriptlet" "$INSTALL_SCRIPTLET_ARG"
         fi
 
         echo -e "\e[92mComplete: $?\e[0m"
@@ -1554,9 +1555,9 @@ uninstall_prerm_scriptlet() {
         if [[ ! $TARGET_DIR == "/" ]]; then
             print_str "echo Running Reloc."
             configure_scriptlet "$prerm_scriptlet"
-            $SUDO_OPTS "$prerm_scriptlet-reloc" "$UNINSTALL_SCRIPTLET_ARG"
+            $SUDO_OPTS RPM_INSTALL_PREFIX0="$RPM_INSTALL_PREFIX0" bash "$prerm_scriptlet-reloc" "$UNINSTALL_SCRIPTLET_ARG"
         else
-            $SUDO_OPTS "$prerm_scriptlet" "$UNINSTALL_SCRIPTLET_ARG"
+            $SUDO_OPTS RPM_INSTALL_PREFIX0="$RPM_INSTALL_PREFIX0" bash "$prerm_scriptlet" "$UNINSTALL_SCRIPTLET_ARG"
         fi
 
         echo -e "\e[92mComplete: $?\e[0m"
@@ -1586,9 +1587,9 @@ uninstall_postrm_scriptlet() {
         if [[ ! $TARGET_DIR == "/" ]]; then
             print_str "echo Running Reloc."
             configure_scriptlet "$postrm_scriptlet"
-            $SUDO_OPTS "$postrm_scriptlet-reloc" "$UNINSTALL_SCRIPTLET_ARG"
+            $SUDO_OPTS RPM_INSTALL_PREFIX0="$RPM_INSTALL_PREFIX0" bash "$postrm_scriptlet-reloc" "$UNINSTALL_SCRIPTLET_ARG"
         else
-            $SUDO_OPTS "$postrm_scriptlet" "$UNINSTALL_SCRIPTLET_ARG"
+            $SUDO_OPTS RPM_INSTALL_PREFIX0="$RPM_INSTALL_PREFIX0" bash "$postrm_scriptlet" "$UNINSTALL_SCRIPTLET_ARG"
         fi
 
         echo -e "\e[92mComplete: $?\e[0m"
@@ -2112,30 +2113,24 @@ draw_progress_bar() {
     fi
 }
 
-check_rocm_package_install() {
-    #echo Checking for package installation: $1...
-
+check_rocm_package_install_therock() {
+    # Check for theROCK package format (amdrocm-core7.13-gfxXYZ)
     local rocm_loc=$1
     local ret=0
 
     # Package install only for /opt installs
     if [[ "$TARGET_DIR" == "/opt" || "$rocm_loc" == "/opt/rocm"* ]]; then
-        # check for a rocm-core package and if it matches the version of rocm being installed
-        local rocm_core_pkg
-        rocm_core_pkg=$($PKG_INSTALLED_CMD 2>&1 | grep "rocm-core")
-
         local rocm_ver_name
         rocm_ver_name=$(basename "$rocm_loc")
         # Strip both "rocm-" and "core-" prefixes to get version number
         local rocm_ver=${rocm_ver_name#rocm-}
         rocm_ver=${rocm_ver#core-}
 
-        IFS='.' read -r x y z <<< "$rocm_ver"
-        local rocm_core_ver
-        rocm_core_ver=$(printf "%d%02d%02d" "$x" "$y" "$z")
-
-        if [[ -n $rocm_core_pkg ]] && [[ "$rocm_core_pkg" == *"$rocm_core_ver"* ]]; then
-            echo rocm-core package detected : "$rocm_core_ver"
+        # Check for theROCK package format: amdrocm-core<version>-gfx<arch>
+        # Examples: amdrocm-core7.13-gfx950, amdrocm-base7.13
+        # Use exit code to determine if packages exist (0=found, 1=not found)
+        if $PKG_INSTALLED_CMD 2>&1 | grep -q -E "amdrocm-core${rocm_ver}(-gfx|$)"; then
+            echo "amdrocm-core package detected (theRock): ${rocm_ver}"
 
             # cached the installed packages
             INSTALLED_PKGS=$($PKG_INSTALLED_CMD 2>&1)
@@ -2149,6 +2144,65 @@ check_rocm_package_install() {
     fi
 
     return $ret
+}
+
+check_rocm_package_install_legacy() {
+    # Check for legacy package format (rocm-core, rocm-dev, etc.)
+    local rocm_loc=$1
+    local ret=0
+
+    # Package install only for /opt installs
+    if [[ "$TARGET_DIR" == "/opt" || "$rocm_loc" == "/opt/rocm"* ]]; then
+        # check for a rocm-core package and if it matches the version of rocm being installed
+        local rocm_ver_name
+        rocm_ver_name=$(basename "$rocm_loc")
+        # Strip both "rocm-" and "core-" prefixes to get version number
+        local rocm_ver=${rocm_ver_name#rocm-}
+        rocm_ver=${rocm_ver#core-}
+
+        IFS='.' read -r x y z <<< "$rocm_ver"
+        local rocm_core_ver
+        # Default z to 0 if not set (handles versions like 7.13 without patch)
+        rocm_core_ver=$(printf "%d%02d%02d" "$x" "$y" "${z:-0}")
+
+        # Use exit code to determine if packages exist (0=found, 1=not found)
+        if $PKG_INSTALLED_CMD 2>&1 | grep -q "rocm-core" | grep -q "$rocm_core_ver"; then
+            echo "rocm-core package detected (legacy): $rocm_core_ver"
+
+            # cached the installed packages
+            INSTALLED_PKGS=$($PKG_INSTALLED_CMD 2>&1)
+            ret=1
+        fi
+
+        if [[ $FORCE_INSTALL == 1 ]]; then
+            echo Force install for package-based install.
+            INSTALLED_PKGS=
+        fi
+    fi
+
+    return $ret
+}
+
+check_rocm_package_install() {
+    # Wrapper function that checks both theROCK and legacy package formats
+    # Returns 1 if package manager install detected, 0 otherwise
+    local rocm_loc=$1
+
+    # Try theROCK format first (newer)
+    check_rocm_package_install_therock "$rocm_loc"
+    local therock_ret=$?
+    if [[ $therock_ret -eq 1 ]]; then
+        return 1  # Package found
+    fi
+
+    # Fall back to legacy format
+    check_rocm_package_install_legacy "$rocm_loc"
+    local legacy_ret=$?
+    if [[ $legacy_ret -eq 1 ]]; then
+        return 1  # Package found
+    fi
+
+    return 0  # No packages found
 }
 
 find_rocm_with_progress() {
