@@ -820,7 +820,7 @@ setup_puller_config_amdgpu() {
     fi
 
     # List of all supported distro tags
-    DISTRO_TAGS=("ub24" "ub22" "el10" "el9" "el8" "sle16" "sle15" "amzn23")
+    DISTRO_TAGS=("ub26" "ub24" "ub22" "el10" "el9" "el8" "sle16" "sle15" "amzn23")
 
     if [[ "${PULL_CONFIG_AMDGPU}" == "config" ]]; then
         # Custom config directory provided

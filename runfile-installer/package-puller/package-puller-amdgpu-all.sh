@@ -42,6 +42,7 @@ AMDGPU_PACKAGES="amdgpu-dkms amdgpu-dkms-firmware"
 
 # Distro configurations - now using dynamic naming
 declare -A DISTRO_CONFIGS=(
+    ["ub26"]="amdgpu-${AMDGPU_CONFIG_TYPE}-${AMDGPU_CONFIG_VER}-ub26.config"
     ["ub24"]="amdgpu-${AMDGPU_CONFIG_TYPE}-${AMDGPU_CONFIG_VER}-ub24.config"
     ["ub22"]="amdgpu-${AMDGPU_CONFIG_TYPE}-${AMDGPU_CONFIG_VER}-ub22.config"
     ["el10"]="amdgpu-${AMDGPU_CONFIG_TYPE}-${AMDGPU_CONFIG_VER}-el10.config"
@@ -53,6 +54,7 @@ declare -A DISTRO_CONFIGS=(
 )
 
 declare -A DISTRO_TYPES=(
+    ["ub26"]="deb"
     ["ub24"]="deb"
     ["ub22"]="deb"
     ["el10"]="rpm"
