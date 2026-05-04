@@ -1523,9 +1523,9 @@ install_postinst_scriptlet() {
         if [[ ! $TARGET_DIR == "/" ]]; then
             print_str "Running Reloc."
             configure_scriptlet "$postinst_scriptlet"
-            $SUDO_OPTS RPM_INSTALL_PREFIX0="$RPM_INSTALL_PREFIX0" bash "$postinst_scriptlet-reloc" "$INSTALL_SCRIPTLET_ARG"
+            $SUDO_OPTS env RPM_INSTALL_PREFIX0="$RPM_INSTALL_PREFIX0" bash "$postinst_scriptlet-reloc" "$INSTALL_SCRIPTLET_ARG"
         else
-            $SUDO_OPTS RPM_INSTALL_PREFIX0="$RPM_INSTALL_PREFIX0" bash "$postinst_scriptlet" "$INSTALL_SCRIPTLET_ARG"
+            $SUDO_OPTS env RPM_INSTALL_PREFIX0="$RPM_INSTALL_PREFIX0" bash "$postinst_scriptlet" "$INSTALL_SCRIPTLET_ARG"
         fi
 
         echo -e "\e[92mComplete: $?\e[0m"
@@ -1555,9 +1555,9 @@ uninstall_prerm_scriptlet() {
         if [[ ! $TARGET_DIR == "/" ]]; then
             print_str "echo Running Reloc."
             configure_scriptlet "$prerm_scriptlet"
-            $SUDO_OPTS RPM_INSTALL_PREFIX0="$RPM_INSTALL_PREFIX0" bash "$prerm_scriptlet-reloc" "$UNINSTALL_SCRIPTLET_ARG"
+            $SUDO_OPTS env RPM_INSTALL_PREFIX0="$RPM_INSTALL_PREFIX0" bash "$prerm_scriptlet-reloc" "$UNINSTALL_SCRIPTLET_ARG"
         else
-            $SUDO_OPTS RPM_INSTALL_PREFIX0="$RPM_INSTALL_PREFIX0" bash "$prerm_scriptlet" "$UNINSTALL_SCRIPTLET_ARG"
+            $SUDO_OPTS env RPM_INSTALL_PREFIX0="$RPM_INSTALL_PREFIX0" bash "$prerm_scriptlet" "$UNINSTALL_SCRIPTLET_ARG"
         fi
 
         echo -e "\e[92mComplete: $?\e[0m"
@@ -1587,9 +1587,9 @@ uninstall_postrm_scriptlet() {
         if [[ ! $TARGET_DIR == "/" ]]; then
             print_str "echo Running Reloc."
             configure_scriptlet "$postrm_scriptlet"
-            $SUDO_OPTS RPM_INSTALL_PREFIX0="$RPM_INSTALL_PREFIX0" bash "$postrm_scriptlet-reloc" "$UNINSTALL_SCRIPTLET_ARG"
+            $SUDO_OPTS env RPM_INSTALL_PREFIX0="$RPM_INSTALL_PREFIX0" bash "$postrm_scriptlet-reloc" "$UNINSTALL_SCRIPTLET_ARG"
         else
-            $SUDO_OPTS RPM_INSTALL_PREFIX0="$RPM_INSTALL_PREFIX0" bash "$postrm_scriptlet" "$UNINSTALL_SCRIPTLET_ARG"
+            $SUDO_OPTS env RPM_INSTALL_PREFIX0="$RPM_INSTALL_PREFIX0" bash "$postrm_scriptlet" "$UNINSTALL_SCRIPTLET_ARG"
         fi
 
         echo -e "\e[92mComplete: $?\e[0m"
