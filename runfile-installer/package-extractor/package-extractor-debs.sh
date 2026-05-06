@@ -58,7 +58,7 @@ INSTALLER_DEPS=(rsync)
 # Kernel dependencies for specific GFX architectures (APUs requiring OEM kernel)
 # Note: OEM kernel is only required for Ubuntu 24.04 with Ryzen APUs
 EXTRA_KERNEL_DEPS=(linux-image-6.14.0-1018-oem)
-EXTRA_KERNEL_GFX=(gfx1103 gfx1150 gfx1151 gfx1152)
+EXTRA_KERNEL_GFX=(gfx1103 gfx1150 gfx1151 gfx1152 gfx1153)
 
 # Graphics dependencies (Mesa/amdgpu-lib for graphics use case)
 # Note: Only 64-bit library included. 32-bit (amdgpu-lib32) only needed for 32-bit app support.
