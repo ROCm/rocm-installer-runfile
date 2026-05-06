@@ -6,30 +6,44 @@ optimized for your GPU.
 [H1]GPU Families:
 
 [H2]Instinct (Data Center):
-  MI355X/MI350P/MI350 (gfx950)  - CDNA 4 architecture
+  MI355X/MI350X        (gfx950) - CDNA 4 architecture
   MI325X/MI300X/MI300A (gfx94x) - CDNA 3 architecture
-  MI250X/MI250/MI210 (gfx90a)   - CDNA 2 architecture
-  MI100 (gfx908)                - CDNA 1 architecture
+  MI250X/MI250/MI210   (gfx90a) - CDNA 2 architecture
+  MI100                (gfx908) - CDNA 1 architecture
 
 [H2]Radeon PRO (Professional Workstation):
-  AI PRO R9700/R9600D (gfx120x)    - RDNA 4 AI accelerators
-  W7900/W7800/W7700/V710 (gfx110x) - RDNA 3 workstation GPUs
-  W6800/V620 (gfx103x)             - RDNA 2 workstation/server
+  AI PRO R9700/R9600D (gfx120x) - RDNA 4 AI accelerators
+  W7900/W7800/W7700   (gfx110x) - RDNA 3 workstation GPUs
+  V710                (gfx110x) - RDNA 3 virtualization GPU
+  W6800               (gfx103x) - RDNA 2 workstation GPU
+  V620                (gfx103x) - RDNA 2 virtualization GPU
 
 [H2]Radeon RX (Consumer Gaming):
-  RX 9070 XT/GRE/9070 (gfx120x)    - RDNA 4 high-end gaming
-  RX 9060 XT/XT LP/9060 (gfx120x)  - RDNA 4 mid-range gaming
-  RX 7900 XTX/XT/GRE (gfx110x)     - RDNA 3 high-end gaming
-  RX 7800 XT/7700 XT/7700 (gfx110x)- RDNA 3 mid-range gaming
+  RX 9070 XT/9070 GRE/9070     (gfx120x) - RDNA 4 high-end gaming
+  RX 9060 XT LP/9060 XT/9060   (gfx120x) - RDNA 4 mid-range gaming
+  RX 7900 XTX/7900 XT/7900 GRE (gfx110x) - RDNA 3 high-end gaming
+  RX 7800 XT                   (gfx110x) - RDNA 3 mid-range gaming
+  RX 7700 XT/7700 XE/7700      (gfx110x) - RDNA 3 mid-range gaming
+  RX 7600                      (gfx110x) - RDNA 3 entry-level gaming
 
-[H2]Ryzen AI (Mobile APUs):
-  AI PRO 360/350/340 (gfx1152)    - AI PRO 300 series
-  AI 7 350/345/5 340/330 (gfx1152)- AI 300 series (7/5)
-  Max PRO+ 395 (gfx1151)          - AI Max PRO+ 395 (300 series)
-  Max+ 395 (gfx1151)              - AI Max+ 395 (300 series)
-  Max PRO 390/385/380 (gfx1151)   - AI Max PRO 390/385/380 (300 series)
-  Max 390/385 (gfx1151)           - AI Max 390/385 (300 series)
-  9 HX 375/370/9 365 (gfx1150)    - AI 300 series (9 HX)
+[H2]Ryzen APUs (Integrated Graphics):
+
+  RDNA 3.5 Architecture (gfx115x):
+    AI Max PRO 300 Series (gfx1151) - Ryzen AI Max+ PRO 395, Max PRO 390/385/380
+    AI Max 300 Series     (gfx1151) - Ryzen AI Max+ 395/392/388, Max 390/385
+    AI PRO 400 Series     (gfx1150) - Ryzen AI 9 HX PRO 475/470, 9 PRO 465
+    AI PRO 400 Series     (gfx1152) - Ryzen AI 7 PRO 450
+    AI PRO 400 Series     (gfx1153) - Ryzen AI 5 PRO 440/435
+    AI 400 Series         (gfx1150) - Ryzen AI 9 HX 475/470/465
+    AI 400 Series         (gfx1152) - Ryzen AI 7 450/445
+    AI 400 Series         (gfx1153) - Ryzen AI 5 435/430
+    AI PRO 300 Series     (gfx1152) - Ryzen AI 9 HX PRO 370, 7 PRO 360/350,
+                                       5 PRO 340
+    AI 300 Series         (gfx1150) - Ryzen AI 9 HX 375/370
+    AI 300 Series         (gfx1152) - Ryzen AI 9 365, 7 350/345, 5 340/330
+
+  RDNA 3 Architecture (gfx1103):
+    200 Series            (gfx1103) - Ryzen 9 270, 7 260/250, 5 240/230/220, 3 210
 
 [H1]About GFX Groups:
 The 'x' in gfx codes (e.g., gfx94x, gfx110x) is a wildcard that covers

@@ -1,22 +1,31 @@
 Data center compute accelerators
-CDNA 4 architecture - MI350 series data center GPUs (MI355X/MI350P/MI350)
+CDNA 4 architecture - MI350 series data center GPUs (MI355X/MI350X)
 CDNA 3 architecture - MI300 series data center APUs and GPUs
 CDNA 2 architecture - MI200 series data center GPUs
 CDNA 1 architecture - MI100 data center GPU
 Professional workstation and server graphics cards
 RDNA 4 architecture - Radeon AI PRO R9000 series professional GPUs
-RDNA 3 architecture - Radeon PRO W7000/V-series workstation GPUs
-RDNA 2 architecture - Radeon PRO W6000/V-series workstation GPUs
+RDNA 3 architecture - Radeon PRO W7000 series workstation GPUs
+RDNA 3 architecture - Radeon PRO V710 virtualization GPU
+RDNA 2 architecture - Radeon PRO W6800 workstation GPU
+RDNA 2 architecture - Radeon PRO V620 virtualization GPU
 Consumer desktop graphics cards
 RDNA 4 architecture - High-end RX 9070 series gaming GPUs
 RDNA 4 architecture - Mid-range RX 9060 series gaming GPUs
 RDNA 3 architecture - High-end RX 7900 series gaming GPUs
-RDNA 3 architecture - Mid-range RX 7800/7700 series gaming GPUs
-Mobile APUs with integrated GPU
-RDNA 3.5 architecture - Ryzen AI PRO 300 series APUs (AI PRO)
-RDNA 3.5 architecture - Ryzen AI 300 series APUs (AI 7/5)
-RDNA 3.5 architecture - Ryzen AI Max PRO+ 395 series APU (300 series)
-RDNA 3.5 architecture - Ryzen AI Max+ 395 series APU (300 series)
-RDNA 3.5 architecture - Ryzen AI Max PRO 390/385/380 series APUs (300 series)
-RDNA 3.5 architecture - Ryzen AI Max 390/385 series APUs (300 series)
-RDNA 3.5 architecture - Ryzen AI 300 series APUs (9 HX)
+RDNA 3 architecture - Mid-range RX 7800 XT gaming GPU
+RDNA 3 architecture - Mid-range RX 7700 series gaming GPUs
+RDNA 3 architecture - Entry-level RX 7600 gaming GPU
+Mobile APUs with integrated GPU (Ryzen)
+RDNA 3.5 - Ryzen AI Max PRO 300 Series (Radeon 8060S/8050S/8040S)
+RDNA 3.5 - Ryzen AI Max 300 Series (Radeon 8060S/8050S)
+RDNA 3.5 - Ryzen AI PRO 400 Series - 9 HX PRO (Radeon 890M)
+RDNA 3.5 - Ryzen AI PRO 400 Series - 7 PRO (Radeon 860M)
+RDNA 3.5 - Ryzen AI PRO 400 Series - 5 PRO (Radeon 840M)
+RDNA 3.5 - Ryzen AI 400 Series - 9 HX (Radeon 890M/880M)
+RDNA 3.5 - Ryzen AI 400 Series - 7 (Radeon 860M/840M)
+RDNA 3.5 - Ryzen AI 400 Series - 5 (Radeon 840M)
+RDNA 3.5 - Ryzen AI PRO 300 Series (Radeon 890M/880M/860M/840M)
+RDNA 3.5 - Ryzen AI 300 Series - 9 HX (Radeon 890M)
+RDNA 3.5 - Ryzen AI 300 Series - 7/5 (Radeon 880M/860M/840M/820M)
+RDNA 3 - Ryzen 200 Series (Radeon 780M/760M/740M)

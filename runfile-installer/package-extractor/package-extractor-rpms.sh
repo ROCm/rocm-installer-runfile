@@ -80,7 +80,7 @@ INSTALLER_DEPS=(rsync wget)
 # OEM kernel dependencies (Ubuntu 24.04 specific)
 # For RPM: We don't create required_deps_gfxXYZ.txt files, but we need the list for oem-kernel-archs.txt
 EXTRA_KERNEL_DEPS=()
-EXTRA_KERNEL_GFX=(gfx1103 gfx1150 gfx1151 gfx1152)
+EXTRA_KERNEL_GFX=(gfx1103 gfx1150 gfx1151 gfx1152 gfx1153)
 
 # Graphics dependencies (Mesa/amdgpu-lib for graphics use case)
 # Note: Only 64-bit library included. 32-bit (amdgpu-lib32) only needed for 32-bit app support.
