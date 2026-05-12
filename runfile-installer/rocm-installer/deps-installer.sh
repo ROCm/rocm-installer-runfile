@@ -2270,6 +2270,71 @@ install_repos_el() {
     echo "------------------------------------"
 }
 
+# Check if a SUSE module/extension is already registered
+suse_module_registered() {
+    local module_name=$1
+
+    # Use SUSEConnect --status to check if module is registered
+    # Returns 0 (true) if registered, 1 (false) if not
+    if $SUDO SUSEConnect --status 2>/dev/null | grep -q "\"identifier\":\"${module_name}\".*\"status\":\"Registered\""; then
+        return 0  # Module is registered
+    else
+        return 1  # Module is not registered
+    fi
+}
+
+# Register a SUSE module if not already registered
+register_suse_module() {
+    local module_name=$1
+    local module_version=$2
+    local arch=${3:-x86_64}
+    local module_path="${module_name}/${module_version}/${arch}"
+
+    if suse_module_registered "$module_name"; then
+        echo "  ✓ ${module_name} already registered, skipping"
+        return 0
+    else
+        echo "  → Activating ${module_name}..."
+        if $SUDO SUSEConnect -p "$module_path"; then
+            echo "  ✓ ${module_name} activated"
+            return 0
+        else
+            echo "  ✗ Failed to activate ${module_name}"
+            return 1
+        fi
+    fi
+}
+
+install_repos_sle() {
+    echo "------------------------------------"
+    echo "Setting up SLES Repos..."
+
+    if [[ $DISTRO_NAME == "sles" ]]; then
+        if [[ $DISTRO_MAJOR_VER -eq 15 ]]; then
+            echo "Activating required SLES modules for version ${DISTRO_VER}..."
+
+            # Register the 5 required modules for SLES 15.x
+            register_suse_module "sle-module-python3" "${DISTRO_VER}"
+            register_suse_module "sle-module-systems-management" "${DISTRO_VER}"
+            register_suse_module "sle-module-desktop-applications" "${DISTRO_VER}"
+            register_suse_module "sle-module-development-tools" "${DISTRO_VER}"
+            register_suse_module "PackageHub" "${DISTRO_VER}"
+
+            echo "Module activation complete."
+        elif [[ $DISTRO_MAJOR_VER -eq 16 ]]; then
+            echo "Activating required SLES modules for version ${DISTRO_VER}..."
+
+            # Register PackageHub for SLES 16.x
+            register_suse_module "PackageHub" "16.0"
+
+            echo "Module activation complete."
+        fi
+    fi
+
+    echo "Setting up SLES Repos...Complete."
+    echo "------------------------------------"
+}
+
 block_kernel_meta_packages_debian12() {
     # On Debian 12, installing dkms triggers installation of kernel meta-packages
     # (linux-headers-amd64, linux-headers-686-pae, linux-headers-generic), which can
@@ -2324,6 +2389,9 @@ install_dependencies() {
         build_installable_pkg_cache_dnf
 
     else
+        # add the required repos for sle
+        install_repos_sle
+
         echo Updating zypper cache.
         $SUDO zypper refresh > /dev/null 2>&1
     fi
