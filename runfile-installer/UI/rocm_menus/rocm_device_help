@@ -6,7 +6,7 @@ optimized for your GPU.
 [H1]GPU Families:
 
 [H2]Instinct (Data Center):
-  MI355X/MI350X        (gfx950) - CDNA 4 architecture
+  MI355X/MI350X/MI350P (gfx950) - CDNA 4 architecture
   MI325X/MI300X/MI300A (gfx94x) - CDNA 3 architecture
   MI250X/MI250/MI210   (gfx90a) - CDNA 2 architecture
   MI100                (gfx908) - CDNA 1 architecture
