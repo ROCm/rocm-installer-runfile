@@ -701,6 +701,14 @@ translate_package_name_sles() {
             translated="libexpat1"
             ;;
 
+        # ELF utilities (added for ROCm 7.13 profiler)
+        elfutils-libelf)
+            translated="libelf1"
+            ;;
+        elfutils-libs)
+            translated="libdw1"
+            ;;
+
         # OpenCL ICD Loader
         ocl-icd)
             translated="ocl-icd"
