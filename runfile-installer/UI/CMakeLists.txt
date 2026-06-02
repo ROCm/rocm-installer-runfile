@@ -91,6 +91,12 @@ add_executable(rocm_ui ${SOURCEFILES})
 
 # Version info now loaded at runtime from VERSION file - no compile-time definitions needed
 
+# Multi-arch build flag - passed from parent CMakeLists.txt
+if(MULTI_ARCH_BUILD)
+    message(STATUS "UI: Building with MULTI_ARCH_BUILD support")
+    add_compile_definitions(MULTI_ARCH_BUILD)
+endif()
+
 # UI target settings
 target_compile_options(rocm_ui PRIVATE -Wall -Wextra -Werror)
 

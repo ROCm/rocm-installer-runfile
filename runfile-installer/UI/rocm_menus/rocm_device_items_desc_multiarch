@@ -1,0 +1,42 @@
+Install all GPU architectures (largest install size)
+Install ROCm components for all available GPU architectures
+Data center compute accelerators
+CDNA 4 architecture - MI350 series data center GPUs
+CDNA 3 architecture - MI300 series data center APUs and GPUs
+CDNA 2 architecture - MI200 series data center GPUs
+CDNA 1 architecture - MI100 data center GPU
+GCN 5.0 architecture - Radeon Pro VII professional GPU
+GCN 5.0 architecture - Radeon Pro WX 9100/8200 professional GPUs
+Professional workstation and server graphics cards
+RDNA 3 architecture - Radeon PRO W7900/W7800/W7900D workstation GPUs (Navi 31)
+RDNA 3 architecture - Radeon PRO W7700 workstation GPU (Navi 32)
+RDNA 3 architecture - Radeon PRO W7600 workstation GPU (Navi 33)
+RDNA 2 architecture - Radeon PRO W6800 workstation GPU (Sienna Cichlid)
+RDNA 2 architecture - Radeon PRO W6600/W6600M workstation GPUs (Beige Goby)
+RDNA 2 architecture - Radeon PRO W6500M/W6400/W6300 series workstation GPUs (Beige Goby)
+RDNA 1 architecture - Radeon PRO W5700/W5500 series workstation GPUs (Navi 10)
+RDNA 4 architecture - Radeon AI PRO R9700/R9600D professional GPUs (Navi 48)
+Consumer desktop and mobile graphics cards
+RDNA 4 architecture - Radeon RX 9070 series gaming GPUs (Navi 48)
+RDNA 4 architecture - Radeon RX 9060 series gaming GPUs (Navi 44)
+RDNA 3 architecture - High-end RX 7900 series gaming GPUs (Navi 31)
+RDNA 3 architecture - Mid-range RX 7800/7700 series gaming GPUs (Navi 32)
+RDNA 3 architecture - Mainstream RX 7600 series gaming GPUs (Navi 33)
+RDNA 2 architecture - High-end RX 6950/6900/6800 series gaming GPUs (Sienna Cichlid)
+RDNA 2 architecture - Mid-range RX 6800S/6700S/6650/6600 series gaming GPUs (Beige Goby)
+RDNA 2 architecture - Mainstream RX 6500/6450/6400 series gaming GPUs (Beige Goby)
+RDNA 1 architecture - RX 5700/5600 series gaming GPUs (Navi 10)
+RDNA 1 architecture - RX 5500/5300 series gaming GPUs (Navi 14)
+GCN 5.0 architecture - Radeon RX Vega 64/56/20 consumer GPUs
+Mobile APUs with integrated GPU (Ryzen processors)
+RDNA 3.5 - Ryzen AI Max PRO/Max 300 Series (Radeon 8060S/8050S graphics)
+RDNA 3.5 - Ryzen AI PRO/AI 400/300 Series with 9 HX PRO/9 HX (Radeon 890M graphics)
+RDNA 3.5 - Ryzen AI PRO/AI 400/300 Series with 7 PRO/7/5 (Radeon 880M/860M/840M/820M graphics)
+RDNA 3.5 - Ryzen AI 400/300 Series other models (various Radeon 800M graphics)
+RDNA 3 - Ryzen 200 Series (Radeon 780M/760M/740M graphics)
+RDNA 1 architecture - Other models
+RDNA 1 architecture - RX 5000 series model (Navi 10)
+RDNA 2 architecture - Radeon PRO W6800 model (Sienna Cichlid)
+RDNA 2 architecture - Radeon PRO W6600 model (Beige Goby)
+RDNA 2 architecture - Radeon PRO W6600 model (Beige Goby)
+RDNA 2 architecture - Radeon PRO W6600 model (Beige Goby)

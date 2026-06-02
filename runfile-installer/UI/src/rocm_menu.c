@@ -1069,7 +1069,11 @@ void uninstall_rocm_paths()
         len = strlen(base_path);
         strncat(target, base_path, len);
 
+#ifdef MULTI_ARCH_BUILD
+        strcat(target, " gfx=all uninstall-rocm");
+#else
         strcat(target, " uninstall-rocm");
+#endif
 
         // execute the ROCm uninstall command
         if (execute_cmd("./rocm-installer.sh", target, pWin) == 0)
@@ -1337,6 +1341,7 @@ void process_rocm_device_menu()
 }
 
 // Extract gfx code/group from item name like "    MI325X/MI300X/MI300A (gfx94x)"
+// Also handles special values like "(all)" for multi-arch installers
 // Returns pointer to gfx code within the string, or NULL if not found
 const char* extract_gfx_code(const char *item_name)
 {
@@ -1346,14 +1351,14 @@ const char* extract_gfx_code(const char *item_name)
 
     start++; // Move past '('
 
-    // Check if it starts with "gfx"
-    if (strncmp(start, "gfx", 3) != 0) return NULL;
-
     // Find closing parenthesis to validate format
     const char *end = strchr(start, ')');
     if (!end) return NULL;
 
-    // Return pointer to gfx code/group (e.g., "gfx94x", "gfx950")
+    // Check if it starts with "gfx" or is the special "all" value
+    if (strncmp(start, "gfx", 3) != 0 && strncmp(start, "all", 3) != 0) return NULL;
+
+    // Return pointer to gfx code/group (e.g., "gfx94x", "gfx950", "all")
     return start;
 }
 

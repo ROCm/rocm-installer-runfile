@@ -66,9 +66,7 @@ END_USAGE
 
 format_duration() {
     local duration=$1
-    local minutes=$((duration / 60))
-    local seconds=$((duration % 60))
-    echo "${minutes}m ${seconds}s (${duration} seconds)"
+    echo "${duration} seconds"
 }
 
 run_with_progress() {

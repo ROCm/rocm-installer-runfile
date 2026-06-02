@@ -162,10 +162,9 @@ format_size() {
 
 format_duration() {
     local duration=$1
-    local hours=$((duration / 3600))
-    local minutes=$(((duration % 3600) / 60))
+    local minutes=$((duration / 60))
     local seconds=$((duration % 60))
-    echo "${hours}h ${minutes}m ${seconds}s (${duration} seconds)"
+    echo "${minutes}m ${seconds}s (${duration} seconds)"
 }
 
 dump_extract_stats() {

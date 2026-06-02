@@ -105,6 +105,12 @@ cleanup_install() {
 
         print_msg "Cleaning up file /etc/apt/preferences.d/block-headers...Complete"
     fi
+
+    # Remove .gfx-lists file (auto-generated GFX architecture mappings)
+    if [ -f component-rocm/.gfx-lists ]; then
+        print_msg "Removing .gfx-lists file..."
+        $SUDO rm component-rocm/.gfx-lists
+    fi
 }
 
 

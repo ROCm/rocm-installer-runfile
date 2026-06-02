@@ -77,7 +77,7 @@ SETUP_AMDGPU_MODE="all"  # Default: all distros
 SETUP_ROCM_MODE="chroot" # Default: native (use current OS), Options: native, chroot
 
 # Configuration
-ROCM_RELEASE_TYPES=(dev nightly prerelease release)
+ROCM_RELEASE_TYPES=(dev nightly nightly-multiarch prerelease release)
 
 
 ###### Functions ###############################################################
@@ -329,7 +329,7 @@ validate_args() {
     if [[ -z "$PULL_CONFIG_TAG" ]]; then
         echo -e "\e[31mERROR: pulltag= required for all builds\e[0m"
         case "$PULL_CONFIG_RELEASE_TYPE" in
-            dev|nightly)
+            dev|nightly|nightly-multiarch)
                 echo "Example: pulltag=20260123"
                 ;;
             prerelease)
@@ -346,7 +346,7 @@ validate_args() {
     if [[ -z "$PULL_CONFIG_RUNID" ]]; then
         echo -e "\e[31mERROR: pullrunid= required for all builds\e[0m"
         case "$PULL_CONFIG_RELEASE_TYPE" in
-            dev|nightly)
+            dev|nightly|nightly-multiarch)
                 echo "Example: pullrunid=21893116598"
                 ;;
             prerelease)
@@ -745,12 +745,18 @@ setup_puller_config_rocm() {
     BUILD_CONFIG_DIR="../build-config"
     mkdir -p "$BUILD_CONFIG_DIR"
 
+    # Normalize release type for template directory (nightly-multiarch uses nightly templates)
+    local template_release_type="${PULL_CONFIG_RELEASE_TYPE}"
+    if [[ "${PULL_CONFIG_RELEASE_TYPE}" == "nightly-multiarch" ]]; then
+        template_release_type="nightly"
+    fi
+
     # Template directory for ROCm configs
-    TEMPLATE_DIR="../package-puller/config/therock/rocm/${PULL_CONFIG_RELEASE_TYPE}"
+    TEMPLATE_DIR="../package-puller/config/therock/rocm/${template_release_type}"
 
     # Template files
-    TEMPLATE_DEB="${TEMPLATE_DIR}/rocm-${PULL_CONFIG_RELEASE_TYPE}-deb.config"
-    TEMPLATE_RPM="${TEMPLATE_DIR}/rocm-${PULL_CONFIG_RELEASE_TYPE}-rpm.config"
+    TEMPLATE_DEB="${TEMPLATE_DIR}/rocm-${template_release_type}-deb.config"
+    TEMPLATE_RPM="${TEMPLATE_DIR}/rocm-${template_release_type}-rpm.config"
 
     # Build version string from tag and runid
     local version_string=""
@@ -777,17 +783,28 @@ setup_puller_config_rocm() {
         exit 1
     fi
 
+    # Determine package path based on release type
+    local package_path=""
+    if [[ "${PULL_CONFIG_RELEASE_TYPE}" == "nightly-multiarch" ]]; then
+        package_path="packages-multi-arch/"
+        echo "Using multiarch package path"
+    fi
+
     echo "Using ROCm config type: ${PULL_CONFIG_RELEASE_TYPE}"
     echo "Using ROCm tag        : ${PULL_CONFIG_TAG}"
     echo "Using ROCm run ID     : ${PULL_CONFIG_RUNID}"
 
     # Generate DEB config from template
     echo "Generating DEB config: $PULLER_CONFIG_DEB"
-    sed "s/{{VERSION_STRING}}/${version_string}/g" "$TEMPLATE_DEB" > "$PULLER_CONFIG_DEB"
+    sed -e "s|{{VERSION_STRING}}|${version_string}|g" \
+        -e "s|{{PACKAGE_PATH}}|${package_path}|g" \
+        "$TEMPLATE_DEB" > "$PULLER_CONFIG_DEB"
 
     # Generate RPM config from template
     echo "Generating RPM config: $PULLER_CONFIG_RPM"
-    sed "s/{{VERSION_STRING}}/${version_string}/g" "$TEMPLATE_RPM" > "$PULLER_CONFIG_RPM"
+    sed -e "s|{{VERSION_STRING}}|${version_string}|g" \
+        -e "s|{{PACKAGE_PATH}}|${package_path}|g" \
+        "$TEMPLATE_RPM" > "$PULLER_CONFIG_RPM"
 
     echo -e "\e[32mROCm package puller configuration files generated successfully.\e[0m"
     echo "Setting up ROCm package puller configuration files...Complete"

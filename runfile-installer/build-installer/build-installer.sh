@@ -62,6 +62,9 @@ MAKESELF_COMPRESS_MODE=""  # Compression mode (set by mscomp: dev1, dev2, etc.)
 MAKESELF_OPT_COMPRESS=""   # Compression setting used by makeself
 XZ_COMPRESS_LEVEL=9        # XZ compression level (1-9, lower=faster/larger, higher=slower/smaller)
 
+# Architecture family mapping (fine-grained → coarse)
+# This will be populated dynamically based on PULL_CONFIG_RELEASE_TYPE
+declare -A GFX_FAMILY_MAP
 
 ###### Functions ###############################################################
 
@@ -128,6 +131,79 @@ Usage: $PROG [options]
                            Standard (xz): Requires xz-utils on target (may not be in minimal installs)
 
 END_USAGE
+}
+
+get_coarse_family() {
+    # Maps fine-grained arch to coarse family
+    # Args: $1 = fine-grained arch (e.g., gfx1101)
+    # Returns: coarse family (e.g., gfx110x) or input if no mapping
+
+    local fine_arch="$1"
+
+    # Check if mapping exists
+    if [[ -n "${GFX_FAMILY_MAP[$fine_arch]}" ]]; then
+        echo "${GFX_FAMILY_MAP[$fine_arch]}"
+    else
+        # No mapping, use as-is (future-proof for unknown archs)
+        echo "$fine_arch"
+    fi
+}
+
+initialize_gfx_family_map() {
+    # Initialize GFX_FAMILY_MAP based on build type
+    # - Single-arch (nightly): 1:1 mapping from ROCM_GFX_ARCHS
+    # - Multi-arch (nightly-multiarch): Fine→coarse grouping
+
+    # Clear any existing mappings
+    GFX_FAMILY_MAP=()
+
+    if [[ "${PULL_CONFIG_RELEASE_TYPE:-}" == "nightly-multiarch" ]]; then
+        # Multi-arch build: Use fine-grained → coarse family mappings
+        echo "Initializing GFX_FAMILY_MAP for multi-arch build"
+        GFX_FAMILY_MAP=(
+            ["gfx900"]="gfx900"
+            ["gfx906"]="gfx906"
+            ["gfx908"]="gfx908"
+            ["gfx90a"]="gfx90a"
+            ["gfx942"]="gfx94x"
+            ["gfx950"]="gfx950"
+            ["gfx1010"]="gfx101x"
+            ["gfx1011"]="gfx101x"
+            ["gfx1012"]="gfx101x"
+            ["gfx1030"]="gfx103x"
+            ["gfx1031"]="gfx103x"
+            ["gfx1032"]="gfx103x"
+            ["gfx1033"]="gfx103x"
+            ["gfx1034"]="gfx103x"
+            ["gfx1035"]="gfx103x"
+            ["gfx1036"]="gfx103x"
+            ["gfx1100"]="gfx110x"
+            ["gfx1101"]="gfx110x"
+            ["gfx1102"]="gfx110x"
+            ["gfx1103"]="gfx110x"
+            ["gfx1150"]="gfx115x"
+            ["gfx1151"]="gfx115x"
+            ["gfx1152"]="gfx115x"
+            ["gfx1153"]="gfx115x"
+            ["gfx1200"]="gfx120x"
+            ["gfx1201"]="gfx120x"
+        )
+    else
+        # Single-arch build: Use 1:1 mapping from ROCM_GFX_ARCHS
+        # Each architecture maps to itself
+        echo "Initializing GFX_FAMILY_MAP for single-arch build"
+
+        if [[ -n "${ROCM_GFX_ARCHS:-}" ]]; then
+            for arch in "${ROCM_GFX_ARCHS[@]}"; do
+                GFX_FAMILY_MAP["$arch"]="$arch"
+            done
+            echo "  Mapped ${#ROCM_GFX_ARCHS[@]} architectures from ROCM_GFX_ARCHS"
+        else
+            echo "  WARNING: ROCM_GFX_ARCHS not set, GFX_FAMILY_MAP will be empty"
+        fi
+    fi
+
+    echo "  GFX_FAMILY_MAP initialized with ${#GFX_FAMILY_MAP[@]} entries"
 }
 
 os_release() {
@@ -197,7 +273,15 @@ format_duration() {
     local hours=$((duration / 3600))
     local minutes=$(((duration % 3600) / 60))
     local seconds=$((duration % 60))
-    echo -e "\e[36m${hours}h ${minutes}m ${seconds}s (${duration} seconds)\e[0m"
+
+    local time_str=""
+    if [[ $hours -gt 0 ]]; then
+        time_str="${hours}h ${minutes}m ${seconds}s"
+    else
+        time_str="${minutes}m ${seconds}s"
+    fi
+
+    echo -e "\e[36m${time_str} (${duration} seconds)\e[0m"
 }
 
 show_compression_progress() {
@@ -345,40 +429,113 @@ print_directory_size() {
 
 generate_component_lists() {
     echo -------------------------------------------------------------
-    echo Scanning components to build embedded lists...
+    echo Generating GFX architecture lists from GFX_FAMILY_MAP...
 
-    GFX_LIST=""
-    COMPO_LIST=""
+    local all_archs=()
+    local -A coarse_families
+    local is_multiarch=false
 
-    local component_dir="../rocm-installer/component-rocm"
+    # Detect build type by checking if we have actual fine→coarse grouping
+    # Multi-arch: gfx1100→gfx110x (fine != coarse)
+    # Single-arch: gfx110x→gfx110x (fine == coarse) or no mapping
+    for fine_arch in "${!GFX_FAMILY_MAP[@]}"; do
+        local coarse="${GFX_FAMILY_MAP[$fine_arch]}"
+        if [[ "$fine_arch" != "$coarse" ]]; then
+            is_multiarch=true
+            break
+        fi
+    done
 
-    if [ ! -d "$component_dir" ]; then
-        echo "WARNING: component-rocm directory not found at: $component_dir"
-        echo "GFX list will be empty."
-    else
-        # Extract GFX architectures (e.g., gfx94x, gfx942, gfx1030)
-        # Look for patterns like gfx followed by numbers and optional letters
-        local gfx_found=()
-        for file in "$component_dir"/*; do
-            if [[ -e "$file" ]]; then
-                local filename
-                filename=$(basename "$file")
-                if [[ "$filename" =~ gfx[0-9]+[a-z]* ]]; then
-                    gfx_found+=("${BASH_REMATCH[0]}")
-                fi
-            fi
+    if [[ "$is_multiarch" == "true" ]]; then
+        # Multi-arch build: Only expose fine-grained archs to users
+        # Coarse families (gfx110x, gfx94x) are internal for compression
+        echo "Build type: Multi-arch (fine-grained architectures)"
+        for fine_arch in "${!GFX_FAMILY_MAP[@]}"; do
+            all_archs+=("$fine_arch")
         done
-
-        # Remove duplicates and convert to space-separated list
-        GFX_LIST=$(printf '%s\n' "${gfx_found[@]}" | sort -u | tr '\n' ' ' | sed 's/ *$//')
+    else
+        # Single-arch build: Expose coarse families to users
+        # This is what packages are built for in single-arch
+        echo "Build type: Single-arch (coarse family architectures)"
+        for arch in "${!GFX_FAMILY_MAP[@]}"; do
+            all_archs+=("$arch")
+            coarse_families["${GFX_FAMILY_MAP[$arch]}"]=1
+        done
+        # Add unique coarse families
+        for coarse in "${!coarse_families[@]}"; do
+            all_archs+=("$coarse")
+        done
     fi
 
+    # Create space-separated list (sorted)
+    GFX_LIST=$(printf '%s\n' "${all_archs[@]}" | sort -u | tr '\n' ' ' | sed 's/ *$//')
+
     # Component categories are fixed (defined in rocm-installer.sh)
-    # These map to meta packages, not individual extracted packages
     COMPO_LIST="core core-dev dev-tools core-sdk opencl"
 
-    echo "GFX architectures detected: ${GFX_LIST:-<none>}"
+    echo "GFX architectures: ${GFX_LIST:-<none>}"
     echo "Component categories: $COMPO_LIST"
+
+    # Write .gfx-lists file to component-rocm directory
+    echo "Writing .gfx-lists file..."
+    local gfx_lists_file="../rocm-installer/component-rocm/.gfx-lists"
+
+    # Determine build type
+    local installer_build_type="single-arch"
+    if [[ "$is_multiarch" == "true" ]]; then
+        installer_build_type="multi-arch"
+    fi
+
+    # Write file header and base variables
+    cat > "$gfx_lists_file" << EOF
+#!/bin/bash
+# Auto-generated GFX architecture mappings
+# Generated during build, used by installer and build scripts
+
+# All available architectures (fine-grained + coarse families)
+GFX_ARCHS_AVAILABLE="$GFX_LIST"
+
+# Build type: single-arch or multi-arch
+# - single-arch: Users select coarse families (gfx110x, gfx1150, etc.)
+# - multi-arch: Users select fine-grained archs (gfx1100, gfx1101, etc.)
+INSTALLER_BUILD_TYPE="$installer_build_type"
+
+# Fine-grained to coarse family mapping
+declare -A GFX_FINE_TO_COARSE=(
+EOF
+
+    # Write fine→coarse mappings
+    for fine_arch in "${!GFX_FAMILY_MAP[@]}"; do
+        local coarse_family="${GFX_FAMILY_MAP[$fine_arch]}"
+        echo "    [\"$fine_arch\"]=\"$coarse_family\"" >> "$gfx_lists_file"
+    done
+
+    # Write coarse→fine mapping header
+    cat >> "$gfx_lists_file" << 'EOF'
+)
+
+# Coarse family to fine-grained members mapping
+declare -A GFX_COARSE_TO_FINE=(
+EOF
+
+    # Build and write coarse→fine mappings
+    local -A coarse_members
+    for fine_arch in "${!GFX_FAMILY_MAP[@]}"; do
+        local coarse_family="${GFX_FAMILY_MAP[$fine_arch]}"
+        if [[ -n "${coarse_members[$coarse_family]}" ]]; then
+            coarse_members[$coarse_family]+=" $fine_arch"
+        else
+            coarse_members[$coarse_family]="$fine_arch"
+        fi
+    done
+
+    for coarse_family in "${!coarse_members[@]}"; do
+        echo "    [\"$coarse_family\"]=\"${coarse_members[$coarse_family]}\"" >> "$gfx_lists_file"
+    done
+
+    echo ")" >> "$gfx_lists_file"
+
+    echo "  Written: $gfx_lists_file"
 }
 
 generate_headers() {
@@ -390,7 +547,7 @@ generate_headers() {
         sed -e "s|@@GFX_ARCHS_LIST@@|$GFX_LIST|g" \
             -e "s|@@COMPONENTS_LIST@@|$COMPO_LIST|g" \
             rocm-makeself-header-pre.sh.template > rocm-makeself-header-pre.sh
-        echo "Generated: rocm-makeself-header-pre.sh"
+        echo "Generated: rocm-makeself-header-pre.sh (embedded GFX_ARCHS_AVAILABLE)"
     else
         echo "ERROR: rocm-makeself-header-pre.sh.template not found!"
         exit 1
@@ -1065,36 +1222,55 @@ compress_tests() {
     echo "Found test packages for ${#gfx_archs[@]} architecture(s): ${gfx_archs[*]}"
     echo ""
 
+    # Group test packages by coarse family (same as main components)
+    declare -A GFX_FAMILY_TESTS
+
+    for gfx_arch in "${gfx_archs[@]}"; do
+        # Map to coarse family
+        local coarse_family
+        coarse_family=$(get_coarse_family "$gfx_arch")
+
+        # Add to family group
+        GFX_FAMILY_TESTS["$coarse_family"]+="$gfx_arch "
+    done
+
     local total_archives_created=0
     local total_removed_dirs=0
 
-    # Compress tests for each GFX architecture separately
-    for gfx_arch in "${gfx_archs[@]}"; do
-        echo "  Processing tests for: $gfx_arch"
+    # Compress test packages for each family
+    for family in "${!GFX_FAMILY_TESTS[@]}"; do
+        local members="${GFX_FAMILY_TESTS[$family]}"
+        # Trim trailing space
+        members="${members% }"
 
-        # Collect test packages for this architecture
-        local arch_test_dirs=()
-        for component in "component-rocm/content/$gfx_arch"/*test*/; do
-            if [[ -d "$component" ]]; then
-                arch_test_dirs+=("$component")
-            fi
+        echo "  Processing tests for family: $family"
+        echo "    Members: $members"
+
+        # Collect test packages for all members in this family
+        local family_test_dirs=()
+        for gfx_arch in $members; do
+            for component in "component-rocm/content/$gfx_arch"/*test*/; do
+                if [[ -d "$component" ]]; then
+                    family_test_dirs+=("$component")
+                fi
+            done
         done
 
-        if [[ ${#arch_test_dirs[@]} -eq 0 ]]; then
-            echo "    No test packages found for $gfx_arch, skipping."
+        if [[ ${#family_test_dirs[@]} -eq 0 ]]; then
+            echo "    No test packages found for family $family, skipping."
             continue
         fi
 
-        local tests_archive="component-rocm/tests-${gfx_arch}.tar.xz"
+        local tests_archive="component-rocm/tests-${family}.tar.xz"
 
         # Calculate source size
         local source_size_kb
-        source_size_kb=$(du -sk "${arch_test_dirs[@]}" 2>/dev/null | awk '{s+=$1} END {print s}')
+        source_size_kb=$(du -sk "${family_test_dirs[@]}" 2>/dev/null | awk '{s+=$1} END {print s}')
 
-        echo "    Source: ${#arch_test_dirs[@]} test package(s) ($(format_size $((source_size_kb * 1024))))"
+        echo "    Source: ${#family_test_dirs[@]} test package(s) ($(format_size $((source_size_kb * 1024))))"
 
         # List test packages being compressed
-        for test_dir in "${arch_test_dirs[@]}"; do
+        for test_dir in "${family_test_dirs[@]}"; do
             local pkg_name
             pkg_name=$(basename "$test_dir")
             echo "      - $pkg_name"
@@ -1116,7 +1292,7 @@ compress_tests() {
 
         # Compress using same pattern as component-compressor.sh
         local success=0
-        if tar -cf - "${arch_test_dirs[@]}" 2>/dev/null | \
+        if tar -cf - "${family_test_dirs[@]}" 2>/dev/null | \
            xz "-$XZ_COMPRESS_LEVEL" -T"$(nproc)" --verbose 2>/tmp/compress-tests.log > "$tests_archive"; then
             success=1
         fi
@@ -1128,7 +1304,7 @@ compress_tests() {
 
         if [[ $success -eq 0 ]]; then
             echo ""
-            echo -e "    \e[31mFailed to compress tests for $gfx_arch\e[0m"
+            echo -e "    \e[31mFailed to compress tests for family $family\e[0m"
             cd - >/dev/null || exit
             exit 1
         fi
@@ -1153,13 +1329,13 @@ compress_tests() {
         echo -e "    \e[32mCompressed: $(format_size $((archive_size_kb * 1024))) (${ratio}:1, ${reduction}%) in \e[36m$(format_duration "$duration")\e[0m"
 
         # Remove uncompressed test directories
-        for test_dir in "${arch_test_dirs[@]}"; do
+        for test_dir in "${family_test_dirs[@]}"; do
             rm -rf "$test_dir"
         done
-        echo -e "    \e[93mRemoved ${#arch_test_dirs[@]} uncompressed test content directories\e[0m"
+        echo -e "    \e[93mRemoved ${#family_test_dirs[@]} uncompressed test content directories\e[0m"
 
         ((total_archives_created++))
-        total_removed_dirs=$((total_removed_dirs + ${#arch_test_dirs[@]}))
+        total_removed_dirs=$((total_removed_dirs + ${#family_test_dirs[@]}))
         echo ""
     done
 
@@ -1167,6 +1343,169 @@ compress_tests() {
     echo ""
     echo "Test compression complete: $total_archives_created archive(s) created, $total_removed_dirs directories removed."
     echo "-------------------------------------------------------------"
+}
+
+print_compression_stats() {
+    local source_size=$1
+    local compressed_size=$2
+    local duration=$3
+
+    local ratio="0.0"
+    if [[ $compressed_size -gt 0 ]]; then
+        ratio=$(awk "BEGIN {printf \"%.1f\", $source_size / $compressed_size}")
+    fi
+
+    local reduction=0
+    if [[ $source_size -gt 0 ]]; then
+        reduction=$(awk "BEGIN {printf \"%.0f\", 100 - ($compressed_size * 100 / $source_size)}")
+    fi
+
+    echo -e "  \e[32mCompressed: $(format_size "$compressed_size") (${ratio}:1, ${reduction}%) in $(format_duration "$duration")\e[0m"
+}
+
+compress_gfx() {
+    local -n compressed_count=$1
+    local -n error_count=$2
+
+    if [[ ! -d "component-rocm/content" ]]; then
+        return 0
+    fi
+
+    echo "Compressing ROCm content directories (grouped by family)..."
+    echo ""
+
+    # Group GFX directories by coarse family
+    declare -A GFX_FAMILY_DIRS
+    for content_dir in component-rocm/content/*; do
+        if [[ -d "$content_dir" ]]; then
+            local gfx_name
+            gfx_name=$(basename "$content_dir")
+
+            # Skip base directory (handled separately)
+            [[ "$gfx_name" == "base" ]] && continue
+
+            # Map to coarse family and add to group
+            local coarse_family
+            coarse_family=$(get_coarse_family "$gfx_name")
+            GFX_FAMILY_DIRS["$coarse_family"]+="$gfx_name "
+        fi
+    done
+
+    # Compress each family group
+    for family in "${!GFX_FAMILY_DIRS[@]}"; do
+        local members="${GFX_FAMILY_DIRS[$family]% }"  # Trim trailing space
+        local archive_name="component-rocm/content-${family}.tar.xz"
+
+        echo "[$((compressed_count + 1))] Compressing ROCm family: $family"
+        echo "  Members: $members"
+
+        # Calculate source size
+        local source_size=0
+        for member in $members; do
+            local member_size
+            member_size=$(du -sb "component-rocm/content/$member" 2>/dev/null | awk '{print $1}')
+            source_size=$((source_size + member_size))
+        done
+
+        echo "  Source: $(format_size $source_size)"
+        echo "  Target: $archive_name"
+        echo "  Method: xz (level: ${XZ_COMPRESS_LEVEL:-9})"
+
+        # Compress
+        local start_time
+        start_time=$(date +%s)
+        local success=0
+
+        if [[ "$HYBRID_ALL_XZ" == "yes" ]] || [[ "${MAKESELF_COMPRESS_MODE:-auto}" == "xz" ]]; then
+            # shellcheck disable=SC2086  # $members needs word splitting for multiple directories
+            tar -cf - -C component-rocm/content $members 2>/dev/null | \
+                xz "-${XZ_COMPRESS_LEVEL:-9}" -T"$(nproc)" > "$archive_name" && success=1
+        else
+            if command -v pigz &> /dev/null; then
+                # shellcheck disable=SC2086  # $members needs word splitting for multiple directories
+                tar -cf - -C component-rocm/content $members 2>/dev/null | \
+                    pigz -6 -p "$(nproc)" > "$archive_name" && success=1
+            else
+                # shellcheck disable=SC2086  # $members needs word splitting for multiple directories
+                tar -czf "$archive_name" -C component-rocm/content $members 2>/dev/null && success=1
+            fi
+        fi
+
+        if [[ $success -eq 1 ]]; then
+            local end_time
+            end_time=$(date +%s)
+            local compressed_size
+            compressed_size=$(stat -c%s "$archive_name" 2>/dev/null || stat -f%z "$archive_name" 2>/dev/null || echo 0)
+
+            print_compression_stats "$source_size" "$compressed_size" "$((end_time - start_time))"
+
+            ((compressed_count++))
+            for member in $members; do
+                rm -rf "component-rocm/content/$member"
+                echo -e "  \e[93mRemoved uncompressed: component-rocm/content/$member\e[0m"
+            done
+        else
+            ((error_count++))
+            echo -e "  \e[31mERROR: Failed to compress family $family\e[0m"
+        fi
+        echo ""
+    done
+}
+
+compress_base() {
+    local -n compressed_count=$1
+    local -n error_count=$2
+
+    if [[ ! -d "component-rocm/content/base" ]]; then
+        return 0
+    fi
+
+    local archive_name="component-rocm/content-base.tar.xz"
+    echo "[$((compressed_count + 1))] Compressing ROCm content for: base"
+
+    if compress_directory "component-rocm/content/base" "$archive_name"; then
+        ((compressed_count++))
+        rm -rf "component-rocm/content/base"
+        echo -e "  \e[93mRemoved uncompressed: component-rocm/content/base\e[0m"
+    else
+        ((error_count++))
+        echo -e "  \e[31mERROR: Failed to compress base\e[0m"
+    fi
+    echo ""
+
+    # Remove empty content directory
+    if [[ -d "component-rocm/content" ]] && [[ -z "$(ls -A component-rocm/content)" ]]; then
+        rmdir component-rocm/content
+        echo -e "  \e[93mRemoved empty content directory\e[0m"
+        echo ""
+    fi
+}
+
+compress_amdgpu() {
+    local -n compressed_count=$1
+    local -n error_count=$2
+
+    if [[ ! -d "component-amdgpu" ]]; then
+        return 0
+    fi
+
+    echo "Compressing AMDGPU component..."
+    echo ""
+    echo "[$((compressed_count + 1))] Compressing component-amdgpu/content"
+
+    if [[ -d "component-amdgpu/content" ]]; then
+        if compress_directory "component-amdgpu/content" "component-amdgpu/content-amdgpu.tar.xz"; then
+            ((compressed_count++))
+            rm -rf "component-amdgpu/content"
+            echo -e "  \e[93mRemoved uncompressed: component-amdgpu/content\e[0m"
+        else
+            ((error_count++))
+            echo -e "  \e[31mERROR: Failed to compress component-amdgpu/content\e[0m"
+        fi
+    else
+        echo -e "  \e[93mNo content directory found in component-amdgpu, skipping compression\e[0m"
+    fi
+    echo ""
 }
 
 compress_components() {
@@ -1177,7 +1516,7 @@ compress_components() {
     local INSTALLER_DIR="../rocm-installer"
     cd "$INSTALLER_DIR" || exit 1
 
-    # Remove any old component archives from previous builds
+    # Remove old archives
     echo ""
     echo "Removing old component archives..."
     rm -f component-rocm/content-*.tar.* component-amdgpu/content-amdgpu.tar.* 2>/dev/null
@@ -1187,71 +1526,23 @@ compress_components() {
     local total_compressed=0
     local total_errors=0
 
-    # Compress ROCm content directories per-gfx architecture
-    if [[ -d "component-rocm/content" ]]; then
-        echo "Compressing ROCm content directories..."
-        echo ""
+    # Compress GFX families
+    compress_gfx total_compressed total_errors
 
-        for content_dir in component-rocm/content/*; do
-            if [[ -d "$content_dir" ]]; then
-                local gfx_tag
-                gfx_tag=$(basename "$content_dir")
+    # Compress base directory
+    compress_base total_compressed total_errors
 
-                local archive_name="component-rocm/content-${gfx_tag}.tar.xz"
+    # Compress AMDGPU
+    compress_amdgpu total_compressed total_errors
 
-                echo "[$((total_compressed + 1))] Compressing ROCm content for: $gfx_tag"
-
-                if compress_directory "$content_dir" "$archive_name"; then
-                    ((total_compressed++))
-                    # Remove the uncompressed content directory after successful compression
-                    rm -rf "$content_dir"
-                    echo -e "  \e[93mRemoved uncompressed: $content_dir\e[0m"
-                else
-                    ((total_errors++))
-                    echo -e "  \e[31mERROR: Failed to compress $content_dir\e[0m"
-                fi
-                echo ""
-            fi
-        done
-
-        # Remove the empty content parent directory if all subdirectories were compressed
-        if [[ -d "component-rocm/content" ]] && [[ -z "$(ls -A component-rocm/content)" ]]; then
-            rmdir component-rocm/content
-            echo -e "  \e[93mRemoved empty content directory\e[0m"
-            echo ""
-        fi
-    fi
-
-    # Compress AMDGPU component directory (single archive for all distros)
-    if [[ -d "component-amdgpu" ]]; then
-        echo "Compressing AMDGPU component..."
-        echo ""
-
-        echo "[$((total_compressed + 1))] Compressing component-amdgpu/content"
-
-        # Only compress content/ subdirectory, keep deps/ and scriptlets/ uncompressed
-        if [[ -d "component-amdgpu/content" ]]; then
-            if compress_directory "component-amdgpu/content" "component-amdgpu/content-amdgpu.tar.xz"; then
-                ((total_compressed++))
-                # Remove the uncompressed content directory after successful compression
-                rm -rf "component-amdgpu/content"
-                echo -e "  \e[93mRemoved uncompressed: component-amdgpu/content\e[0m"
-            else
-                ((total_errors++))
-                echo -e "  \e[31mERROR: Failed to compress component-amdgpu/content\e[0m"
-            fi
-        else
-            echo -e "  \e[93mNo content directory found in component-amdgpu, skipping compression\e[0m"
-        fi
-        echo ""
-    fi
-
-    # Skip compression for component-rocm-deb (small metadata-only directory)
+    # Skip component-rocm-deb (metadata-only)
     if [[ -d "component-rocm-deb" ]]; then
         echo "Skipping compression for component-rocm-deb (metadata-only, <1MB)"
     fi
 
     cd - >/dev/null || exit
+
+    # Summary
     echo ""
     echo "-------------------------------------------------------------"
     echo "Compression Summary:"
@@ -1282,8 +1573,24 @@ build_UI() {
         mkdir $BUILD_DIR_UI
 
         pushd $BUILD_DIR_UI || exit
+            # Detect multi-arch build by checking GFX_FAMILY_MAP
+            local is_multiarch=false
+            for fine_arch in "${!GFX_FAMILY_MAP[@]}"; do
+                local coarse="${GFX_FAMILY_MAP[$fine_arch]}"
+                if [[ "$fine_arch" != "$coarse" ]]; then
+                    is_multiarch=true
+                    break
+                fi
+            done
+
             # UI now reads VERSION file at runtime - no version parameters needed
-            cmake ../build-installer
+            if [[ "$is_multiarch" == "true" ]]; then
+                echo "Building UI with MULTI_ARCH_BUILD support"
+                cmake -DMULTI_ARCH_BUILD=ON ../build-installer
+            else
+                echo "Building UI for single-arch installer"
+                cmake -DMULTI_ARCH_BUILD=OFF ../build-installer
+            fi
             if ! make; then
                 echo -e "\e[31mFailed GUI build.\e[0m"
                 exit 1
@@ -1366,6 +1673,9 @@ os_release
 
 # Load config file if specified (allows command-line args to override)
 read_config "$@"
+
+# Initialize GFX_FAMILY_MAP based on build type (after config is loaded)
+initialize_gfx_family_map
 
 # parse args
 while (($#))

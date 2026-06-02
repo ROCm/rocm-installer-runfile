@@ -30,6 +30,9 @@ list(GET VERSION_STRING_LIST 1 ROCM_VERSION_STRING)
 
 project(rocm_runfile_installer VERSION ${VERSION_STRING} LANGUAGES C)
 
+# Multi-arch build option (set by build-installer.sh)
+option(MULTI_ARCH_BUILD "Build for multi-arch installer" OFF)
+
 # Dependency check
 find_program(MAKESELF makeself)
 
@@ -42,6 +45,7 @@ message(STATUS "VERSION_STRING      = " ${VERSION_STRING})
 message(STATUS "ROCM_VERSION_STRING = " ${ROCM_VERSION_STRING})
 message(STATUS "INSTALLER_NAME      = " ${INSTALLER_NAME})
 message(STATUS "AMDGPU_DKMS         = " ${AMDGPU_DKMS})
+message(STATUS "MULTI_ARCH_BUILD    = " ${MULTI_ARCH_BUILD})
 message(STATUS "MAKESELF_VERSION    = " ${MAKESELF_VERSION})
 message(STATUS "MAKESELF_OPTIONS    = " ${MAKESELF_OPTIONS})
 message(STATUS "INCLUDE_DIRECTORIES            = " ${INCLUDE_DIRECTORIES})

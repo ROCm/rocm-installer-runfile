@@ -5,16 +5,29 @@
 # This script detects the GFX architecture of AMD GPUs and maps them to
 # ROCm package groups for use with the ROCm installer.
 #
-# Supported ROCm Package Groups:
+# Installer Type Detection:
+#   - Single-arch installers: Returns coarse families (gfx110x, gfx94x, etc.)
+#   - Multi-arch installers: Returns fine-grained archs (gfx1101, gfx942, etc.)
+#
+# Supported ROCm Package Groups (Single-Arch):
 #   gfx908  - MI100 (CDNA1)
 #   gfx90a  - MI210, MI250, MI250X (CDNA2)
 #   gfx94x  - MI300A, MI300X, MI308X, MI325X (CDNA3)
 #   gfx950  - MI350, MI355, MI358 (CDNA4)
+#   gfx101x - RX 5000 series (RDNA1)
+#   gfx103x - RX 6000 series (RDNA2)
 #   gfx110x - RX 7900/7800/7700/7600, Ryzen 7000 APU (RDNA3)
-#   gfx1150 - Ryzen AI 300 Strix Point (Radeon 880M/890M)
-#   gfx1151 - Ryzen AI Max Strix Halo (RDNA3.5)
-#   gfx1152 - Krackan1 APU (RDNA3.5)
+#   gfx115x - Ryzen AI 300/Max series (RDNA3.5)
 #   gfx120x - RX 9070 series (RDNA4)
+#
+# Supported Fine-Grained Archs (Multi-Arch):
+#   gfx900, gfx906 (Vega), gfx908 (MI100), gfx90a (MI250/MI210)
+#   gfx942 (MI300), gfx950 (MI350+)
+#   gfx1010, gfx1011, gfx1012 (RDNA1)
+#   gfx1030-gfx1036 (RDNA2)
+#   gfx1100-gfx1103 (RDNA3)
+#   gfx1150-gfx1153 (RDNA3.5)
+#   gfx1200, gfx1201 (RDNA4)
 #
 # Detection Methods (in priority order):
 #   1. ROCm tools (amd-smi, rocminfo) - most accurate
@@ -46,6 +59,9 @@ FORCE_METHOD=""
 OUTPUT_FORMAT=""  # gfx, device-id, revision, name, all
 DEDUPLICATE=0     # Deduplicate output when set to 1
 SIMULATE=0        # Simulate mode - output hardcoded test data
+
+# Installer type detection
+INSTALLER_TYPE=""  # "single" or "multi" - auto-detected
 
 # Global arrays to store detected GPU data
 declare -a GPU_NAMES=()
@@ -199,33 +215,320 @@ EXAMPLES:
 EOF
 }
 
+# Detect installer type based on available component directories
+# Returns: "single" for single-arch installer, "multi" for multi-arch installer
+detect_installer_type() {
+    # Detect if installer is multi-arch or single-arch
+    # Multi-arch: Has fine-grained architectures (gfx1100, gfx1101, etc.)
+    # Single-arch: Has coarse families only (gfx110x, gfx94x, etc.)
+
+    local script_dir
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+    # Primary method: Check INSTALLER_BUILD_TYPE from .gfx-lists file
+    if [[ -f "$script_dir/component-rocm/.gfx-lists" ]]; then
+        # Source the file to get INSTALLER_BUILD_TYPE
+        # shellcheck source=/dev/null
+        source "$script_dir/component-rocm/.gfx-lists"
+
+        # Check if INSTALLER_BUILD_TYPE is set
+        if [[ -n "${INSTALLER_BUILD_TYPE:-}" ]]; then
+            if [[ "$INSTALLER_BUILD_TYPE" == "multi-arch" ]]; then
+                echo "multi"
+                return 0
+            elif [[ "$INSTALLER_BUILD_TYPE" == "single-arch" ]]; then
+                echo "single"
+                return 0
+            fi
+        fi
+    fi
+
+    # Fallback: Infer from directory structure (for older installers without INSTALLER_BUILD_TYPE)
+    local content_dir="$script_dir/component-rocm/content"
+    if [[ -d "$content_dir" ]]; then
+        # Check for fine-grained arch directories
+        if [[ -d "$content_dir"/gfx1100 ]] || [[ -d "$content_dir"/gfx1101 ]] || \
+           [[ -d "$content_dir"/gfx940 ]] || [[ -d "$content_dir"/gfx941 ]] || \
+           [[ -d "$content_dir"/gfx1030 ]] || [[ -d "$content_dir"/gfx1031 ]] || \
+           [[ -d "$content_dir"/gfx1200 ]] || [[ -d "$content_dir"/gfx1201 ]]; then
+            echo "multi"
+            return 0
+        fi
+    fi
+
+    # Default to single-arch
+    echo "single"
+    return 0
+}
+
 # Map specific GFX architecture to installer package group
 # (e.g., gfx110x covers gfx1100, gfx1101, gfx1102, gfx1103)
+# For multi-arch installers, returns fine-grained arch as-is
+# For single-arch installers, maps to coarse family
 map_gfx_to_package_group() {
     local gfx_arch="$1"
 
-    case "$gfx_arch" in
-        # CDNA
-        gfx940|gfx941|gfx942)  echo "gfx94x" ;;  # MI300 series
-        gfx90a)                echo "gfx90a" ;;  # MI250/MI210
-        gfx908)                echo "gfx908" ;;  # MI100
-        gfx950)                echo "gfx950" ;;  # MI350+
+    # Detect installer type if not already detected
+    if [[ -z "$INSTALLER_TYPE" ]]; then
+        INSTALLER_TYPE=$(detect_installer_type)
+    fi
 
-        # RDNA3
-        gfx1100|gfx1101|gfx1102|gfx1103) echo "gfx110x" ;;  # RX 7000 series
-        gfx1150)               echo "gfx1150" ;;  # Ryzen AI 300
-        gfx1151)               echo "gfx1151" ;;  # Ryzen AI Max
-        gfx1152)               echo "gfx1152" ;;  # Krackan1 APU
+    # For multi-arch installers, return fine-grained arch as-is
+    # (installer handles fine-grained arch selection)
+    if [[ "$INSTALLER_TYPE" == "multi" ]]; then
+        case "$gfx_arch" in
+            # Return supported fine-grained architectures as-is
+            gfx900|gfx906|gfx908|gfx90a|gfx942|gfx950|\
+            gfx1010|gfx1011|gfx1012|\
+            gfx1030|gfx1031|gfx1032|gfx1033|gfx1034|gfx1035|gfx1036|\
+            gfx1100|gfx1101|gfx1102|gfx1103|\
+            gfx1150|gfx1151|gfx1152|gfx1153|\
+            gfx1200|gfx1201)
+                echo "$gfx_arch"
+                ;;
+            # Unsupported/unknown
+            *)
+                echo "unknown"
+                ;;
+        esac
+    else
+        # For single-arch installers, map to coarse family (existing behavior)
+        case "$gfx_arch" in
+            # CDNA
+            gfx940|gfx941|gfx942)  echo "gfx94x" ;;  # MI300 series
+            gfx90a)                echo "gfx90a" ;;  # MI250/MI210
+            gfx908)                echo "gfx908" ;;  # MI100
+            gfx950)                echo "gfx950" ;;  # MI350+
 
-        # RDNA4
-        gfx1200|gfx1201)       echo "gfx120x" ;;  # RX 9070 series
+            # RDNA3
+            gfx1100|gfx1101|gfx1102|gfx1103) echo "gfx110x" ;;  # RX 7000 series
+            gfx1150)               echo "gfx1150" ;;  # Ryzen AI 300
+            gfx1151)               echo "gfx1151" ;;  # Ryzen AI Max
+            gfx1152)               echo "gfx1152" ;;  # Krackan1 APU
+            gfx1153)               echo "gfx1153" ;;  # RDNA3.5
 
-        # Legacy/unsupported
-        gfx900|gfx906|gfx909)  echo "unsupported" ;;  # Vega
-        gfx1010|gfx1011|gfx1012|gfx1013) echo "unsupported" ;;  # RDNA1
-        gfx1030|gfx1031|gfx1032|gfx1033|gfx1034|gfx1035|gfx1036) echo "unsupported" ;;  # RDNA2
+            # RDNA4
+            gfx1200|gfx1201)       echo "gfx120x" ;;  # RX 9070 series
 
-        *)                     echo "unknown" ;;
+            # RDNA2 (map to family for single-arch)
+            gfx1030|gfx1031|gfx1032|gfx1033|gfx1034|gfx1035|gfx1036) echo "gfx103x" ;;
+
+            # RDNA1 (map to family for single-arch)
+            gfx1010|gfx1011|gfx1012|gfx1013) echo "gfx101x" ;;
+
+            # Vega (map to family for single-arch)
+            gfx900|gfx906|gfx909)  echo "gfx900" ;;
+
+            # Legacy/unsupported
+            *)                     echo "unknown" ;;
+        esac
+    fi
+
+    return 0
+}
+
+# Map PCI device ID + revision ID to GFX architecture (revision-aware)
+# Some device IDs require revision ID to differentiate between GFX architectures
+# Data from radeon-powerbi Excel sheets in GPU-INFO directory
+map_device_id_with_revision_to_gfx() {
+    local device_id="$1"
+    local revision_id="$2"
+
+    # Remove 0x prefix if present
+    device_id="${device_id#0x}"
+    device_id="${device_id,,}"  # Convert to lowercase
+
+    # Normalize revision ID (uppercase, remove 0x prefix)
+    revision_id="${revision_id#0x}"
+    revision_id="${revision_id^^}"  # Convert to uppercase
+
+    # Revision-specific mappings (Device ID + Revision ID -> GFX)
+    # Format: device_id/revision_id
+    # Data sources: radeon-powerbi Excel sheets + amdgpu-gfx-mapping.db
+    case "${device_id}/${revision_id}" in
+        # Vega (gfx900/gfx906)
+        66a1/02) echo "gfx906" ;;  # Radeon Pro VII
+        66a1/06) echo "gfx906" ;;  # Radeon Pro VII
+        66af/c1) echo "gfx906" ;;
+        6861/00) echo "gfx900" ;;  # Radeon Pro WX 9100
+        6868/00) echo "gfx900" ;;  # Radeon Pro WX 8200
+        687f/c1) echo "gfx900" ;;  # AMD Radeon RX Vega 64
+        687f/c7) echo "gfx900" ;;  # AMD Radeon RX Vega 56
+        69af/cf) echo "gfx900" ;;  # AMD Radeon RX Vega 20
+
+        # RDNA1 - RX 5000 series (Navi10)
+        7312/00) echo "gfx1010" ;;  # AMD Radeon Pro W5700
+        731f/c0) echo "gfx1010" ;;
+        731f/c1) echo "gfx1010" ;;  # AMD Radeon RX 5700 XT
+        731f/c2) echo "gfx1010" ;;  # AMD Radeon RX 5600M
+        731f/c3) echo "gfx1010" ;;  # AMD Radeon RX 5700M
+        731f/c4) echo "gfx1010" ;;  # AMD Radeon RX 5700
+        731f/c5) echo "gfx1010" ;;
+        731f/ca) echo "gfx1010" ;;  # AMD Radeon RX 5600 XT
+        731f/cb) echo "gfx1010" ;;  # AMD Radeon RX 5600
+
+        # RDNA1 - RX 5000 series (Navi14)
+        7340/00) echo "gfx1012" ;;
+        7340/c1) echo "gfx1012" ;;  # AMD Radeon RX 5500M
+        7340/c3) echo "gfx1012" ;;  # AMD Radeon RX 5300M
+        7340/c5) echo "gfx1012" ;;
+        7340/c7) echo "gfx1012" ;;  # AMD Radeon RX 5500
+        7340/c9) echo "gfx1012" ;;
+        7340/cf) echo "gfx1012" ;;  # AMD Radeon RX 5300
+        7341/00) echo "gfx1012" ;;  # AMD Radeon Pro W5500
+        7347/00) echo "gfx1012" ;;  # AMD Radeon Pro W5500M
+
+        # RDNA2 - RX 6000 series (Navi21)
+        73a3/00) echo "gfx1030" ;;  # AMD Radeon PRO W6800 GPU
+        73a5/c0) echo "gfx1030" ;;  # AMD Radeon RX 6950 XT
+        73af/c0) echo "gfx1030" ;;  # AMD Radeon RX 6900 XT
+        73bf/c0) echo "gfx1030" ;;  # AMD Radeon RX 6900 XT
+        73bf/c1) echo "gfx1030" ;;  # AMD Radeon RX 6800 XT
+        73bf/c3) echo "gfx1030" ;;  # AMD Radeon RX 6800
+
+        # RDNA2 - RX 6000 series (Navi23)
+        73e1/00) echo "gfx1032" ;;  # AMD Radeon PRO W6600M GPU
+        73e3/00) echo "gfx1032" ;;  # AMD Radeon PRO W6600
+        73ef/c0) echo "gfx1032" ;;  # AMD Radeon RX 6800S
+        73ef/c1) echo "gfx1032" ;;  # AMD Radeon RX 6650 XT
+        73ef/c2) echo "gfx1032" ;;  # AMD Radeon RX 6700S
+        73ef/c3) echo "gfx1032" ;;  # AMD Radeon RX 6650M
+        73ef/c4) echo "gfx1032" ;;  # AMD Radeon RX 6650M XT
+        73ef/c7) echo "gfx1032" ;;  # AMD Radeon RX 6650M 6GB
+        73ff/c1) echo "gfx1032" ;;  # AMD Radeon RX 6600 XT
+        73ff/c3) echo "gfx1032" ;;  # AMD Radeon RX 6600M
+        73ff/c7) echo "gfx1032" ;;  # AMD Radeon RX 6600
+        73ff/cb) echo "gfx1032" ;;  # AMD Radeon RX 6600S
+        73ff/cf) echo "gfx1032" ;;  # AMD Radeon RX 6600 LE
+        73ff/ef) echo "gfx1032" ;;  # AMD Radeon RX 6600M
+
+        # RDNA2 - RX 6000 series (Navi24)
+        7421/00) echo "gfx1033" ;;  # AMD Radeon PRO W6500M GPU
+        7422/00) echo "gfx1033" ;;  # AMD Radeon PRO W6400 GPU
+        7423/00) echo "gfx1033" ;;  # AMD Radeon PRO W6300M
+        7423/01) echo "gfx1033" ;;  # AMD Radeon PRO W6300 GPU
+        7424/00) echo "gfx1033" ;;  # AMD Radeon RX 6300
+        743f/c1) echo "gfx1033" ;;  # AMD Radeon RX 6500 XT
+        743f/c3) echo "gfx1033" ;;  # AMD Radeon RX 6500M
+        743f/c7) echo "gfx1033" ;;  # AMD Radeon RX 6400
+        743f/c8) echo "gfx1033" ;;  # AMD Radeon RX 6550M
+        743f/cc) echo "gfx1033" ;;  # AMD Radeon RX 6550S
+        743f/ce) echo "gfx1033" ;;  # AMD Radeon RX 6450M
+        743f/cf) echo "gfx1033" ;;  # AMD Radeon RX 6300M
+        743f/d3) echo "gfx1033" ;;  # AMD Radeon RX 6550M
+
+        # RDNA3 - RX 7000 series (Navi31)
+        7448/00) echo "gfx1100" ;;  # AMD Radeon PRO W7900 GPU
+        7449/00) echo "gfx1100" ;;  # AMD RadeonTM Pro W7800 48GB
+        744a/00) echo "gfx1100" ;;  # AMD Radeon PRO W7900 GPU Dual Slot
+        744b/00) echo "gfx1100" ;;  # AMD Radeon PRO W7900D
+        744c/c8) echo "gfx1100" ;;  # AMD Radeon RX 7900 XTX
+        744c/cc) echo "gfx1100" ;;  # AMD Radeon RX 7900 XT
+        744c/ce) echo "gfx1100" ;;  # AMD Radeon RX 7900 GRE
+        744c/cf) echo "gfx1100" ;;  # AMD Radeon RX 7900M
+        745e/cc) echo "gfx1100" ;;  # AMD Radeon PRO W7800 GPU
+
+        # RDNA3 - RX 7000 series (Navi32)
+        7470/00) echo "gfx1101" ;;  # AMD Radeon PRO W7700 GPU
+        747e/c8) echo "gfx1101" ;;  # AMD Radeon RX 7800 XT
+        747e/c9) echo "gfx1101" ;;  # TBD
+        747e/d8) echo "gfx1101" ;;  # AMD Radeon RX 7800M
+        747e/db) echo "gfx1101" ;;  # AMD Radeon RX 7700
+        747e/ff) echo "gfx1101" ;;  # AMD Radeon RX 7700 XT
+
+        # RDNA3 - RX 7000 series (Navi33)
+        7480/00) echo "gfx1102" ;;  # AMD Radeon PRO W7600 GPU
+        7480/c0) echo "gfx1102" ;;  # AMD Radeon RX 7600 XT
+        7480/c1) echo "gfx1102" ;;  # AMD Radeon RX 7700S
+        7480/c2) echo "gfx1102" ;;  # AMD Radeon RX7650GRE
+        7480/c3) echo "gfx1102" ;;  # AMD Radeon RX 7600S
+        7480/c7) echo "gfx1102" ;;  # AMD Radeon RX 7600M XT
+        7480/cf) echo "gfx1102" ;;  # AMD Radeon RX 7600
+        7483/cf) echo "gfx1102" ;;  # AMD Radeon RX 7600M
+        7487/cf) echo "gfx1102" ;;  # AMD Radeon RX 7500M
+        7489/00) echo "gfx1102" ;;  # AMD Radeon PRO W7500 GPU
+        7499/00) echo "gfx1102" ;;  # AMD Radeon Pro W7400 GPU
+        7499/c0) echo "gfx1102" ;;  # AMD Radeon RX 7400
+        7499/c1) echo "gfx1102" ;;  # AMD Radeon RX 7300
+
+        # CRITICAL: Phoenix APU (0x15BF) - Ryzen 7000 series
+        # Different revisions map to DIFFERENT GFX architectures:
+        # - Specific revisions below -> gfx1100 (discrete-class RDNA3)
+        # - Other revisions -> gfx1103 (APU-class RDNA3) via fallback mapping
+        15bf/00) echo "gfx1100" ;;
+        15bf/02) echo "gfx1100" ;;
+        15bf/06) echo "gfx1100" ;;
+        15bf/c1) echo "gfx1100" ;;
+        15bf/c2) echo "gfx1100" ;;
+        15bf/c4) echo "gfx1100" ;;
+        15bf/c6) echo "gfx1100" ;;
+        15bf/c7) echo "gfx1100" ;;
+        15bf/c9) echo "gfx1100" ;;
+        15bf/cf) echo "gfx1100" ;;
+        15bf/d0) echo "gfx1100" ;;
+        15bf/d2) echo "gfx1100" ;;
+        15bf/d3) echo "gfx1100" ;;
+        15bf/d4) echo "gfx1100" ;;
+        15bf/d7) echo "gfx1100" ;;
+        15bf/d9) echo "gfx1100" ;;
+        15bf/da) echo "gfx1100" ;;
+        15bf/dd) echo "gfx1100" ;;
+
+        # CRITICAL: Phoenix APU (0x1900) - Ryzen 7000 series
+        # Different revisions map to DIFFERENT GFX architectures:
+        # - Specific revisions below -> gfx1100 (discrete-class RDNA3)
+        # - Other revisions -> gfx1103 (APU-class RDNA3) via fallback mapping
+        1900/01) echo "gfx1100" ;;
+        1900/03) echo "gfx1100" ;;
+        1900/05) echo "gfx1100" ;;
+        1900/06) echo "gfx1100" ;;
+        1900/b0) echo "gfx1100" ;;
+        1900/b1) echo "gfx1100" ;;
+        1900/b2) echo "gfx1100" ;;
+        1900/b3) echo "gfx1100" ;;
+        1900/b4) echo "gfx1100" ;;
+        1900/b5) echo "gfx1100" ;;
+        1900/b6) echo "gfx1100" ;;
+        1900/b9) echo "gfx1100" ;;
+        1900/ba) echo "gfx1100" ;;
+        1900/bb) echo "gfx1100" ;;
+        1900/c0) echo "gfx1100" ;;
+        1900/c2) echo "gfx1100" ;;
+        1900/c4) echo "gfx1100" ;;
+        1900/c5) echo "gfx1100" ;;
+        1900/c7) echo "gfx1100" ;;
+        1900/c9) echo "gfx1100" ;;
+        1900/cb) echo "gfx1100" ;;
+        1900/cc) echo "gfx1100" ;;
+        1900/ce) echo "gfx1100" ;;
+        1900/d0) echo "gfx1100" ;;
+        1900/d2) echo "gfx1100" ;;
+        1900/d4) echo "gfx1100" ;;
+        1900/d5) echo "gfx1100" ;;
+        1900/d7) echo "gfx1100" ;;
+        1900/d9) echo "gfx1100" ;;
+        1900/db) echo "gfx1100" ;;
+        1900/dc) echo "gfx1100" ;;
+        1900/de) echo "gfx1100" ;;
+        1900/f0) echo "gfx1100" ;;
+        1900/f1) echo "gfx1100" ;;
+        1900/f2) echo "gfx1100" ;;
+
+        # RDNA4 - RX 9000 series (Navi48 -> gfx1201)
+        7550/c0) echo "gfx1201" ;;  # AMD Radeon RX 9070 XT
+        7550/c2) echo "gfx1201" ;;  # AMD Radeon 9070 GRE
+        7550/c3) echo "gfx1201" ;;  # AMD Radeon RX 9070
+        7551/c0) echo "gfx1201" ;;  # AMD Radeon AI PRO R9700
+        7551/c1) echo "gfx1201" ;;  # AMD Radeon AI PRO R9700S
+        7551/c8) echo "gfx1201" ;;  # AMD Radeon AI PRO R9600D
+
+        # RDNA4 - RX 9000 series (Navi44 -> gfx1200)
+        7590/c0) echo "gfx1200" ;;  # AMD Radeon 9060 XT
+        7590/c1) echo "gfx1200" ;;  # AMD Radeon RX 9060 XT LP
+        7590/c7) echo "gfx1200" ;;  # AMD Radeon 9060
+
+        # No revision-specific mapping found
+        *) return 1 ;;
     esac
 
     return 0
@@ -233,9 +536,22 @@ map_gfx_to_package_group() {
 
 # Map PCI device ID to GFX architecture
 # Device IDs from AMDGPU driver, ROCm metadata, and verified hardware
+# Note: This function is revision-agnostic. For revision-aware mapping,
+#       use map_device_id_with_revision_to_gfx() first.
 map_device_id_to_gfx() {
     local device_id="$1"
+    local revision_id="${2:-}"  # Optional revision ID parameter
 
+    # Try revision-aware mapping first (if revision ID provided)
+    if [[ -n "$revision_id" ]]; then
+        local gfx_with_rev
+        if gfx_with_rev=$(map_device_id_with_revision_to_gfx "$device_id" "$revision_id" 2>/dev/null); then
+            echo "$gfx_with_rev"
+            return 0
+        fi
+    fi
+
+    # Fall back to revision-agnostic mapping
     # Remove 0x prefix if present
     device_id="${device_id#0x}"
     device_id="${device_id,,}"  # Convert to lowercase
@@ -295,9 +611,11 @@ map_device_id_to_gfx() {
         163f) echo "gfx1033" ;;
         164e) echo "gfx1036" ;;
 
-        # RDNA4 - RX 9070 series
-        7550|7551|7552|7553|7554|7555|7556|7557|7558|7559|755a|755b|755c|755d|755e|755f|7590)
-            echo "gfx1200" ;;
+        # RDNA4 - RX 9000 series
+        # Note: 0x7550/0x7551 are Navi48 (gfx1201), 0x7590 is Navi44 (gfx1200)
+        # Revision ID is required for accurate detection - use revision-aware mapping when available
+        7550|7551) echo "gfx1201" ;;  # Navi48: RX 9070 series (default without revision)
+        7590) echo "gfx1200" ;;  # Navi44: RX 9060 series
 
         *) return 1 ;;
     esac
@@ -364,7 +682,12 @@ detect_from_sysfs() {
         fi
 
         local gfx_arch
-        gfx_arch=$(map_device_id_to_gfx "$device_id")
+        # Pass revision ID to enable revision-aware mapping
+        if [[ -n "$rev_id" ]]; then
+            gfx_arch=$(map_device_id_to_gfx "$device_id" "$rev_id")
+        else
+            gfx_arch=$(map_device_id_to_gfx "$device_id")
+        fi
 
         if [[ -n "$gfx_arch" ]]; then
             detected_gfx_list+=("$gfx_arch")
@@ -418,7 +741,12 @@ detect_from_pci() {
         fi
 
         local gfx_arch
-        gfx_arch=$(map_device_id_to_gfx "$device_id")
+        # Pass revision ID to enable revision-aware mapping
+        if [[ -n "$rev_id" && "$rev_id" != "00" ]]; then
+            gfx_arch=$(map_device_id_to_gfx "$device_id" "$rev_id")
+        else
+            gfx_arch=$(map_device_id_to_gfx "$device_id")
+        fi
 
         if [[ -n "$gfx_arch" ]]; then
             detected_gfx_list+=("$gfx_arch")

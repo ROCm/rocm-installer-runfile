@@ -237,7 +237,10 @@ Usage:
             <arch> = GPU architecture to install (e.g., gfx94x, gfx950, etc.)
                      Installs base components plus architecture-specific components.
                      If not specified, only base components are installed.
-                     Use gfx=list to see available architectures in this installer.
+
+                     Special values:
+                       gfx=all  - Install all available architectures
+                       gfx=list - Show available architectures in this installer
                      Available architectures: gfx94x, gfx950
 
         compo=<component_list>
@@ -286,8 +289,9 @@ Usage:
                                          rocm-ver  = ROCm version directory: rocm-x.y.z (x=major, y=minor, patch number)
 
                              * If target=<directory/rocm-ver> is not provided, uninstall will be from /opt/rocm-x.y.z
-                             * Optional: Use compo= and gfx= for selective uninstall (same args as install)
-                             * If compo=/gfx= not specified, auto-detects and uninstalls all installed components
+                             * Optional: Use gfx= for selective GFX uninstall
+                             * Use gfx=all to uninstall all architectures
+                             * If gfx= not specified, auto-detects and uninstalls all installed components
 
         uninstall-amdgpu = Uninstall amdgpu driver.
 
@@ -331,6 +335,9 @@ Usage examples:
 
     * Install core-sdk with gfx support
         bash \$installer_name.run compo=core-sdk gfx=gfx94x rocm
+
+    * Multi-arch: Install all available architectures
+        bash \$installer_name.run gfx=all rocm
 
     * Install without post-install processing
         bash \$installer_name.run gfx=gfx94x rocm nopostrocm

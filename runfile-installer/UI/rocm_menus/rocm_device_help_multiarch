@@ -1,0 +1,108 @@
+[H1]Overview:
+Select the GPU architecture that matches your hardware. Multi-arch installers
+support fine-grained architectures for precise GPU matching. Each entry
+corresponds to a specific GPU model.
+
+[H1]What is Multi-Arch?
+Multi-arch installers contain components for multiple fine-grained GPU
+architectures. This allows you to install ROCm optimized for your exact GPU
+model, reducing installation size compared to installing all models.
+
+[H1]Fine-Grained Architectures:
+Unlike single-arch installers that use coarse families (gfx110x for all RDNA 3),
+multi-arch installers let you select specific models.
+
+  Single-arch example: gfx110x covers all RDNA 3 GPUs
+  Multi-arch example: gfx1100 (Navi 31), gfx1101 (Navi 32), gfx1102 (Navi 33)
+
+[H1]GPU Families:
+
+[H2]Instinct (Data Center):
+  MI355X/MI350X/MI350P (gfx950) - CDNA 4 architecture
+  MI325X/MI300X/MI300A (gfx942) - CDNA 3 architecture
+  MI250X/MI250/MI210   (gfx90a) - CDNA 2 architecture
+  MI100                (gfx908) - CDNA 1 architecture
+  Radeon Pro VII       (gfx906) - GCN 5.0 architecture
+  Radeon Pro WX series (gfx900) - GCN 5.0 architecture
+
+[H2]Radeon PRO (Professional Workstation):
+
+  RDNA 4 GPUs:
+    AI PRO R9700/R9600D  (gfx1201) - Navi 48
+
+  RDNA 3 GPUs:
+    W7900/W7800/W7900D   (gfx1100) - Navi 31
+    W7700                (gfx1101) - Navi 32
+    W7600                (gfx1102) - Navi 33
+
+  RDNA 2 GPUs:
+    W6800                (gfx1030) - Sienna Cichlid
+    W6600/W6600M         (gfx1032) - Beige Goby
+    W6500M/W6400/W6300   (gfx1033) - Beige Goby
+
+  RDNA 1 GPUs:
+    W5700/W5500          (gfx1010) - Navi 10
+
+[H2]Radeon RX (Consumer Gaming):
+
+  RDNA 4 GPUs:
+    RX 9070 series       (gfx1201) - Navi 48 high-end
+    RX 9060 series       (gfx1200) - Navi 44 mid-range
+
+  RDNA 3 GPUs:
+    RX 7900 series       (gfx1100) - Navi 31 high-end
+    RX 7800/7700 series  (gfx1101) - Navi 32 mid-range
+    RX 7600 series       (gfx1102) - Navi 33 mainstream
+
+  RDNA 2 GPUs:
+    RX 6950/6900/6800    (gfx1030) - Sienna Cichlid high-end
+    RX 6800S/6650/6600   (gfx1032) - Beige Goby mid-range
+    RX 6500/6450/6400    (gfx1033) - Beige Goby mainstream
+
+  RDNA 1 GPUs:
+    RX 5700/5600 series  (gfx1010) - Navi 10
+    RX 5500/5300 series  (gfx1012) - Navi 14
+
+  GCN GPUs:
+    RX Vega 64/56/20     (gfx900)  - Vega 10/20
+
+[H2]Ryzen APUs (Integrated Graphics):
+
+  RDNA 3.5 APUs:
+    AI Max PRO/Max 300       (gfx1151) - Radeon 8060S/8050S
+    AI PRO/AI 400/300 (9 HX) (gfx1150) - Radeon 890M
+    AI PRO/AI 400/300 (7/5)  (gfx1152) - Radeon 880M/860M/840M/820M
+    AI 400/300 (Other)       (gfx1153) - Various Radeon 800M
+
+  RDNA 3 APUs:
+    200 Series           (gfx1103) - Radeon 780M/760M/740M
+
+[H1]How to Choose:
+
+[H2]Option 1: Install All Architectures
+Select the "All Architectures" option at the top of the menu to install
+ROCm components for all available GPU architectures. This is the largest
+installation but ensures compatibility with any GPU in the system.
+
+[H2]Option 2: Install Specific Architecture
+If you know your GPU model, find it in the list above and select the
+corresponding gfx architecture for a smaller, optimized installation.
+
+Examples:
+  RX 7900 XTX: Select gfx1100
+  MI300X: Select gfx942
+  Ryzen AI 9 HX 370: Select gfx1150
+
+If unsure about your GPU model, after installation run 'rocminfo' or
+'amd-smi' to verify your GPU's exact gfx architecture code.
+
+[H1]Usage:
+Use Up/Down arrows to navigate. Family headers (Instinct:, Radeon PRO:, etc.)
+are automatically skipped during navigation.
+
+Press Space or Enter to select your GPU architecture.
+Press DONE when finished to return to the ROCm Options menu.
+
+[H1]Auto-Detection:
+If you don't select a GPU architecture manually, the installer will attempt
+to auto-detect your GPU and install the correct components automatically.
