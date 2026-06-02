@@ -1578,17 +1578,63 @@ get_kernel_packages_amzn() {
     echo "KERNEL_VER_AMZN: $KERNEL_VER_AMZN"
 
     if [[ $DEPS_LIST_ONLY == 0 ]]; then
-        if dnf list "kernel$KERNEL_MAJ_MIN-headers-$KERNEL_VER_AMZN"; then
-            echo "Kernel Packages for $KERNEL_VER_AMZN are available in the repositories."
+        # Check if base kernel package is available (without specific version)
+        # Amazon Linux 2023 uses package names like: kernel6.1-headers, kernel6.1-devel
+        echo "Checking for kernel$KERNEL_MAJ_MIN-headers package..."
+        if dnf list "kernel$KERNEL_MAJ_MIN-headers" &>/dev/null; then
+            echo "Found versioned package: kernel$KERNEL_MAJ_MIN-headers"
+            # Use versioned packages
+            KERNEL_PACKAGES="kernel$KERNEL_MAJ_MIN-headers kernel$KERNEL_MAJ_MIN-devel "
         else
-            print_err "Kernel Packages not available in the repositories."
-            exit 1
+            # Try without version prefix (Amazon Linux 2023 uses generic kernel-headers)
+            echo "kernel$KERNEL_MAJ_MIN-headers not found, checking for generic kernel-headers..."
+
+            # Query the available or installed kernel-headers version
+            local available_version
+            available_version=$(dnf list kernel-headers 2>/dev/null | grep "^kernel-headers" | awk '{print $2}' | sed 's/^[0-9]*://')
+
+            if [[ -z "$available_version" ]]; then
+                print_err "Kernel Packages not available in the repositories."
+                echo "Searched for: kernel$KERNEL_MAJ_MIN-headers and kernel-headers"
+                exit 1
+            fi
+
+            echo "Found generic kernel-headers package version: $available_version"
+
+            # Verify the available version matches the running kernel
+            if [[ "$available_version" == "$KERNEL_VER_AMZN" ]]; then
+                echo "✓ Kernel headers version matches running kernel: $KERNEL_VER_AMZN"
+                # Use generic packages with specific version
+                KERNEL_PACKAGES="kernel-headers-$KERNEL_VER_AMZN kernel-devel-$KERNEL_VER_AMZN "
+            else
+                print_err "Kernel headers version mismatch!"
+                echo "  Running kernel: $KERNEL_VER_AMZN"
+                echo "  Available headers: $available_version"
+                echo ""
+                echo "The available kernel-headers package does not match your running kernel."
+                echo "This may cause AMDGPU DKMS build failures."
+                echo ""
+                echo "Options:"
+                echo "  1. Update your system and reboot to kernel $available_version"
+                echo "  2. Install matching kernel-headers manually"
+                echo "  3. Continue anyway (may fail during DKMS build)"
+                read -p "Continue anyway? [y/N]: " -n 1 -r
+                echo
+                if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                    exit 1
+                fi
+                # Use generic packages (dnf will install best available)
+                KERNEL_PACKAGES="kernel-headers kernel-devel "
+            fi
+        fi
+    else
+        # List-only mode: use generic package names
+        if dnf list "kernel$KERNEL_MAJ_MIN-headers" &>/dev/null; then
+            KERNEL_PACKAGES="kernel$KERNEL_MAJ_MIN-headers kernel$KERNEL_MAJ_MIN-devel "
+        else
+            KERNEL_PACKAGES="kernel-headers kernel-devel "
         fi
     fi
-
-    # Use base package names for Amazon Linux kernel packages
-    # This allows proper matching with the installable package cache
-    KERNEL_PACKAGES="kernel$KERNEL_MAJ_MIN-headers kernel$KERNEL_MAJ_MIN-devel "
 
     FILTER_PACKAGES="kernel-devel"
     REMOVE_PACKAGES="kernel-headers"
