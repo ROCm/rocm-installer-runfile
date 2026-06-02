@@ -906,8 +906,25 @@ extract_gfx_archives_for_list() {
 
     local -a gfx_list=("$@")
     declare -A extracted_families
+    declare -A family_members  # Track which GFX archs belong to each family
 
-    echo "Extracting archives for base + ${#gfx_list[@]} GFX architecture(s)..."
+    # Pre-compute unique families needed and their members
+    declare -A families_needed
+    for gfx in "${gfx_list[@]}"; do
+        local family
+        family=$(get_coarse_family "$gfx")
+        families_needed[$family]=1
+
+        # Track members for this family
+        if [[ -z "${family_members[$family]:-}" ]]; then
+            family_members[$family]="$gfx"
+        else
+            family_members[$family]="${family_members[$family]} $gfx"
+        fi
+    done
+
+    local num_families=${#families_needed[@]}
+    echo "Extracting archives for base + $num_families GFX family/families (${#gfx_list[@]} architectures)..."
 
     # Step 1: Extract base archive first
     local base_archive="$INSTALLER_DIR/component-rocm/content-base.tar.xz"
@@ -930,21 +947,19 @@ extract_gfx_archives_for_list() {
     fi
 
     # Step 2: Extract GFX family archives
-    for gfx in "${gfx_list[@]}"; do
-        # Map to coarse family for archive extraction
-        local family
-        family=$(get_coarse_family "$gfx")
-
-        # Skip if already extracted this family
+    for family in "${!families_needed[@]}"; do
+        # Check if already extracted this family
         if [[ -n "${extracted_families[$family]:-}" ]]; then
-            echo "  Family $family already extracted (needed for $gfx), skipping"
             continue
         fi
 
+        # Get first member of this family to check if content exists
+        local first_member
+        first_member=$(echo "${family_members[$family]}" | awk '{print $1}')
+
         # Check if content already exists from previous extraction
-        local content_dir="$EXTRACT_ROCM_DIR/content/$gfx"
+        local content_dir="$EXTRACT_ROCM_DIR/content/$first_member"
         if [[ -d "$content_dir" ]]; then
-            echo "  Content for $gfx already extracted, skipping"
             extracted_families[$family]=1
             EXTRACTED_CONTENT_ARCHIVES="$EXTRACTED_CONTENT_ARCHIVES $family"
             continue
@@ -952,7 +967,6 @@ extract_gfx_archives_for_list() {
 
         # Check if already extracted in this session
         if echo "$EXTRACTED_CONTENT_ARCHIVES" | grep -q "$family"; then
-            echo "  Family $family already extracted (contains $gfx), skipping"
             extracted_families[$family]=1
             continue
         fi
@@ -962,12 +976,19 @@ extract_gfx_archives_for_list() {
 
         if [[ ! -f "$archive" ]]; then
             print_err "Required archive not found: $archive"
-            print_err "  Requested GFX: $gfx"
-            print_err "  Mapped to family: $family"
+            print_err "  Requested family: $family"
+            print_err "  Needed for: ${family_members[$family]}"
             return 1
         fi
 
-        echo "  Extracting family: $family (for $gfx)"
+        # Show which architectures this family provides
+        local member_count
+        member_count=$(echo "${family_members[$family]}" | wc -w)
+        if [[ $member_count -eq 1 ]]; then
+            echo "  Extracting family: $family"
+        else
+            echo "  Extracting family: $family (provides: ${family_members[$family]})"
+        fi
 
         if ! "$INSTALLER_DIR/component-extractor.sh" "$archive" "$EXTRACT_ROCM_DIR/content" "$INSTALLER_DIR"; then
             print_err "Failed to extract archive: $archive"
@@ -3354,6 +3375,7 @@ uninstall_gfx_components() {
 
     # Delete GFX-specific files (MULTI-ARCH ONLY)
     # This uses the multi-arch directory structure: component-rocm/content/gfxXYZ/
+    # Archives should have been extracted before calling this function
     if [[ ${#components_to_remove[@]} -gt 0 ]]; then
         local rocm_ver_dir="$TARGET_DIR/rocm/core-$ROCM_VER"
         local gfx_content_dir="$EXTRACT_ROCM_DIR/content/$gfx"
@@ -3380,8 +3402,6 @@ uninstall_gfx_components() {
                         if [[ -f "$install_file" ]]; then
                             $SUDO rm -f "$install_file"
                             ((files_deleted++))
-                        else
-                            echo -e "\e[33mWARNING: Expected file not found: $install_file\e[0m"
                         fi
                     done < <(find "$component_dir" -type f 2>/dev/null)
                 fi
@@ -3393,8 +3413,8 @@ uninstall_gfx_components() {
             echo "Cleaning up empty directories..."
             $SUDO find "$rocm_ver_dir" -type d -empty -delete 2>/dev/null || true
         else
-            echo "WARNING: Multi-arch content directory not found: $gfx_content_dir"
-            echo "This function is only for multi-arch installations."
+            echo "WARNING: Content directory not found: $gfx_content_dir"
+            echo "This may occur if archive extraction failed. Files deleted via manifest only."
         fi
     fi
 
@@ -3507,6 +3527,14 @@ uninstall_rocm_multi_gfx() {
     # Set the PREFIX variable for scriptlets (needed for update-alternatives)
     local rocm_ver_dir="$TARGET_DIR/rocm/core-$ROCM_VER"
     set_prefix_scriptlet "$rocm_ver_dir"
+
+    # Extract GFX family archives needed for uninstallation
+    # This allows access to content directories for file-by-file deletion
+    echo "Extracting GFX archives needed for uninstallation..."
+    if ! extract_gfx_archives_for_list "${gfx_list[@]}"; then
+        echo "WARNING: Failed to extract GFX archives, will rely on manifest only"
+    fi
+    echo ""
 
     # Step 1: Uninstall each GFX arch
     local skipped_archs=()
