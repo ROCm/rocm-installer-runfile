@@ -228,20 +228,22 @@ Usage:
         rocm   = Enable ROCm components install.
         amdgpu = Enable amdgpu driver install.
 
-        force  = Force ROCm/amdgpu driver install.
+        force    = Force ROCm/amdgpu driver install.
+        graphics = Enable graphics support (installs amdgpu-lib for Mesa/OpenGL)
 
         target=<directory>
                <directory> = Target directory path for ROCm component install.
 
         gfx=<arch>
-            <arch> = GPU architecture to install (e.g., gfx94x, gfx950, etc.)
+            <arch> = GPU architecture to install (e.g., gfx94x, gfx110x, gfx1101, etc.)
                      Installs base components plus architecture-specific components.
-                     If not specified, only base components are installed.
+                     If not specified, auto-detects GPU and installs matching architecture.
 
                      Special values:
                        gfx=all  - Install all available architectures
                        gfx=list - Show available architectures in this installer
-                     Available architectures: gfx94x, gfx950
+                       gfx=list-installed - Show currently installed architectures
+                       gfx=show - Detect and display GPU information
 
         compo=<component_list>
             <component_list> = Comma-separated list of ROCm components to install.
@@ -290,8 +292,13 @@ Usage:
 
                              * If target=<directory/rocm-ver> is not provided, uninstall will be from /opt/rocm-x.y.z
                              * Optional: Use gfx= for selective GFX uninstall
-                             * Use gfx=all to uninstall all architectures
                              * If gfx= not specified, auto-detects and uninstalls all installed components
+
+                             Multi-arch selective uninstall:
+                             * Use gfx=<arch> to uninstall specific architecture (e.g., gfx=gfx1101)
+                             * Use gfx=all to uninstall all architectures
+                             * Base components remain until last GFX arch is removed
+                             * Requires manifest file for selective uninstall (created during install)
 
         uninstall-amdgpu = Uninstall amdgpu driver.
 
@@ -351,6 +358,10 @@ Usage examples:
 
 # ROCm + GFX architecture-specific installation
 
+    * Auto-detect GPU and install matching architecture (default if gfx= not specified)
+        bash \$installer_name.run rocm
+        bash \$installer_name.run deps=install rocm
+
     * Install base ROCm + gfx94x components to default location
         bash \$installer_name.run gfx=gfx94x rocm
 
@@ -359,6 +370,10 @@ Usage examples:
 
     * Install base ROCm + gfx94x components to custom location
         bash \$installer_name.run deps=install target="$HOME/myrocm" gfx=gfx94x rocm
+
+    * Multi-arch: Install fine-grained architecture (e.g., gfx1101 instead of gfx110x)
+        bash \$installer_name.run gfx=gfx1101 rocm
+        bash \$installer_name.run deps=install gfx=gfx1101 rocm
 
 # ROCm + Component selection
 
@@ -396,9 +411,10 @@ Usage examples:
         bash \$installer_name.run uninstall-rocm
         bash \$installer_name.run target="$HOME/myrocm/rocm-x.y.z" uninstall-rocm
 
-    * Selective uninstall (specify same compo=/gfx= as install)
-        bash \$installer_name.run target=/opt/rocm-7.11 compo=core gfx=gfx950 uninstall-rocm
-        bash \$installer_name.run target=/opt/rocm-7.11 compo=core-sdk gfx=gfx94x uninstall-rocm
+    * Multi-arch selective uninstall (remove specific GFX arch, keep base + other archs)
+        bash \$installer_name.run gfx=gfx1101 uninstall-rocm                    # Remove gfx1101, keep base + other archs
+        bash \$installer_name.run gfx=all uninstall-rocm                        # Remove all architectures
+        bash \$installer_name.run target=/opt/rocm-7.14 gfx=gfx942 uninstall-rocm  # Selective with custom target
 
     * Uninstall amdgpu driver
         bash \$installer_name.run uninstall-amdgpu
