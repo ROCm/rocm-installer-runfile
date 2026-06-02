@@ -218,9 +218,6 @@ Usage:
             install-only <compo> = Install dependencies only for <compo>.
             install <compo>      = Install with dependencies for <compo>.
 
-            file <file_path>      = Install with dependencies from a dependencies configuration file with path <file_path>.
-            file-only <file_path> = Install with dependencies from a dependencies configuration file only with path <file_path>.
-
         <compo> = install component (rocm/amdgpu/rocm amdgpu)
 
     Install:

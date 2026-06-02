@@ -128,9 +128,6 @@ Usage: bash $PROG [options]
             install-only <compo> = Install dependencies only for <compo>.
             install <compo>      = Install with dependencies for <compo>.
 
-            file <file_path>      = Install with dependencies from a dependencies configuration file with path <file_path>.
-            file-only <file_path> = Install with dependencies from a dependencies configuration file only with path <file_path>.
-
         <compo> = install component (rocm/amdgpu/rocm amdgpu)
 
     Install:
@@ -1863,21 +1860,6 @@ install_deps() {
             exit 0
         fi
 
-    elif [[ $DEPS_ARG == "file" ]] || [[ $DEPS_ARG == "file-only" ]]; then
-
-        ./deps-installer.sh install-file "$DEPS_ARG2" $depOp
-        status=$?
-
-        if [[ status -ne 0 ]]; then
-            print_err "Failed Dependencies Install."
-            exit 1
-        fi
-
-        if [[ $DEPS_ARG == "file-only" ]]; then
-            echo Only dependencies installed.  Exiting.
-            exit 0
-        fi
-
     else
         print_err "Invalid dependencies argument."
         exit 1
@@ -2648,6 +2630,12 @@ install_rocm_multi_gfx() {
         return 1
     fi
 
+    # Step 1.5: Extract test packages if needed
+    if [[ "$COMPO_INSTALL" =~ (^|,)test(,|$) ]]; then
+        echo ""
+        extract_tests_if_needed
+    fi
+
     # Step 2: Install base packages (if not already installed)
     echo ""
     install_base_components
@@ -3096,8 +3084,9 @@ process_base_only_component() {
     if [ -f "$base_meta_file" ]; then
         echo "  Reading base meta config: $base_meta_file"
         while IFS= read -r pkg; do
-            # Check if package is in base directory
-            if [ -d "$EXTRACT_ROCM_DIR/content/base/$pkg" ]; then
+            # For multi-arch builds, content is extracted on-demand, so trust the meta config
+            # For legacy builds, verify content directory exists
+            if [ -d "$EXTRACT_ROCM_DIR/content/base/$pkg" ] || [ -f "$INSTALLER_DIR/component-rocm/content-base.tar.xz" ]; then
                 COMPONENTS="$COMPONENTS $pkg"
             fi
         done < "$base_meta_file"
@@ -3155,8 +3144,9 @@ process_base_component() {
         echo "  Reading base meta config: $base_meta_file"
         while IFS= read -r pkg; do
             # Only add packages that are in base directory
-            # Check content first (for install), then scriptlets (for uninstall/post-install)
-            if [ -d "$EXTRACT_ROCM_DIR/content/base/$pkg" ] || [ -d "$EXTRACT_ROCM_DIR/scriptlets/base/$pkg" ]; then
+            # For multi-arch builds, content is extracted on-demand, so trust the meta config
+            # Check content first (for install), then scriptlets (for uninstall/post-install), or if base archive exists
+            if [ -d "$EXTRACT_ROCM_DIR/content/base/$pkg" ] || [ -d "$EXTRACT_ROCM_DIR/scriptlets/base/$pkg" ] || [ -f "$INSTALLER_DIR/component-rocm/content-base.tar.xz" ]; then
                 if [[ ! " $COMPONENTS " =~ \ $pkg\  ]]; then
                     COMPONENTS="$COMPONENTS $pkg"
                 fi
@@ -4320,11 +4310,7 @@ do
         ;;
     deps=*)
         DEPS_ARG="${1#*=}"
-        DEPS_ARG2="$2"
         echo "Using Dependency args : $DEPS_ARG"
-        if [[ $DEPS_ARG == "file" ]]; then
-            echo "Using Dependency args2: $DEPS_ARG2"
-        fi
         shift
         ;;
     amdgpu)
