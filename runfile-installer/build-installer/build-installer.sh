@@ -96,6 +96,8 @@ Usage: $PROG [options]
     nocompress           = Disable component/test compression (skip compression step).
     norunfile            = Disable makeself build of installer runfile.
     nogui                = Disable GUI building.
+    runfileonly          = Build only the .run file (implies noextract, nogui, nocompress).
+                           Use this when only installer scripts changed and you want to rebuild the .run file quickly.
     noautodeps           = Disable automatic dependency resolution for RPM packages.
     buildname=<name>     = Set a name for the build (default: local).
     buildrunid=<id>      = Set the Runfile build run ID (default: 1).
@@ -1738,6 +1740,14 @@ do
     nogui)
         echo "Disabling UI build."
         BUILD_UI="no"
+        shift
+        ;;
+    runfileonly)
+        echo "Build runfile only (skipping extraction, compression, and UI build)."
+        BUILD_EXTRACT="no"
+        BUILD_COMPRESS="no"
+        BUILD_UI="no"
+        BUILD_INSTALLER="yes"
         shift
         ;;
     noautodeps)

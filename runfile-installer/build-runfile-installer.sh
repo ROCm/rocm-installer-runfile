@@ -116,6 +116,8 @@ This script performs a complete ROCm runfile installer build:
     contentlist           = List all files extracted to content directories.
     norunfile             = Disable makeself build of installer runfile.
     nogui                 = Disable GUI building.
+    runfileonly           = Build only the .run file (implies noextract, nogui, nocompress).
+                            Use this when only installer scripts changed.
     noautodeps            = Disable automatic dependency resolution for RPM packages.
     buildname=<name>      = Set a name for the build (default: local).
     buildrunid=<id>       = Set the Runfile build run ID (default: 1).
@@ -167,10 +169,12 @@ Examples:
     $0 nogui                                                  # Build without GUI
     $0 norunfile                                              # Pull and extract only (no .run file)
     $0 mscomp=hybriddev                                       # Use fast compression (xz-3)
+    $0 runfileonly                                            # Rebuild only .run file (when scripts changed)
 
     # Build phases
     $0 skip-build                                             # Only pull packages
     $0 skip-setup                                             # Only build (packages already pulled)
+    $0 runfileonly                                            # Only rebuild .run file (fast, auto-skips setup)
 END_USAGE
 }
 
@@ -278,6 +282,12 @@ while (($#)); do
         ;;
     amdgpu-mode=*|rocm-mode=*|rocm-archs=*|pull=*|pullrocmver=*|pullpkg=*|pullpkgextra=*|pullpkgforce=*|pullrocmpkgver=*|pullamdgpu=*)
         SETUP_ARGS+=("$1")
+        shift
+        ;;
+    runfileonly)
+        # runfileonly implies skip-setup (no need to pull packages)
+        SKIP_SETUP=1
+        BUILD_ARGS+=("$1")
         shift
         ;;
     # Build-specific arguments
