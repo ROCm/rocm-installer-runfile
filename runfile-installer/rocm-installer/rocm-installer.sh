@@ -97,6 +97,7 @@ PRERM_COUNT=0
 POSTRM_COUNT=0
 
 PROMPT_USER=0
+ASSUME_YES=0
 POST_ROCM_INSTALL=0
 VERBOSE=0
 FORCE_INSTALL=0
@@ -215,8 +216,9 @@ Usage: bash $PROG [options]
     findrocm = Search for an install of ROCm.
     manifest = List the version of all ROCm components included in the installer.
     manifest=<gfx> = List components for specific gfx architecture (e.g., manifest=gfx110x, manifest=base).
-    prompt   = Run the installer with user prompts.
-    verbose  = Run installer with verbose logging
+    prompt     = Run the installer with user prompts.
+    assumeyes  = Automatically answer yes to all prompts (useful for automation/scripting).
+    verbose    = Run installer with verbose logging
 
 +++++++++++++++++++++++++++++++
 Usage examples:
@@ -539,6 +541,14 @@ print_str() {
 }
 
 prompt_user() {
+    # If assumeyes is set, always answer yes without prompting
+    if [[ $ASSUME_YES == 1 ]]; then
+        option=y
+        echo "$1y (assumeyes)"
+        return
+    fi
+
+    # Normal prompt behavior
     if [[ $PROMPT_USER == 1 ]]; then
         read -rp "$1" option
     else
@@ -2922,7 +2932,7 @@ query_prev_rocm() {
     fi
 
     echo -e "Overwriting an existing installation may result in a loss of functionality.\n"
-    read -rp "Do you wish to continue with a new Runfile ROCm installation (y/n): " option
+    prompt_user "Do you wish to continue with a new Runfile ROCm installation (y/n): "
     if [[ $option == "Y" || $option == "y" ]]; then
         echo "Proceeding with install..."
     else
@@ -4526,6 +4536,12 @@ do
         echo "Enabling user prompts."
         PROMPT_USER=1
         AMDGPU_INSTALLER_ARGS="prompt"
+        shift
+        ;;
+    assumeyes)
+        echo "Enabling assumeyes mode (auto-answer yes to all prompts)."
+        ASSUME_YES=1
+        AMDGPU_INSTALLER_ARGS="$AMDGPU_INSTALLER_ARGS assumeyes"
         shift
         ;;
     verbose)

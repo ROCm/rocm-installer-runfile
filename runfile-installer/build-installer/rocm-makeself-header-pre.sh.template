@@ -305,8 +305,9 @@ Usage:
     findrocm = Search for an install of ROCm.
     manifest = List the version of all ROCm components included in the installer.
     manifest=<gfx> = List components for specific gfx architecture (e.g., manifest=gfx110x, manifest=base).
-    prompt   = Run the installer with user prompts.
-    verbose  = Run installer with verbose logging
+    prompt     = Run the installer with user prompts.
+    assumeyes  = Automatically answer yes to all prompts (useful for automation/scripting).
+    verbose    = Run installer with verbose logging
 
 +++++++++++++++++++++++++++++++
 Usage examples:
@@ -371,6 +372,9 @@ Usage examples:
     * Multi-arch: Install fine-grained architecture (e.g., gfx1101 instead of gfx110x)
         bash \$installer_name.run gfx=gfx1101 rocm
         bash \$installer_name.run deps=install gfx=gfx1101 rocm
+
+    * Multi-arch: Install coarse family (all members: gfx1100, gfx1101, gfx1102, gfx1103)
+        bash \$installer_name.run gfx=gfx110x rocm
 
 # ROCm + Component selection
 
@@ -593,6 +597,9 @@ cleanupargs=
 
 initargs="\$@"
 
+# String to collect non-makeself arguments to pass to installer script (POSIX-compatible)
+installer_args=""
+
 while true
 do
     case "\$1" in
@@ -775,9 +782,26 @@ EOLSM
 	exit 1
 	;;
     *)
-	break ;;
+	# Not a makeself flag - save it for the installer script and continue
+	if [ -n "\$1" ]; then
+	    installer_args="\$installer_args \$1"
+	    shift
+	else
+	    break
+	fi
+	;;
     esac
 done
+
+# Add any remaining arguments after -- or end of makeself args
+while [ \$# -gt 0 ]; do
+    installer_args="\$installer_args \$1"
+    shift
+done
+
+# Set positional parameters to collected installer arguments (POSIX-compatible)
+# shellcheck disable=SC2086
+set -- \$installer_args
 
 if test x"\$quiet" = xy -a x"\$verbose" = xy; then
 	echo Cannot be verbose and quiet at the same time. >&2
