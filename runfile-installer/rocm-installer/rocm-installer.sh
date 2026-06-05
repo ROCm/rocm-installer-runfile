@@ -1191,7 +1191,7 @@ check_rocm_version_mismatch() {
 }
 
 #------------------------------------------------------------------------------
-# Multi-GFX Tracking Functions (using manifest.txt header)
+# Multi-Arch GFX Tracking Functions (using manifest.txt header)
 #------------------------------------------------------------------------------
 
 mark_gfx_installed() {
@@ -1225,7 +1225,7 @@ unmark_gfx_installed() {
         return 0
     fi
 
-    sed -i "/^installed-gfx:${gfx}$/d" "$INSTALL_MANIFEST_FILE"
+    $SUDO sed -i "/^installed-gfx:${gfx}$/d" "$INSTALL_MANIFEST_FILE"
     echo "Unmarked GFX arch: $gfx"
 }
 
@@ -1332,7 +1332,7 @@ unmark_base_installed() {
         return 0
     fi
 
-    sed -i "/^installed-base:yes$/d" "$INSTALL_MANIFEST_FILE"
+    $SUDO sed -i "/^installed-base:yes$/d" "$INSTALL_MANIFEST_FILE"
     echo "Unmarked base packages"
 }
 
@@ -1526,6 +1526,10 @@ auto_detect_gfx() {
         # Successfully detected single architecture
         INSTALL_GFX="$detected_gfx"
         USER_SPECIFIED_GFX=0  # Mark as auto-detected, not user-specified
+
+        # Populate GFX_INSTALL_LIST for multiarch builds (ensures same flow as explicit gfx=)
+        GFX_INSTALL_LIST=("$detected_gfx")
+
         echo "Auto-detected GFX architecture: $INSTALL_GFX"
         echo "=============================================================="
         echo ""
@@ -2622,14 +2626,14 @@ install_gfx_components() {
     fi
 }
 
-install_rocm_multi_gfx() {
+install_rocm_multiarch() {
     # Install multiple GFX architectures with shared base packages
     # Args: $@ = Array of GFX architectures
 
     local -a gfx_list=("$@")
 
     echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
-    echo -e "\e[96mMulti-GFX Installation\e[0m"
+    echo -e "\e[96mMultiarch Installation\e[0m"
     echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
     echo "Installing ROCm for ${#gfx_list[@]} GFX architecture(s): ${gfx_list[*]}"
     echo ""
@@ -2664,26 +2668,21 @@ install_rocm_multi_gfx() {
             echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
         fi
 
-        # Set INSTALL_GFX for install_gfx_components
+        # Set INSTALL_GFX and populate COMPONENTS_GFX for this specific architecture
         INSTALL_GFX="$gfx"
 
-        # Read GFX meta config to populate COMPONENTS_GFX for this architecture
-        COMPONENTS_GFX=""
-        local meta_base="amdrocm-${COMPO_INSTALL}${ROCM_VER}"
-        local gfx_meta_file="$COMPO_META_DIR/${meta_base}-${gfx}-meta.config"
-
-        if [[ -f "$gfx_meta_file" ]]; then
-            while IFS= read -r pkg; do
-                # Split packages between base and gfx directories
-                if [[ -d "$EXTRACT_ROCM_DIR/content/${gfx}/$pkg" ]] || [[ -d "$EXTRACT_ROCM_DIR/scriptlets/${gfx}/$pkg" ]]; then
-                    # Package is in gfx directory
-                    if [[ ! " $COMPONENTS_GFX " =~ \ $pkg\  ]]; then
-                        COMPONENTS_GFX="$COMPONENTS_GFX $pkg"
-                    fi
-                fi
-            done < "$gfx_meta_file"
-
-            # Trim whitespace
+        # For multi-GFX installations, populate COMPONENTS_GFX for this specific arch
+        # (Single-GFX case already populated in configure_rocm_install)
+        if [[ ${#gfx_list[@]} -gt 1 ]]; then
+            COMPONENTS_GFX=""
+            IFS=',' read -ra COMPO_LIST <<< "$COMPO_INSTALL"
+            for compo_name in "${COMPO_LIST[@]}"; do
+                compo_name="${compo_name#"${compo_name%%[![:space:]]*}"}"
+                compo_name="${compo_name%"${compo_name##*[![:space:]]}"}"
+                local meta_base
+                meta_base=$(get_component_meta_base "$compo_name")
+                process_gfx_component "$meta_base"
+            done
             COMPONENTS_GFX="${COMPONENTS_GFX#"${COMPONENTS_GFX%%[![:space:]]*}"}"
             COMPONENTS_GFX="${COMPONENTS_GFX%"${COMPONENTS_GFX##*[![:space:]]}"}"
         fi
@@ -2697,7 +2696,7 @@ install_rocm_multi_gfx() {
 
     echo ""
     echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
-    echo -e "\e[32mMulti-GFX installation complete\e[0m"
+    echo -e "\e[32mMultiarch Installation Complete\e[0m"
     echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
 
     # Show installed summary
@@ -3060,14 +3059,15 @@ process_test_component() {
             # Skip empty lines
             [[ -z "$pkg" ]] && continue
 
-            # Check if package is in gfx directory or base directory using deps/
-            if [ -d "$EXTRACT_ROCM_DIR/deps/${INSTALL_GFX}/$pkg" ]; then
-                # Package is in gfx directory - add to COMPONENTS_GFX if not duplicate
+            # Determine if package is GFX-specific or base by checking package name suffix
+            # GFX packages end with -gfx#### (e.g., amdrocm-blas-test7.14-gfx1100)
+            if [[ "$pkg" =~ -gfx[0-9]+$ ]]; then
+                # Package is GFX-specific - add to COMPONENTS_GFX if not duplicate
                 if [[ ! " $COMPONENTS_GFX " =~ \ $pkg\  ]]; then
                     COMPONENTS_GFX="$COMPONENTS_GFX $pkg"
                 fi
-            elif [ -d "$EXTRACT_ROCM_DIR/deps/base/$pkg" ]; then
-                # Package is in base directory - add to COMPONENTS if not duplicate
+            else
+                # Package is base - add to COMPONENTS if not duplicate
                 if [[ ! " $COMPONENTS " =~ \ $pkg\  ]]; then
                     COMPONENTS="$COMPONENTS $pkg"
                 fi
@@ -3184,6 +3184,42 @@ process_base_component() {
     fi
 }
 
+# Get meta base name for a component (maps component name to package name)
+# Args: $1 = component name (e.g., "core-dev", "core-sdk")
+# Returns: meta base name (e.g., "amdrocm-core-devel7.14")
+get_component_meta_base() {
+    local compo_name="$1"
+    local meta_base
+
+    case "$compo_name" in
+        core)
+            meta_base="amdrocm-core${ROCM_VER}"
+            ;;
+        core-dev)
+            meta_base="amdrocm-core-devel${ROCM_VER}"
+            ;;
+        dev-tools)
+            meta_base="amdrocm-developer-tools${ROCM_VER}"
+            ;;
+        core-sdk)
+            meta_base="amdrocm-core-sdk${ROCM_VER}"
+            ;;
+        opencl)
+            meta_base="amdrocm-opencl${ROCM_VER}"
+            ;;
+        test)
+            # Test packages are handled separately using test config files
+            meta_base="test"
+            ;;
+        *)
+            # For unknown or composite components, use as-is
+            meta_base="amdrocm-${compo_name}${ROCM_VER}"
+            ;;
+    esac
+
+    echo "$meta_base"
+}
+
 configure_rocm_install() {
     echo "Configuring ROCm installation using component list: $COMPO_INSTALL"
 
@@ -3210,32 +3246,22 @@ configure_rocm_install() {
 
         # Determine meta base name for the component
         local meta_base
-        case "$compo_name" in
-            core)
-                meta_base="amdrocm-core${ROCM_VER}"
-                ;;
-            core-dev)
-                meta_base="amdrocm-core-devel${ROCM_VER}"
-                ;;
-            dev-tools)
-                meta_base="amdrocm-developer-tools${ROCM_VER}"
-                ;;
-            core-sdk)
-                meta_base="amdrocm-core-sdk${ROCM_VER}"
-                ;;
-            opencl)
-                meta_base="amdrocm-opencl${ROCM_VER}"
-                ;;
-            test)
-                # Test packages are handled separately using test config files
-                meta_base="test"
-                ;;
-            *)
-                print_err "Unknown component: $compo_name"
-                echo "Valid components: core, core-dev, dev-tools, core-sdk, opencl, test"
-                exit 1
-                ;;
-        esac
+        meta_base=$(get_component_meta_base "$compo_name")
+
+        # Validate known components (reject unknown ones in configure phase)
+        if [[ "$meta_base" == "amdrocm-${compo_name}${ROCM_VER}" ]]; then
+            # This means get_component_meta_base returned the default (unknown component)
+            case "$compo_name" in
+                core|core-dev|dev-tools|core-sdk|opencl|test)
+                    # Known component, continue
+                    ;;
+                *)
+                    print_err "Unknown component: $compo_name"
+                    echo "Valid components: core, core-dev, dev-tools, core-sdk, opencl, test"
+                    exit 1
+                    ;;
+            esac
+        fi
 
         # Process component based on type
         if [[ "$compo_name" == "test" ]]; then
@@ -3245,8 +3271,11 @@ configure_rocm_install() {
         else
             # For core, core-dev, core-sdk: read both base packages and gfx packages
             if [[ -n $INSTALL_GFX ]]; then
+                # Single GFX: populate both COMPONENTS and COMPONENTS_GFX
                 process_gfx_component "$meta_base"
             else
+                # No GFX or Multi-GFX: only populate COMPONENTS (base packages)
+                # For multi-GFX, COMPONENTS_GFX will be populated per-arch in multiarch loop
                 process_base_component "$meta_base"
             fi
         fi
@@ -3268,6 +3297,23 @@ configure_rocm_install() {
         print_err "No components found for installation"
         exit 1
     fi
+}
+
+install_rocm_singlearch() {
+    # Single-arch build installation flow
+    # Extracts content and installs base + GFX components
+
+    echo "Single-arch installation flow"
+
+    # Extract content archives before installing
+    extract_content_if_needed
+
+    # Extract tests if needed (for compo=test)
+    extract_tests_if_needed
+
+    # Install base and GFX components
+    install_base_components
+    install_gfx_components
 }
 
 install_rocm() {
@@ -3304,21 +3350,13 @@ install_rocm() {
     # Create/initialize the installation manifest
     create_manifest
 
-    # Check if using multi-GFX installation (multi-arch only)
+    # Check if using multi-arch or single-arch installation
     if [[ "${INSTALLER_BUILD_TYPE:-}" == "multi-arch" && ${#GFX_INSTALL_LIST[@]} -gt 0 ]]; then
-        # Multi-arch multi-GFX installation (handles 1 or many GFX archs)
-        install_rocm_multi_gfx "${GFX_INSTALL_LIST[@]}"
+        # Multi-arch installation (handles 1 or many GFX archs)
+        install_rocm_multiarch "${GFX_INSTALL_LIST[@]}"
     else
         # Single-arch build OR multi-arch without GFX list (legacy flow)
-        # Extract content archives before installing
-        extract_content_if_needed
-
-        # Extract tests if needed (for compo=test)
-        extract_tests_if_needed
-
-        # Install base and GFX components
-        install_base_components
-        install_gfx_components
+        install_rocm_singlearch
     fi
 
     echo "Installation manifest updated successfully"
@@ -3328,7 +3366,7 @@ install_rocm() {
 }
 
 #------------------------------------------------------------------------------
-# Multi-GFX Uninstallation Functions
+# Multi-Arch Uninstallation Functions
 #------------------------------------------------------------------------------
 
 uninstall_gfx_components() {
@@ -3419,7 +3457,7 @@ uninstall_gfx_components() {
     fi
 
     # Remove GFX entries from manifest (pipe-separated format)
-    sed -i "/^gfx|.*|${gfx}$/d" "$INSTALL_MANIFEST_FILE"
+    $SUDO sed -i "/^gfx|.*|${gfx}$/d" "$INSTALL_MANIFEST_FILE"
 }
 
 uninstall_base_components() {
@@ -3457,10 +3495,10 @@ uninstall_base_components() {
     fi
 
     # Remove base entries from manifest (pipe-separated format)
-    sed -i "/^base|/d" "$INSTALL_MANIFEST_FILE"
+    $SUDO sed -i "/^base|/d" "$INSTALL_MANIFEST_FILE"
 }
 
-uninstall_rocm_multi_gfx() {
+uninstall_rocm_multiarch() {
     # Uninstall multiple GFX architectures (MULTI-ARCH ONLY)
     # Keeps base packages until last GFX arch is removed
     # Args: $@ = Array of GFX architectures
@@ -3475,7 +3513,7 @@ uninstall_rocm_multi_gfx() {
     local -a gfx_list=("$@")
 
     echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
-    echo -e "\e[95mMulti-GFX Uninstallation\e[0m"
+    echo -e "\e[95mMultiarch Uninstallation\e[0m"
     echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
     echo "Uninstalling ${#gfx_list[@]} GFX architecture(s): ${gfx_list[*]}"
     echo ""
@@ -3644,19 +3682,19 @@ uninstall_rocm_target() {
         if [[ $USER_SPECIFIED_GFX -eq 1 && ${#GFX_INSTALL_LIST[@]} -gt 0 ]]; then
             # Check if manifest exists and has multi-GFX markers
             if [[ -f "$INSTALL_MANIFEST_FILE" ]] && grep -q "^installed-gfx:" "$INSTALL_MANIFEST_FILE" 2>/dev/null; then
-                # Multi-arch installation confirmed - use multi-GFX uninstall
-                echo "Multi-GFX uninstall requested for: ${GFX_INSTALL_LIST[*]}"
-                uninstall_rocm_multi_gfx "${GFX_INSTALL_LIST[@]}"
+                # Multi-arch installation confirmed - use multiarch uninstall
+                echo "Multiarch uninstall requested for: ${GFX_INSTALL_LIST[*]}"
+                uninstall_rocm_multiarch "${GFX_INSTALL_LIST[@]}"
                 return 0
             elif [[ ! -f "$INSTALL_MANIFEST_FILE" ]]; then
-                # Manifest missing - use multi-GFX uninstall which has fallback logic
-                echo "Multi-GFX uninstall requested for: ${GFX_INSTALL_LIST[*]}"
+                # Manifest missing - use multiarch uninstall which has fallback logic
+                echo "Multiarch uninstall requested for: ${GFX_INSTALL_LIST[*]}"
                 echo "Note: Manifest file missing, will use fallback uninstall method."
-                uninstall_rocm_multi_gfx "${GFX_INSTALL_LIST[@]}"
+                uninstall_rocm_multiarch "${GFX_INSTALL_LIST[@]}"
                 return 0
             else
                 # Manifest exists but no multi-GFX markers - this is single-arch
-                echo "WARNING: Multi-GFX uninstall requested but this is not a multi-arch installation."
+                echo "WARNING: Multiarch uninstall requested but this is not a multi-arch installation."
                 echo "Falling back to standard uninstall flow."
                 # Continue with standard uninstall below
             fi
@@ -3680,7 +3718,7 @@ uninstall_rocm_target() {
 
                     if is_gfx_installed "$DETECTED_GFX_RESULT"; then
                         echo "Uninstalling detected GFX architecture: $DETECTED_GFX_RESULT"
-                        uninstall_rocm_multi_gfx "$DETECTED_GFX_RESULT"
+                        uninstall_rocm_multiarch "$DETECTED_GFX_RESULT"
                         return 0
                     else
                         echo "Detected GFX '$DETECTED_GFX_RESULT' is not installed."
@@ -3688,7 +3726,16 @@ uninstall_rocm_target() {
                         installed_gfx=$(get_installed_gfx_archs)
                         if [[ -n "$installed_gfx" ]]; then
                             echo "Installed GFX architectures: $installed_gfx"
-                            echo "Use 'gfx=<arch>' to specify which GFX to uninstall."
+                            # Show specific examples based on what's actually installed
+                            local gfx_count
+                            gfx_count=$(echo "$installed_gfx" | wc -w)
+                            if [[ $gfx_count -eq 1 ]]; then
+                                echo "Use 'gfx=$installed_gfx' to uninstall this architecture."
+                            else
+                                local first_gfx
+                                first_gfx=$(echo "$installed_gfx" | awk '{print $1}')
+                                echo "Use 'gfx=<arch>' to specify which GFX to uninstall (e.g., gfx=$first_gfx)."
+                            fi
                         fi
                         exit 1
                     fi
