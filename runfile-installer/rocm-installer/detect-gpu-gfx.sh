@@ -612,7 +612,7 @@ map_device_id_to_gfx() {
         164e) echo "gfx1036" ;;
 
         # RDNA4 - RX 9000 series
-        # Note: 0x7550/0x7551 are Navi48 (gfx1201), 0x7590 is Navi44 (gfx1200)
+        # Note: Navi48 uses gfx1201, Navi44 uses gfx1200
         # Revision ID is required for accurate detection - use revision-aware mapping when available
         7550|7551) echo "gfx1201" ;;  # Navi48: RX 9070 series (default without revision)
         7590) echo "gfx1200" ;;  # Navi44: RX 9060 series
@@ -1108,7 +1108,7 @@ simulate_gpu_data() {
     add_gpu "AMD Radeon RX 7900 XTX" "7448" "00" "gfx1100"
 
     # GPU 4: RX 9070 XT (RDNA4)
-    add_gpu "AMD Radeon RX 9070 XT" "7550" "01" "gfx1200"
+    add_gpu "AMD Radeon RX 9070 XT" "7550" "01" "gfx1201"
 
     return 0
 }
