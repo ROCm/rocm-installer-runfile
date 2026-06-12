@@ -29,5 +29,5 @@ jobs:
       pull_tag: rc2
       pull_run_id: "25753625030"
       pull_pkg: amdrocm-core-sdk
-      gfx_archs: gfx110x
-      pull_amdgpu: "release,30.30.3"
+      gfx_archs: gfx1100
+      pull_amdgpu: "release,31.30"
