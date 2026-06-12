@@ -1311,6 +1311,49 @@ extract_rpms() {
     echo Extracting RPMs...Complete.
 }
 
+generate_capability_mapping_file() {
+    # Create a mapping file that records: capability -> RHEL package name
+    # This allows SLES/other distros to resolve capabilities at runtime
+    # Format: capability|package (e.g., "libnuma.so.1()(64bit)|numactl-libs")
+
+    echo "=========================================="
+    echo "Generating capability mapping file..."
+    echo "=========================================="
+
+    local deps_dir="$EXTRACT_ROCM_DIR/deps"
+    local capability_map_file="$deps_dir/rocm_capability_map.txt"
+
+    # Remove previous mapping file
+    rm -f "$capability_map_file"
+
+    # Extract capability mappings from the global AUTO_DEPS_CACHE
+    # This cache was populated during batch_resolve_dependencies()
+    local mapping_count=0
+
+    for capability in "${!AUTO_DEPS_CACHE[@]}"; do
+        local pkg="${AUTO_DEPS_CACHE[$capability]}"
+
+        # Skip empty entries (filtered AMD packages)
+        [[ -z "$pkg" ]] && continue
+
+        # Skip if capability is same as package (no mapping needed)
+        [[ "$capability" == "$pkg" ]] && continue
+
+        # Write mapping: capability|package
+        echo "$capability|$pkg" >> "$capability_map_file"
+        mapping_count=$((mapping_count + 1))
+    done
+
+    # Sort the mapping file for readability
+    if [ -f "$capability_map_file" ]; then
+        sort -u "$capability_map_file" -o "$capability_map_file"
+        echo "Generated capability mapping file: $capability_map_file"
+        echo "Total capability mappings: $mapping_count"
+    else
+        echo "No capability mappings found (resolveautodeps may not be enabled)"
+    fi
+}
+
 combine_rocm_deps() {
     echo ===================================================
     echo Combining dependencies from all component-rocm subdirectories...
@@ -1486,6 +1529,9 @@ combine_rocm_deps() {
     echo "Output file: $combined_deps_file"
 
     echo Combining dependencies...Complete.
+
+    # Generate capability mapping file for cross-distro resolution
+    generate_capability_mapping_file
 }
 
 combine_components_list() {
