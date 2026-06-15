@@ -1487,13 +1487,13 @@ void create_rocm_menu_compo_window(WINDOW *pMenuWindow)
 
         i = item_count;
 
-        // Add blank separator before core-sdk
+        // Add blank separator before test
         strcpy(rocmMenuCompoOps[i], " ");
         strcpy(rocmMenuCompoDesc[i++], " ");
 
-        // Add core-sdk item
-        strcpy(rocmMenuCompoOps[i], "core-sdk");
-        strcpy(rocmMenuCompoDesc[i++], "Complete SDK (includes all components above)");
+        // Add test component
+        strcpy(rocmMenuCompoOps[i], "test");
+        strcpy(rocmMenuCompoDesc[i++], "Test packages (amdrocm-*-test)");
 
         // Add menu system items
         strcpy(rocmMenuCompoOps[i], " ");
@@ -1561,7 +1561,7 @@ void update_rocm_compo_selection_state()
 {
     MENU *pMenu = menuROCmCompo.pMenu;
     ITEM **items = menuROCmCompo.itemList[0].items;
-    int core_sdk_index = 5;  // core-sdk is now at index 5 (after blank separator)
+    int core_sdk_index = 4;  // core-sdk is now at index 4 (core, core-dev, dev-tools, opencl, core-sdk)
 
     // Check if core-sdk is selected
     bool core_sdk_selected = item_value(items[core_sdk_index]);
