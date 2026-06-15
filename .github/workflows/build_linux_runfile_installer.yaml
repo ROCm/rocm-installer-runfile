@@ -81,6 +81,7 @@ on:
           - nightly         # rocm.nightlies.amd.com
           - prerelease      # rocm.prereleases.amd.com
           - release         # repo.amd.com
+          - nightly-multiarch # rocm.nightlies.amd.com/packages-multi-arch/
         default: nightly
 permissions:
   id-token: write

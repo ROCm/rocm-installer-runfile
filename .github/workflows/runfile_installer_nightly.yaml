@@ -11,11 +11,11 @@ on:
       gfx_archs:
         description: gfx architectures to build
         type: string
-        default: "gfx110x"
+        default: "gfx1100"
       pull_amdgpu:
         description: Version of amdgpu to be packaged into runfile installer.
         type: string
-        default: "latest" # If set to latest, script automatically gets the version of the latest released amdgpu driver
+        default: "31.30" # If set to latest, script automatically gets the version of the latest released amdgpu driver
       pull_tag:
         description: Build date in format YYYYMMDD. If empty, will use today's date.
         type: string
@@ -91,7 +91,7 @@ jobs:
     with:
       rocm_version: ${{ needs.setup.outputs.rocm_version }}
       release_type: ${{ inputs.release_type || 'nightly' }}
-      pull_type: nightly
+      pull_type: nightly-multiarch
       pull_tag: ${{ needs.setup.outputs.pull_tag }}
       pull_run_id: ${{ needs.setup.outputs.pull_run_id }}
       pull_pkg: ${{ needs.setup.outputs.pull_pkg }}
