@@ -332,7 +332,7 @@ validate_args() {
             dev|nightly|nightly-multiarch)
                 echo "Example: pulltag=20260123"
                 ;;
-            prerelease)
+            prerelease|prerelease-multiarch)
                 echo "Example: pulltag=rc0"
                 ;;
             release)
@@ -349,7 +349,7 @@ validate_args() {
             dev|nightly|nightly-multiarch)
                 echo "Example: pullrunid=21893116598"
                 ;;
-            prerelease)
+            prerelease|prerelease-multiarch)
                 echo "Example: pullrunid=21843385957"
                 ;;
             release)
@@ -749,6 +749,8 @@ setup_puller_config_rocm() {
     local template_release_type="${PULL_CONFIG_RELEASE_TYPE}"
     if [[ "${PULL_CONFIG_RELEASE_TYPE}" == "nightly-multiarch" ]]; then
         template_release_type="nightly"
+    elif [[ "${PULL_CONFIG_RELEASE_TYPE}" == "prerelease-multiarch" ]]; then
+        template_release_type="prerelease"
     fi
 
     # Template directory for ROCm configs
@@ -785,7 +787,7 @@ setup_puller_config_rocm() {
 
     # Determine package path based on release type
     local package_path=""
-    if [[ "${PULL_CONFIG_RELEASE_TYPE}" == "nightly-multiarch" ]]; then
+    if [[ "${PULL_CONFIG_RELEASE_TYPE}" == "nightly-multiarch" ]] || [[ "${PULL_CONFIG_RELEASE_TYPE}" == "prerelease-multiarch" ]]; then
         package_path="packages-multi-arch/"
         echo "Using multiarch package path"
     fi

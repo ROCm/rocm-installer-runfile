@@ -78,7 +78,7 @@ This script performs a complete ROCm runfile installer build:
                             Legacy (ROCm < 7.12): gfx90x,gfx94x,gfx950,gfx110x,gfx1150,gfx1151,gfx120x
 
     pull=<release-type>   = Pull ROCm packages from specified repository (required).
-                            Valid types: dev, nightly, nightly-multiarch, prerelease, release
+                            Valid types: dev, nightly, nightly-multiarch, prerelease, prerelease-multiarch, release
     pulltag=<tag>         = Set ROCm build tag (required for all builds).
                             - dev/nightly: Valid build date (YYYYMMDD format, e.g., 20260123)
                             - prerelease: RC tag (e.g., rc0, rc1, rc2)
@@ -151,6 +151,7 @@ Examples:
     $0 pull=nightly-multiarch pulltag=20260602 pullrunid=26796219223 pullrocmver=7.14.0  # Nightly multiarch
     $0 pull=dev pulltag=20260219 pullrunid=22188089855 pullrocmver=7.12.0            # Dev
     $0 pull=prerelease pulltag=rc2 pullrunid=21843385957 pullrocmver=7.11.0          # Prerelease RC2
+    $0 pull=prerelease-multiarch pulltag=rc2 pullrunid=25753472298 pullrocmver=7.13.0          # Prerelease multiarch 7.13 RC2
     $0 pull=release pulltag=release pullrunid=1 pullrocmver=7.11.0                   # Release
 
     # GPU architectures

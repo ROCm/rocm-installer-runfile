@@ -154,12 +154,12 @@ get_coarse_family() {
 initialize_gfx_family_map() {
     # Initialize GFX_FAMILY_MAP based on build type
     # - Single-arch (nightly): 1:1 mapping from ROCM_GFX_ARCHS
-    # - Multi-arch (nightly-multiarch): Fine→coarse grouping
+    # - Multi-arch (nightly-multiarch, prerelease-multiarch): Fine→coarse grouping
 
     # Clear any existing mappings
     GFX_FAMILY_MAP=()
 
-    if [[ "${PULL_CONFIG_RELEASE_TYPE:-}" == "nightly-multiarch" ]]; then
+    if [[ "${PULL_CONFIG_RELEASE_TYPE:-}" == "nightly-multiarch" ]] || [[ "${PULL_CONFIG_RELEASE_TYPE:-}" == "prerelease-multiarch" ]] ; then
         # Multi-arch build: Use fine-grained → coarse family mappings
         echo "Initializing GFX_FAMILY_MAP for multi-arch build"
         GFX_FAMILY_MAP=(
