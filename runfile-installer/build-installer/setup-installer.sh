@@ -77,7 +77,7 @@ SETUP_AMDGPU_MODE="all"  # Default: all distros
 SETUP_ROCM_MODE="chroot" # Default: native (use current OS), Options: native, chroot
 
 # Configuration
-ROCM_RELEASE_TYPES=(dev nightly nightly-multiarch prerelease release)
+ROCM_RELEASE_TYPES=(dev nightly nightly-multiarch prerelease prerelease-multiarch release)
 
 
 ###### Functions ###############################################################
@@ -790,6 +790,8 @@ setup_puller_config_rocm() {
     if [[ "${PULL_CONFIG_RELEASE_TYPE}" == "nightly-multiarch" ]] || [[ "${PULL_CONFIG_RELEASE_TYPE}" == "prerelease-multiarch" ]]; then
         package_path="packages-multi-arch/"
         echo "Using multiarch package path"
+    elif [[ "${PULL_CONFIG_RELEASE_TYPE}" == "prerelease" ]] ; then
+        package_path="packages/"
     fi
 
     echo "Using ROCm config type: ${PULL_CONFIG_RELEASE_TYPE}"
