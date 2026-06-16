@@ -25,7 +25,7 @@ jobs:
     with:
       rocm_version: "7.13.0"
       release_type: dev
-      pull_type: prerelease
+      pull_type: prerelease-multiarch
       pull_tag: rc2
       pull_run_id: "25753625030"
       pull_pkg: amdrocm-core-sdk
