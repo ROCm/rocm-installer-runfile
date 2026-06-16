@@ -328,6 +328,12 @@ if [ $CLEAN_BUILD -eq 1 ]; then
         $SUDO rm rocm-installer/VERSION
     fi
 
+    # Note: BUILDINFO file is created in rocm-installer/ during build from theRock manifest
+    if [ -f "rocm-installer/BUILDINFO" ]; then
+        echo -e "\e[93mRemoving: rocm-installer/BUILDINFO\e[0m"
+        $SUDO rm rocm-installer/BUILDINFO
+    fi
+
     if [ -f "rocm-installer/rocm_ui" ]; then
         echo -e "\e[93mRemoving: rocm-installer/rocm_ui\e[0m"
         $SUDO rm rocm-installer/rocm_ui

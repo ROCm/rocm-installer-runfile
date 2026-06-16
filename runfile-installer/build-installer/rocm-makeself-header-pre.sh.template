@@ -23,6 +23,7 @@ scriptargs="$SCRIPTARGS"
 cleanup_script="${CLEANUP_SCRIPT}"
 licensetxt="$LICENSE"
 helpheader='$HELPHEADER'
+buildheader='$BUILDHEADER'
 targetdir="$archdirname"
 filesizes="$filesizes"
 keep="$KEEP"
@@ -200,8 +201,9 @@ Usage:
     [Cmdline]:= bash \$installer_name.run [options]
 
 [options]:
-    help    = Displays this help information.
-    version = Display version information.
+    help      = Displays this help information.
+    version   = Display version information.
+    buildinfo = Display ROCm build information (theRock commit, GitHub run ID, etc.).
 
     Runfile options:
     ----------------
@@ -550,6 +552,14 @@ get_version() {
 EOH
 }
 
+get_buildinfo() {
+    echo "=========================================="
+    echo "ROCm Installer Build Information"
+    echo "=========================================="
+    echo "\${buildheader}"
+    echo "=========================================="
+}
+
 get_rocm_version() {
     output=\$(cat << EOH
 \${helpheader}
@@ -619,6 +629,10 @@ do
 	;;
     -v | --version | version)
         get_version
+        exit 0
+        ;;
+    buildinfo)
+        get_buildinfo
         exit 0
         ;;
     gfx=list)

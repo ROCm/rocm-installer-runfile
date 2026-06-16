@@ -116,8 +116,9 @@ cat <<END_USAGE
 Usage: bash $PROG [options]
 
 [options]:
-    help    = Displays this help information.
-    version = Display version information.
+    help      = Displays this help information.
+    version   = Display version information.
+    buildinfo = Display ROCm build information (theRock commit, GitHub run ID, etc.).
 
     Dependencies:
     -------------
@@ -4371,6 +4372,19 @@ do
         ;;
     version)
         get_version
+        exit 0
+        ;;
+    buildinfo)
+        # Display theRock build information (from BUILDINFO file in installer root)
+        if [[ -f "$SCRIPT_DIR/BUILDINFO" ]]; then
+            echo "=========================================="
+            echo "ROCm Installer Build Information"
+            echo "=========================================="
+            cat "$SCRIPT_DIR/BUILDINFO"
+            echo "=========================================="
+        else
+            echo "Build information not available."
+        fi
         exit 0
         ;;
     deps=*)

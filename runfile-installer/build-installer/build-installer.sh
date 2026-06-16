@@ -411,6 +411,45 @@ write_version() {
     # Copy VERSION file to rocm-installer directory for makeself --help-header
     cp "$VERSION_FILE" "$EXTRACT_DIR/VERSION"
 
+    # Create BUILDINFO file from theRock manifest (before content compression)
+    # If BUILDINFO already exists (from previous build), keep it
+    local BUILDINFO_FILE="$EXTRACT_DIR/BUILDINFO"
+
+    if [[ -f "$BUILDINFO_FILE" ]]; then
+        echo "BUILDINFO already exists, using existing file"
+    else
+        # BUILDINFO doesn't exist - try to create from theRock manifest
+        local THEROCK_MANIFEST=$(find "$EXTRACT_DIR/component-rocm/content/base" -path "*/share/therock/therock_manifest.json" 2>/dev/null | head -1)
+
+        if [[ -f "$THEROCK_MANIFEST" ]]; then
+            echo "Found theRock manifest: $THEROCK_MANIFEST"
+
+            # Parse JSON using grep/sed (no jq dependency needed)
+            local rocm_version=$(grep -oP '"rocm_version":\s*"\K[^"]+' "$THEROCK_MANIFEST" || echo "unknown")
+            local pkg_version=$(grep -oP '"rocm_package_version":\s*"\K[^"]+' "$THEROCK_MANIFEST" || echo "unknown")
+            local therock_commit=$(grep -oP '"the_rock_commit":\s*"\K[^"]+' "$THEROCK_MANIFEST" || echo "unknown")
+            local github_run_id=$(grep -oP '"github_run_id":\s*"\K[^"]+' "$THEROCK_MANIFEST" || echo "unknown")
+            local rocm_libs_commit=$(grep -A3 '"submodule_name":\s*"rocm-libraries"' "$THEROCK_MANIFEST" | grep -oP '"pin_sha":\s*"\K[^"]+' || echo "unknown")
+            local rocm_sys_commit=$(grep -A3 '"submodule_name":\s*"rocm-systems"' "$THEROCK_MANIFEST" | grep -oP '"pin_sha":\s*"\K[^"]+' || echo "unknown")
+
+            # Create BUILDINFO file
+            cat > "$BUILDINFO_FILE" <<EOF
+ROCm Version: $rocm_version
+Package Version: $pkg_version
+theRock Commit: $therock_commit
+rocm-libraries Commit: $rocm_libs_commit
+rocm-systems Commit: $rocm_sys_commit
+GitHub Run ID: $github_run_id
+Build Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+EOF
+            echo "Created BUILDINFO from theRock manifest"
+        else
+            # Fallback if manifest doesn't exist
+            echo "WARNING: theRock manifest not found (content may be compressed)"
+            echo "Build information not available." > "$BUILDINFO_FILE"
+        fi
+    fi
+
     echo "Installer name: $BUILD_INSTALLER_NAME"
 }
 
@@ -473,7 +512,7 @@ generate_component_lists() {
     GFX_LIST=$(printf '%s\n' "${all_archs[@]}" | sort -u | tr '\n' ' ' | sed 's/ *$//')
 
     # Component categories are fixed (defined in rocm-installer.sh)
-    COMPO_LIST="core core-dev dev-tools core-sdk opencl"
+    COMPO_LIST="core core-dev dev-tools core-sdk opencl test"
 
     echo "GFX architectures: ${GFX_LIST:-<none>}"
     echo "Component categories: $COMPO_LIST"
@@ -546,13 +585,43 @@ generate_headers() {
 
     # Generate makeself header (used for all AlmaLinux versions)
     if [ -f "rocm-makeself-header-pre.sh.template" ]; then
-        sed -e "s|@@GFX_ARCHS_LIST@@|$GFX_LIST|g" \
-            -e "s|@@COMPONENTS_LIST@@|$COMPO_LIST|g" \
-            rocm-makeself-header-pre.sh.template > rocm-makeself-header-pre.sh
-        echo "Generated: rocm-makeself-header-pre.sh (embedded GFX_ARCHS_AVAILABLE)"
+        # Use a temporary file and process substitutions one at a time to avoid sed errors
+        cp rocm-makeself-header-pre.sh.template rocm-makeself-header-pre.sh.tmp
+
+        # Replace GFX_ARCHS_LIST (using | as delimiter since paths use /)
+        sed -i "s|@@GFX_ARCHS_LIST@@|$GFX_LIST|g" rocm-makeself-header-pre.sh.tmp
+
+        # Replace COMPONENTS_LIST
+        sed -i "s|@@COMPONENTS_LIST@@|$COMPO_LIST|g" rocm-makeself-header-pre.sh.tmp
+
+        mv rocm-makeself-header-pre.sh.tmp rocm-makeself-header-pre.sh
+        chmod +x rocm-makeself-header-pre.sh
+
+        echo "Generated: rocm-makeself-header-pre.sh (embedded GFX_ARCHS_AVAILABLE and component lists)"
     else
         echo "ERROR: rocm-makeself-header-pre.sh.template not found!"
         exit 1
+    fi
+
+    # Embed BUILDINFO content directly into the header by replacing the variable assignment
+    # This is done after the template substitution to handle multi-line content correctly
+    if [[ -f "$EXTRACT_DIR/BUILDINFO" ]]; then
+        # Read BUILDINFO and escape it for embedding in a shell $'...' string
+        # Use awk to properly convert newlines to literal \n for $'...' syntax
+        local BUILDINFO_ESCAPED=$(awk '{
+            gsub(/\\/, "\\\\");           # Escape backslashes first
+            gsub(/'\''/, "'\''\\'\'''\''");  # Escape single quotes
+            printf "%s\\n", $0;           # Add literal \n after each line
+        }' "$EXTRACT_DIR/BUILDINFO" | sed 's/\\n$//')  # Remove trailing \n
+
+        # Replace buildheader='$BUILDHEADER' with actual content using $'...' for multi-line
+        sed -i "s|^buildheader=.*|buildheader=\$'$BUILDINFO_ESCAPED'|" rocm-makeself-header-pre.sh
+
+        echo "  Embedded BUILDINFO into header"
+    else
+        # Use default message if BUILDINFO doesn't exist
+        sed -i "s|^buildheader=.*|buildheader='Build information not available.'|" rocm-makeself-header-pre.sh
+        echo "  WARNING: BUILDINFO file not found, using default message"
     fi
 }
 
