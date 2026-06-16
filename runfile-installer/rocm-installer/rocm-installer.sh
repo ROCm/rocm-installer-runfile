@@ -2971,6 +2971,30 @@ process_prev_rocm() {
 
         # Query the user for processing of the previous install of rocm
         if [[ $prev_install -eq 1 ]]; then
+            # Check if the existing installation is from a package manager
+            # Package manager installs cannot be mixed with runfile installs
+            if ! check_rocm_package_install "$inst"; then
+                # Existing install is from package manager - FAIL
+                echo -e "\e[31m++++++++++++++++++++++++++++++++++++"
+                echo "Error: Package installation of ROCm: $inst"
+                echo -e "++++++++++++++++++++++++++++++++++++\e[0m"
+                echo ""
+                echo "Cannot install ROCm using runfile installer over a package manager"
+                echo "installation at the same location and version."
+                echo ""
+                echo "Detected installation type: Package manager"
+                echo "Detected installation path: $inst"
+                echo "Detected ROCm version     : $ROCM_VER"
+                echo ""
+                echo "Resolution options:"
+                echo "  1. Uninstall the package manager installation first using:"
+                echo "       - Ubuntu/Debian: sudo apt remove 'amdrocm*'"
+                echo "       - RHEL/Rocky   : sudo dnf remove 'amdrocm*'"
+                echo "  2. Use a different target directory with: target=<path>"
+                echo "  3. Install to package manager location using package manager"
+                exit 1
+            fi
+
             # For multi-arch installations, check if we're doing an incremental install
             if [[ "${INSTALLER_BUILD_TYPE:-}" == "multi-arch" && ${#GFX_INSTALL_LIST[@]} -gt 0 ]]; then
                 # Multi-arch: check if ANY of the GFX archs are already installed
