@@ -457,6 +457,11 @@ void menu_item_select(MENU_DATA *pMenuData, ITEM *pCurrentItem)
     {
         delete_menu_item_selection_mark(pMenuData, pCurrentItem);
     }
+
+    // Redraw border and title separator to fix any corruption from selection
+    box(pMenuData->pMenuWindow, 0, 0);
+    mvwhline(pMenuData->pMenuWindow, 2, 2, ACS_HLINE, WIN_WIDTH_COLS - 4);
+    wrefresh(pMenuData->pMenuWindow);
 }
 
 static void handle_key_down(MENU_DATA *pMenuData)
@@ -480,6 +485,11 @@ static void handle_key_down(MENU_DATA *pMenuData)
 
     // update menu scrolling position
     menu_scroll_update_selections(pMenuData, item_index(pCurrentItem));
+
+    // Redraw border and title separator after scrolling to fix corruption
+    box(pMenuData->pMenuWindow, 0, 0);
+    mvwhline(pMenuData->pMenuWindow, 2, 2, ACS_HLINE, WIN_WIDTH_COLS - 4);
+    wrefresh(pMenuData->pMenuWindow);
 
     p = item_userptr(pCurrentItem);
     if (NULL != p)
@@ -530,6 +540,11 @@ static void handle_key_up(MENU_DATA *pMenuData)
 
     // update menu scrolling position
     menu_scroll_update_selections(pMenuData, item_index(pCurrentItem));
+
+    // Redraw border and title separator after scrolling to fix corruption
+    box(pMenuData->pMenuWindow, 0, 0);
+    mvwhline(pMenuData->pMenuWindow, 2, 2, ACS_HLINE, WIN_WIDTH_COLS - 4);
+    wrefresh(pMenuData->pMenuWindow);
 
     p = item_userptr(pCurrentItem);
     if (NULL != p)
@@ -694,7 +709,7 @@ void menu_draw(MENU_DATA *pMenuData)
 
         for(int i = 0; i < pMenuData->itemList[0].numItems; ++i)
         {
-            if ( ((pMenuData->itemSelections) & (1 << i)) && (item_opts(items[i]) == O_SELECTABLE) )
+            if ( ((pMenuData->itemSelections) & (1ULL << i)) && (item_opts(items[i]) == O_SELECTABLE) )
             {
                 set_item_value(items[i], true);
                 add_menu_item_selection_mark(pMenuData, items[i]);
@@ -802,8 +817,11 @@ void remove_menu_item_selection_description(MENU_DATA *pMenuData, int starty, in
     wmove(pMenuWindow, starty, startx);
     wclrtoeol(pMenuWindow);
 
-    wmove(pMenuWindow, starty+1, 0);
-    wclrtoeol(pMenuWindow);
+    // Clear the next line but preserve the left border at column 0
+    for (int col = 1; col < WIN_WIDTH_COLS - 1; col++)
+    {
+        mvwaddch(pMenuWindow, starty+1, col, ' ');
+    }
 
     print_border_around_item_description(pMenuWindow, starty);
 }
@@ -815,7 +833,7 @@ void print_menu_item_selection_opt(MENU_DATA *pMenuData, int starty, int startx,
     wmove(pMenuWindow, starty, startx);
     wclrtoeol(pMenuWindow);
 
-    wmove(pMenuWindow, starty+1, 0);
+    wmove(pMenuWindow, starty+1, 1);
     wclrtoeol(pMenuWindow);
 
 #if ENABLE_MENU_DEBUG

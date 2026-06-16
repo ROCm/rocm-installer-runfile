@@ -24,6 +24,7 @@
 #include "utils.h"
 #include <stdlib.h>
 #include <string.h>
+#include <libgen.h>
 
 
 /***************** ROCm Main Menu Setup *****************/
@@ -323,29 +324,79 @@ int find_rocm_with_progress(char *target)
 
 int check_target_for_package_install(char *target, char *rocm_loc)
 {
-    int ret = 0;
-    char rocm_core_name[LARGE_CHAR_SIZE];
-    char rocm_core_ver[SMALL_CHAR_SIZE];
+    char rocm_ver_str[SMALL_CHAR_SIZE];
+    char command[LARGE_CHAR_SIZE];
+    FILE *fp = NULL;
+    char result[SMALL_CHAR_SIZE];
 
-    // Check if the target is / and current rocm installed location is in /opt/rocm
-    if ( (strcmp(target, "/") == 0) && (is_loc_opt_rocm(rocm_loc) == 1) )
+    // Package manager installs only occur at /opt/rocm/* when target is / or /opt
+    if (((strcmp(target, "/") != 0) && (strcmp(target, "/opt") != 0)) ||
+        (is_loc_opt_rocm(rocm_loc) != 1))
     {
-        // get the rocm-core package name
-        if (get_rocm_core_pkg(g_pConfig->distroType, rocm_core_name, LARGE_CHAR_SIZE) == 0)
+        return 0;
+    }
+
+    // Extract version from path (e.g., /opt/rocm/core-7.14.0 -> "7.14.0")
+    char *last_slash = strrchr(rocm_loc, '/');
+    char *dir_name = (last_slash != NULL) ? last_slash + 1 : rocm_loc;
+    char *ver_start = NULL;
+
+    // Handle both formats: "core-X.Y.Z" and "rocm-X.Y.Z"
+    if (strstr(dir_name, "core-") != NULL)
+    {
+        ver_start = strstr(dir_name, "core-") + strlen("core-");
+    }
+    else if (strstr(dir_name, "rocm-") != NULL)
+    {
+        ver_start = strstr(dir_name, "rocm-") + strlen("rocm-");
+    }
+
+    if (ver_start == NULL)
+    {
+        return 0;
+    }
+
+    // Copy version string
+    strncpy(rocm_ver_str, ver_start, sizeof(rocm_ver_str) - 1);
+    rocm_ver_str[sizeof(rocm_ver_str) - 1] = '\0';
+
+    // Check for theRock packages: amdrocm-core<version>-gfx<arch>
+    // Pattern: amdrocm-core<version> followed by -gfx OR end/separator
+    if (g_pConfig->distroType == eDISTRO_TYPE_DEB)
+    {
+        snprintf(command, sizeof(command),
+            "apt list --installed 2>&1 | grep -q -E 'amdrocm-core%s(-gfx|/)' && echo 'found'",
+            rocm_ver_str);
+    }
+    else
+    {
+        snprintf(command, sizeof(command),
+            "rpm -qa 2>&1 | grep -q -E 'amdrocm-core%s(-gfx|$)' && echo 'found'",
+            rocm_ver_str);
+    }
+
+    fp = popen(command, "r");
+    if (fp != NULL)
+    {
+        if (fgets(result, sizeof(result), fp) != NULL && strstr(result, "found") != NULL)
         {
-            // check if the rocm-core package contains the loc rocm version - if yes = package manger install
-            if (get_rocm_version_str_from_path(rocm_loc, rocm_core_ver) == 0)
-            {
-                char *rocm_chk = strstr(rocm_core_name, rocm_core_ver);
-                if (NULL != rocm_chk)
-                {
-                    ret = 1;
-                }
-            }
+            pclose(fp);
+            return 1;
+        }
+        pclose(fp);
+    }
+
+    // Fall back to legacy rocm-core package check
+    char rocm_core_name[LARGE_CHAR_SIZE];
+    if (get_rocm_core_pkg(g_pConfig->distroType, rocm_core_name, LARGE_CHAR_SIZE) == 0)
+    {
+        if (strstr(rocm_core_name, rocm_ver_str) != NULL)
+        {
+            return 1;
         }
     }
 
-    return ret;
+    return 0;
 }
 
 void check_rocm_install_status()

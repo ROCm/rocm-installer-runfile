@@ -126,7 +126,7 @@ typedef struct _MENU_DATA
     // items
     int         curItemListIndex;
     ITEM_DATA   itemList[MAX_NUM_ITEM_LIST];
-    uint32_t    itemSelections;
+    uint64_t    itemSelections;
     int         curItemSelection;
     int         startListIndex;
     int         endListIndex;

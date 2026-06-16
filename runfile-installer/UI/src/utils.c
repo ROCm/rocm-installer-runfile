@@ -409,13 +409,26 @@ int get_rocm_version_str_from_path(char *rocm_loc, char *rocm_core_ver)
     // get the base directory name from the current location
     char *rocm_dir = basename(rocm_loc);
 
-    // extract "rocm-"
+    // extract "rocm-" or "core-" (theRock uses /opt/rocm/core-X.Y format)
     char *rocm_str = strstr(rocm_dir, "rocm-");
+    if (NULL == rocm_str)
+    {
+        // Try "core-" prefix (theRock format)
+        rocm_str = strstr(rocm_dir, "core-");
+        if (NULL != rocm_str)
+        {
+            // extract the version after "core-"
+            strcpy(rocm_ver, rocm_str + strlen("core-"));
+        }
+    }
+    else
+    {
+        // extract the version after "rocm-"
+        strcpy(rocm_ver, rocm_str + strlen("rocm-"));
+    }
+
     if (NULL != rocm_str)
     {
-        // extract the version
-        strcpy(rocm_ver, rocm_str + strlen("rocm-"));
-
         // convert to a core version number
         int x, y, z;
         if (sscanf(rocm_ver, "%d.%d.%d", &x, &y, &z) == 3)
@@ -484,19 +497,22 @@ int get_rocm_core_pkg(DISTRO_TYPE distroType, char *rocm_core_out, size_t out_si
 
 int is_loc_opt_rocm(char *rocm_loc)
 {
-    char *rocm_base = "/opt/rocm";
+    const char *rocm_base = "/opt/rocm";
+    size_t base_len = strlen(rocm_base);
 
-    // Check if the rocm loc is in /opt/rocm
-    if (strncmp(rocm_loc, rocm_base, strlen(rocm_base)) == 0)
+    // Check if the location starts with /opt/rocm
+    if (strncmp(rocm_loc, rocm_base, base_len) != 0)
     {
-        char next_chr = rocm_loc[strlen(rocm_base)];
-        if (next_chr == '-')
-        {
-            return 1;
-        }
+        return 0;
     }
 
-    return 0;
+    // Get the character immediately after /opt/rocm
+    char next_chr = rocm_loc[base_len];
+
+    // Valid ROCm install locations:
+    // - Legacy format:  /opt/rocm-X.Y.Z   (next char is '-')
+    // - theRock format: /opt/rocm/core-X.Y.Z (next char is '/')
+    return (next_chr == '-' || next_chr == '/') ? 1 : 0;
 }
 
 int is_dkms_pkg_installed(DISTRO_TYPE distroType)
