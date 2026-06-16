@@ -356,9 +356,30 @@ int check_target_for_package_install(char *target, char *rocm_loc)
         return 0;
     }
 
-    // Copy version string
-    strncpy(rocm_ver_str, ver_start, sizeof(rocm_ver_str) - 1);
-    rocm_ver_str[sizeof(rocm_ver_str) - 1] = '\0';
+    // Sanitize version string to only allow version characters (digits, dots, hyphens)
+    // This prevents command injection in the shell commands below
+    // Copy only safe characters to a clean buffer
+    int j = 0;
+    for (int i = 0; ver_start[i] != '\0' && j < (int)(sizeof(rocm_ver_str) - 1); i++)
+    {
+        char c = ver_start[i];
+        if ((c >= '0' && c <= '9') || c == '.' || c == '-')
+        {
+            rocm_ver_str[j++] = c;
+        }
+        else
+        {
+            // Stop at first invalid character (likely end of version string)
+            break;
+        }
+    }
+    rocm_ver_str[j] = '\0';
+
+    // Version string must not be empty
+    if (j == 0)
+    {
+        return 0;
+    }
 
     // Check for theRock packages: amdrocm-core<version>-gfx<arch>
     // Pattern: amdrocm-core<version> followed by -gfx OR end/separator
