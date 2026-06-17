@@ -407,11 +407,55 @@ void main_menu_install_draw(MENU_DATA *pMenuData)
         wattroff(pMenuWindow, WHITE | A_ITALIC );
         menu_info_draw_bool(pMenuData, start_row, start_col+16, g_pRocmConfig->install_rocm);
 
-        // ROCm device
+        // ROCm device - smart display based on device count
         if (strlen(g_pRocmConfig->rocm_device) > 0)
         {
+            // Count devices in comma-separated list
+            int device_count = 1;
+            for (const char *p = g_pRocmConfig->rocm_device; *p; p++)
+            {
+                if (*p == ',') device_count++;
+            }
+
             wattron(pMenuWindow, GREEN | A_BOLD);
-            mvwprintw(pMenuWindow, start_row+1, start_col+8, "Device: %s", g_pRocmConfig->rocm_device);
+
+            if (device_count == 1)
+            {
+                // Single device - show as-is
+                mvwprintw(pMenuWindow, start_row+1, start_col+8, "Device: %s", g_pRocmConfig->rocm_device);
+            }
+            else if (device_count == 2)
+            {
+                // 2 devices - show both (should fit on line)
+                mvwprintw(pMenuWindow, start_row+1, start_col+8, "Device: %s", g_pRocmConfig->rocm_device);
+            }
+            else
+            {
+                // 4+ devices - show first device + count
+                char first_device[32];
+                const char *comma = strchr(g_pRocmConfig->rocm_device, ',');
+                if (comma)
+                {
+                    size_t len = comma - g_pRocmConfig->rocm_device;
+                    if (len < sizeof(first_device))
+                    {
+                        strncpy(first_device, g_pRocmConfig->rocm_device, len);
+                        first_device[len] = '\0';
+                        mvwprintw(pMenuWindow, start_row+1, start_col+8, "Device: %s (+%d more)",
+                                  first_device, device_count - 1);
+                    }
+                    else
+                    {
+                        mvwprintw(pMenuWindow, start_row+1, start_col+8, "Device: %d devices selected", device_count);
+                    }
+                }
+                else
+                {
+                    // Shouldn't happen, but fallback
+                    mvwprintw(pMenuWindow, start_row+1, start_col+8, "Device: %d devices selected", device_count);
+                }
+            }
+
             wattroff(pMenuWindow, GREEN | A_BOLD);
         }
         else
