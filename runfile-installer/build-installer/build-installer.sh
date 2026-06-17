@@ -419,18 +419,20 @@ write_version() {
         echo "BUILDINFO already exists, using existing file"
     else
         # BUILDINFO doesn't exist - try to create from theRock manifest
-        local THEROCK_MANIFEST=$(find "$EXTRACT_DIR/component-rocm/content/base" -path "*/share/therock/therock_manifest.json" 2>/dev/null | head -1)
+        local THEROCK_MANIFEST
+        THEROCK_MANIFEST=$(find "$EXTRACT_DIR/component-rocm/content/base" -path "*/share/therock/therock_manifest.json" 2>/dev/null | head -1)
 
         if [[ -f "$THEROCK_MANIFEST" ]]; then
             echo "Found theRock manifest: $THEROCK_MANIFEST"
 
             # Parse JSON using grep/sed (no jq dependency needed)
-            local rocm_version=$(grep -oP '"rocm_version":\s*"\K[^"]+' "$THEROCK_MANIFEST" || echo "unknown")
-            local pkg_version=$(grep -oP '"rocm_package_version":\s*"\K[^"]+' "$THEROCK_MANIFEST" || echo "unknown")
-            local therock_commit=$(grep -oP '"the_rock_commit":\s*"\K[^"]+' "$THEROCK_MANIFEST" || echo "unknown")
-            local github_run_id=$(grep -oP '"github_run_id":\s*"\K[^"]+' "$THEROCK_MANIFEST" || echo "unknown")
-            local rocm_libs_commit=$(grep -A3 '"submodule_name":\s*"rocm-libraries"' "$THEROCK_MANIFEST" | grep -oP '"pin_sha":\s*"\K[^"]+' || echo "unknown")
-            local rocm_sys_commit=$(grep -A3 '"submodule_name":\s*"rocm-systems"' "$THEROCK_MANIFEST" | grep -oP '"pin_sha":\s*"\K[^"]+' || echo "unknown")
+            local rocm_version pkg_version therock_commit github_run_id rocm_libs_commit rocm_sys_commit
+            rocm_version=$(grep -oP '"rocm_version":\s*"\K[^"]+' "$THEROCK_MANIFEST" || echo "unknown")
+            pkg_version=$(grep -oP '"rocm_package_version":\s*"\K[^"]+' "$THEROCK_MANIFEST" || echo "unknown")
+            therock_commit=$(grep -oP '"the_rock_commit":\s*"\K[^"]+' "$THEROCK_MANIFEST" || echo "unknown")
+            github_run_id=$(grep -oP '"github_run_id":\s*"\K[^"]+' "$THEROCK_MANIFEST" || echo "unknown")
+            rocm_libs_commit=$(grep -A3 '"submodule_name":\s*"rocm-libraries"' "$THEROCK_MANIFEST" | grep -oP '"pin_sha":\s*"\K[^"]+' || echo "unknown")
+            rocm_sys_commit=$(grep -A3 '"submodule_name":\s*"rocm-systems"' "$THEROCK_MANIFEST" | grep -oP '"pin_sha":\s*"\K[^"]+' || echo "unknown")
 
             # Create BUILDINFO file
             cat > "$BUILDINFO_FILE" <<EOF
@@ -608,11 +610,15 @@ generate_headers() {
     if [[ -f "$EXTRACT_DIR/BUILDINFO" ]]; then
         # Read BUILDINFO and escape it for embedding in a shell $'...' string
         # Use awk to properly convert newlines to literal \n for $'...' syntax
-        local BUILDINFO_ESCAPED=$(awk '{
-            gsub(/\\/, "\\\\");           # Escape backslashes first
-            gsub(/'\''/, "'\''\\'\'''\''");  # Escape single quotes
-            printf "%s\\n", $0;           # Add literal \n after each line
-        }' "$EXTRACT_DIR/BUILDINFO" | sed 's/\\n$//')  # Remove trailing \n
+        local BUILDINFO_ESCAPED
+        # shellcheck disable=SC1003
+        BUILDINFO_ESCAPED=$(awk '
+            {
+                gsub(/\\/, "\\\\")         # Escape backslashes first
+                gsub(/'\''/, "'\''\\'\'''\''")  # Escape single quotes
+                printf "%s\\n", $0         # Add literal \n after each line
+            }
+        ' "$EXTRACT_DIR/BUILDINFO" | sed 's/\\n$//')  # Remove trailing \n
 
         # Replace buildheader='$BUILDHEADER' with actual content using $'...' for multi-line
         sed -i "s|^buildheader=.*|buildheader=\$'$BUILDINFO_ESCAPED'|" rocm-makeself-header-pre.sh
