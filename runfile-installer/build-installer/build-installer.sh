@@ -29,6 +29,7 @@ BUILD_EXTRACT="yes"
 BUILD_COMPRESS="yes"
 BUILD_INSTALLER="yes"
 BUILD_UI="yes"
+BUILD_WITH_TESTS="${BUILD_WITH_TESTS:-no}"  # Control test package extraction (passed from build-runfile-installer.sh)
 
 BUILD_DIR=../build
 BUILD_DIR_UI=../build-UI
@@ -86,7 +87,7 @@ Usage: $PROG [options]
                            is sourced by both parent and child scripts. Each script sources
                            independently, then applies command-line overrides.
 
-    noextract            = Disable package extraction.
+    noextract            = Disable package extraction (also disables compression automatically).
     norocm               = Disable ROCm package extraction.
     noamdgpu             = Disable AMDGPU package extraction.
     noextractcontent     = Disable package extraction content. (Extract only deps and scriptlets)
@@ -153,13 +154,13 @@ get_coarse_family() {
 
 initialize_gfx_family_map() {
     # Initialize GFX_FAMILY_MAP based on build type
-    # - Single-arch (nightly): 1:1 mapping from ROCM_GFX_ARCHS
-    # - Multi-arch (nightly-multiarch): Fine→coarse grouping
+    # - Single-arch (nightly-singlearch): 1:1 mapping from ROCM_GFX_ARCHS
+    # - Multi-arch (nightly): Fine→coarse grouping
 
     # Clear any existing mappings
     GFX_FAMILY_MAP=()
 
-    if [[ "${PULL_CONFIG_RELEASE_TYPE:-}" == "nightly-multiarch" ]]; then
+    if [[ "${PULL_CONFIG_RELEASE_TYPE:-}" == "nightly" ]]; then
         # Multi-arch build: Use fine-grained → coarse family mappings
         echo "Initializing GFX_FAMILY_MAP for multi-arch build"
         GFX_FAMILY_MAP=(
@@ -513,8 +514,15 @@ generate_component_lists() {
     # Create space-separated list (sorted)
     GFX_LIST=$(printf '%s\n' "${all_archs[@]}" | sort -u | tr '\n' ' ' | sed 's/ *$//')
 
-    # Component categories are fixed (defined in rocm-installer.sh)
-    COMPO_LIST="core core-dev dev-tools core-sdk opencl test"
+    # Component categories (defined in rocm-installer.sh)
+    # Include "test" only if BUILD_WITH_TESTS is enabled
+    if [[ "$BUILD_WITH_TESTS" == "yes" ]]; then
+        COMPO_LIST="core core-dev dev-tools core-sdk opencl test"
+        echo "Building with test packages enabled"
+    else
+        COMPO_LIST="core core-dev dev-tools core-sdk opencl"
+        echo "Building without test packages (production build)"
+    fi
 
     echo "GFX architectures: ${GFX_LIST:-<none>}"
     echo "Component categories: $COMPO_LIST"
@@ -946,12 +954,26 @@ extract_rocm_packages_deb() {
         else
             echo "Using nodpkg extractor for RPM-based system ($EXTRACT_TYPE_DEB mode)"
         fi
-        PACKAGE_ROCM_DIR="$PWD/packages-rocm-deb" EXTRACT_FORMAT=deb ./package-extractor-debs-nodpkg.sh rocm ext-rocm="../rocm-installer/component-rocm-deb" $EXTRACT_TYPE_DEB
+
+        # Build extractor arguments
+        local extractor_args_deb="rocm ext-rocm=../rocm-installer/component-rocm-deb $EXTRACT_TYPE_DEB"
+        if [[ "$BUILD_WITH_TESTS" == "yes" ]]; then
+            extractor_args_deb+=" test"
+        fi
+
+        # shellcheck disable=SC2086  # extractor_args_deb intentionally unquoted for word splitting
+        PACKAGE_ROCM_DIR="$PWD/packages-rocm-deb" EXTRACT_FORMAT=deb ./package-extractor-debs-nodpkg.sh $extractor_args_deb
         extract_status=$?
     else
         # On DEB-based systems, use standard extractor
-        # shellcheck disable=SC2086  # EXTRACT_TYPE intentionally unquoted for word splitting
-        PACKAGE_ROCM_DIR="$PWD/packages-rocm-deb" EXTRACT_FORMAT=deb ./package-extractor-debs.sh rocm ext-rocm="../rocm-installer/component-rocm" $EXTRACT_TYPE
+        # Build extractor arguments
+        local extractor_args_deb="rocm ext-rocm=../rocm-installer/component-rocm $EXTRACT_TYPE"
+        if [[ "$BUILD_WITH_TESTS" == "yes" ]]; then
+            extractor_args_deb+=" test"
+        fi
+
+        # shellcheck disable=SC2086  # extractor_args_deb intentionally unquoted for word splitting
+        PACKAGE_ROCM_DIR="$PWD/packages-rocm-deb" EXTRACT_FORMAT=deb ./package-extractor-debs.sh $extractor_args_deb
         extract_status=$?
     fi
 
@@ -1000,6 +1022,11 @@ extract_rocm_packages_rpm() {
 
     # Build extractor arguments with auto dependency resolution if build config is available
     local extractor_args="rocm ext-rocm=../rocm-installer $EXTRACT_TYPE"
+
+    # Add test argument if BUILD_WITH_TESTS is enabled
+    if [[ "$BUILD_WITH_TESTS" == "yes" ]]; then
+        extractor_args+=" test"
+    fi
 
     # Check if automatic dependency resolution is disabled
     if [[ "$DISABLE_AUTO_DEPS" == "yes" ]]; then
@@ -1661,13 +1688,27 @@ build_UI() {
             done
 
             # UI now reads VERSION file at runtime - no version parameters needed
+            # Build cmake command with flags
+            local CMAKE_FLAGS=""
+
             if [[ "$is_multiarch" == "true" ]]; then
                 echo "Building UI with MULTI_ARCH_BUILD support"
-                cmake -DMULTI_ARCH_BUILD=ON ../build-installer
+                CMAKE_FLAGS="-DMULTI_ARCH_BUILD=ON"
             else
                 echo "Building UI for single-arch installer"
-                cmake -DMULTI_ARCH_BUILD=OFF ../build-installer
+                CMAKE_FLAGS="-DMULTI_ARCH_BUILD=OFF"
             fi
+
+            # Add test component flag if building with tests
+            if [[ "$BUILD_WITH_TESTS" == "yes" ]]; then
+                echo "Building UI with test component support"
+                CMAKE_FLAGS="$CMAKE_FLAGS -DINCLUDE_TEST_COMPONENT=ON"
+            else
+                CMAKE_FLAGS="$CMAKE_FLAGS -DINCLUDE_TEST_COMPONENT=OFF"
+            fi
+
+            # shellcheck disable=SC2086  # CMAKE_FLAGS intentionally unquoted for word splitting
+            cmake $CMAKE_FLAGS ../build-installer
             if ! make; then
                 echo -e "\e[31mFailed GUI build.\e[0m"
                 exit 1
@@ -1770,6 +1811,8 @@ do
     noextract)
         echo "Disabling package extraction."
         BUILD_EXTRACT="no"
+        echo "Automatically disabling compression (noextract implies nocompress)."
+        BUILD_COMPRESS="no"
         shift
         ;;
     norocm)
@@ -1876,6 +1919,11 @@ do
         esac
         shift
         ;;
+    test)
+        echo "Enabling test package extraction and build."
+        BUILD_WITH_TESTS="yes"
+        shift
+        ;;
     *)
         echo "Unknown option: $1"
         shift
@@ -1898,7 +1946,16 @@ write_version
 # Compress packages if hybrid mode is enabled and compression not disabled
 if [[ "$HYBRID_COMPRESSION" == "yes" ]] && [[ "$BUILD_COMPRESS" == "yes" ]]; then
     compress_setup
-    compress_tests
+
+    # Compress test packages only if BUILD_WITH_TESTS is enabled
+    if [[ "$BUILD_WITH_TESTS" == "yes" ]]; then
+        compress_tests
+    else
+        echo "-------------------------------------------------------------"
+        echo "Skipping test compression (BUILD_WITH_TESTS=$BUILD_WITH_TESTS)"
+        echo "-------------------------------------------------------------"
+    fi
+
     compress_components
 elif [[ "$BUILD_COMPRESS" == "no" ]]; then
     echo "-------------------------------------------------------------"

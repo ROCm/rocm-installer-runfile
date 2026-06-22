@@ -75,6 +75,7 @@ ROCM_EXTRACT=0
 AMDGPU_EXTRACT=0
 EXTRACT_CONTENT=1
 CONTENT_LIST=0
+BUILD_WITH_TESTS="${BUILD_WITH_TESTS:-no}"  # Control test package extraction (set by build-runfile-installer.sh)
 
 ######## Build tags EXTRACT FROM ROCM meta package
 ROCM_VER=
@@ -1522,6 +1523,11 @@ do
     ext-amdgpu=*)
         EXTRACT_AMDGPU_DIR="${1#*=}"
         echo "Extract AMDGPU output: $EXTRACT_AMDGPU_DIR"
+        shift
+        ;;
+    test)
+        echo "Enabling test package extraction."
+        BUILD_WITH_TESTS="yes"
         shift
         ;;
     *)

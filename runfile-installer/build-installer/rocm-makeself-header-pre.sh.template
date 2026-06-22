@@ -254,7 +254,6 @@ Usage:
                                    dev-tools = Developer tools (amdrocm-developer-tools)
                                    core-sdk  = Core SDK components (amdrocm-core-sdk)
                                    opencl    = OpenCL runtime (amdrocm-opencl)
-                                   test      = Test packages (architecture-specific)
                                Examples:
                                    compo=core
                                    compo=core,dev-tools

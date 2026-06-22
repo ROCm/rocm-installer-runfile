@@ -1815,6 +1815,7 @@ void create_rocm_menu_compo_window(WINDOW *pMenuWindow)
 
         i = item_count;
 
+#ifdef INCLUDE_TEST_COMPONENT
         // Add blank separator before test
         strcpy(rocmMenuCompoOps[i], " ");
         strcpy(rocmMenuCompoDesc[i++], " ");
@@ -1822,6 +1823,7 @@ void create_rocm_menu_compo_window(WINDOW *pMenuWindow)
         // Add test component
         strcpy(rocmMenuCompoOps[i], "test");
         strcpy(rocmMenuCompoDesc[i++], "Test packages (amdrocm-*-test)");
+#endif
 
         // Add menu system items
         strcpy(rocmMenuCompoOps[i], " ");

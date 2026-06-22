@@ -60,7 +60,7 @@ TARGET_ROCM_DEFAULT_DIR="/opt"
 TARGET_ROCM_DIR="$TARGET_ROCM_DEFAULT_DIR"
 
 # Component Configuration
-COMPO_INSTALL="core"  # Default component: core, core-dev, dev-tools, core-sdk, opencl, test (comma-separated)
+COMPO_INSTALL="core"  # Default component: core, core-dev, dev-tools, core-sdk, opencl (test only if available)
 COMPO_META_DIR="$EXTRACT_ROCM_DIR/deps/meta"
 COMPO_TEST_DIR="$EXTRACT_ROCM_DIR/deps/test"
 COMPO_VER_FILE="component-versions.txt"
@@ -71,6 +71,13 @@ COMPONENTS=
 COMPONENTS_GFX=
 INSTALL_GFX=
 GFX_INSTALL_LIST=()     # Array of GFX architectures to install (for multi-GFX support)
+
+# Test package availability detection (runtime check)
+# Detect if test packages are included in this installer by checking for test directory
+INSTALLER_HAS_TESTS="no"
+if [[ -d "$INSTALLER_DIR/component-rocm/deps/test" ]]; then
+    INSTALLER_HAS_TESTS="yes"
+fi
 
 # Graphics Configuration
 USE_GRAPHICS=0  # Flag for graphics use case (amdgpu-lib)
@@ -164,7 +171,6 @@ Usage: bash $PROG [options]
                                    dev-tools = Developer tools (amdrocm-developer-tools)
                                    core-sdk  = Core SDK components (amdrocm-core-sdk)
                                    opencl    = OpenCL runtime (amdrocm-opencl)
-                                   test      = Test packages (architecture-specific)
                                Examples:
                                    compo=core
                                    compo=core,dev-tools
@@ -807,6 +813,12 @@ extract_tests_if_needed() {
         return 0
     fi
 
+    # Check if this installer has test packages
+    if [[ "$INSTALLER_HAS_TESTS" != "yes" ]]; then
+        print_err "Test packages not available in this installer."
+        exit 1
+    fi
+
     echo "-------------------------------------------------------------"
     echo "Extracting tests..."
     echo "-------------------------------------------------------------"
@@ -1082,7 +1094,12 @@ get_available_gfx_archs() {
 get_available_components() {
     # Return list of available component categories
     # These are the high-level component categories, not individual packages
-    local components=("core" "core-dev" "dev-tools" "core-sdk" "opencl" "test")
+    # Include "test" only if this installer was built with test packages
+    if [[ "$INSTALLER_HAS_TESTS" == "yes" ]]; then
+        local components=("core" "core-dev" "dev-tools" "core-sdk" "opencl" "test")
+    else
+        local components=("core" "core-dev" "dev-tools" "core-sdk" "opencl")
+    fi
     echo "${components[@]}"
 }
 
@@ -3068,6 +3085,12 @@ set_rocm_target() {
 }
 
 process_test_component() {
+    # Check if this installer has test packages
+    if [[ "$INSTALLER_HAS_TESTS" != "yes" ]]; then
+        print_err "Test packages not available in this installer."
+        exit 1
+    fi
+
     # Test packages require gfx= to be specified
     if [[ -z "$INSTALL_GFX" ]]; then
         print_err "Test packages require gfx= argument to specify architecture."
@@ -3282,7 +3305,11 @@ configure_rocm_install() {
                     ;;
                 *)
                     print_err "Unknown component: $compo_name"
-                    echo "Valid components: core, core-dev, dev-tools, core-sdk, opencl, test"
+                    if [[ "$INSTALLER_HAS_TESTS" == "yes" ]]; then
+                        echo "Valid components: core, core-dev, dev-tools, core-sdk, opencl, test"
+                    else
+                        echo "Valid components: core, core-dev, dev-tools, core-sdk, opencl"
+                    fi
                     exit 1
                     ;;
             esac
