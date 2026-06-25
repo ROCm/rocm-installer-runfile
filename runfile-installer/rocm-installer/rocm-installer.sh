@@ -4289,15 +4289,6 @@ install_post_rocm() {
 set_gpu_access() {
     echo ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     echo Setting GPU Access...
-
-    # Ubuntu 26.04+ does not require video/render group membership for GPU access
-    if [[ "$DISTRO_NAME" == "ubuntu" && "$DISTRO_VER" == "26.04" ]]; then
-        echo "Ubuntu 26.04 detected: GPU access is enabled by default."
-        echo "No additional configuration required (video/render groups not needed)."
-        echo Setting GPU Access...Complete.
-        return 0
-    fi
-
     if [[ $GPU_ACCESS == "user" ]]; then
         echo Adding current user: "$USER" to render,video group.
 
