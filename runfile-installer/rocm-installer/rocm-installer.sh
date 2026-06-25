@@ -4652,7 +4652,6 @@ do
     assumeyes)
         echo "Enabling assumeyes mode (auto-answer yes to all prompts)."
         ASSUME_YES=1
-        AMDGPU_INSTALLER_ARGS="$AMDGPU_INSTALLER_ARGS assumeyes"
         shift
         ;;
     verbose)
