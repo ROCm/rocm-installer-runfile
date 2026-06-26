@@ -338,9 +338,9 @@ map_device_id_with_revision_to_gfx() {
     device_id="${device_id#0x}"
     device_id="${device_id,,}"  # Convert to lowercase
 
-    # Normalize revision ID (uppercase, remove 0x prefix)
+    # Normalize revision ID (lowercase, remove 0x prefix)
     revision_id="${revision_id#0x}"
-    revision_id="${revision_id^^}"  # Convert to uppercase
+    revision_id="${revision_id,,}"  # Convert to lowercase
 
     # Revision-specific mappings (Device ID + Revision ID -> GFX)
     # Format: device_id/revision_id
@@ -590,11 +590,11 @@ map_device_id_to_gfx() {
         7420|7421|7422|7423|7424|743f) echo "gfx1033" ;;
 
         # RDNA3 - RX 7900 XTX/XT
-        7448|744c|7449|744a|744b|7470) echo "gfx1100" ;;
+        7448|744c|7449|744a|744b) echo "gfx1100" ;;
         # RDNA3 - RX 7800/7700
         7478|747e|746f|748f) echo "gfx1101" ;;
         # RDNA3 - RX 7600
-        7480|7483|7487|745e|7460|7461|7489|7499) echo "gfx1102" ;;
+        7480|7483|7487|7460|7461|7489|7499) echo "gfx1102" ;;
 
         # APU - Ryzen 7000 (RDNA3)
         15bf|15c8|1900|1901) echo "gfx1103" ;;
