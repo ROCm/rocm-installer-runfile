@@ -151,7 +151,6 @@ Examples:
     $0 pull=nightly-multiarch pulltag=20260602 pullrunid=26796219223 pullrocmver=7.14.0  # Nightly multiarch
     $0 pull=dev pulltag=20260219 pullrunid=22188089855 pullrocmver=7.12.0            # Dev
     $0 pull=prerelease pulltag=rc2 pullrunid=21843385957 pullrocmver=7.11.0          # Prerelease RC2
-    $0 pull=prerelease-multiarch pulltag=rc2 pullrunid=25753472298 pullrocmver=7.13.0          # Prerelease multiarch 7.13 RC2
     $0 pull=release pulltag=release pullrunid=1 pullrocmver=7.11.0                   # Release
 
     # GPU architectures
