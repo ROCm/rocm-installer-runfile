@@ -78,10 +78,10 @@ on:
         type: choice
         options:
           - dev             # dev.devreleases.amd.com
-          - nightly         # rocm.nightlies.amd.com
-          - prerelease      # rocm.prereleases.amd.com
+          - nightly         # rocm.nightlies.amd.com/packages-multi-arch/
+          - prerelease      # rocm.prereleases.amd.com/packages-multi-arch/
           - release         # repo.amd.com
-          - nightly-multiarch # rocm.nightlies.amd.com/packages-multi-arch/
+          - nightly-singlearch # rocm.nightlies.amd.com 
         default: nightly
 permissions:
   id-token: write
