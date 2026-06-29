@@ -2,7 +2,7 @@ All Architectures:
     All available GPU architectures           (all)
 Instinct:
     MI355/MI358/MI350/MI350P                  (gfx950)
-    MI325X/MI300XHF/MI300X/MI308XHF/MI308X/MI300A (gfx942)
+    MI325X/MI308X/MI300X/MI300A               (gfx942)
     MI250X/MI250/MI210                        (gfx90a)
     MI100                                     (gfx908)
     Radeon Pro VII                            (gfx906)
@@ -30,14 +30,14 @@ Radeon RX:
     Vega 64/Vega 56/Vega 20                      (gfx900)
 Ryzen (APU):
     AI Max PRO 300 Series/AI Max 300 Series   (gfx1151)
-    AI PRO 400/300 Series (9 HX PRO/9 HX)     (gfx1150)
-    AI PRO 400/300 Series (7 PRO/7/5)         (gfx1152)
-    AI 400/300 Series (Other models)          (gfx1153)
+    AI PRO 400/300 Series <9 HX PRO/9 HX>     (gfx1150)
+    AI PRO 400/300 Series <7 PRO/7/5>         (gfx1152)
+    AI 400/300 Series <Other models>          (gfx1153)
     200 Series                                (gfx1103)
 RDNA2:
     RX 6750 XT/6700 XT/6700                   (gfx1031)
 Ryzen 6000 (APU):
-    Radeon 680M/660M (Ryzen 6000)             (gfx1035)
-    Radeon Graphics (Ryzen 6000)              (gfx1036)
+    Radeon 680M/660M <Ryzen 6000>             (gfx1035)
+    Radeon Graphics <Ryzen 6000>              (gfx1036)
 RDNA1 (Other):
     RX 5000 series - model 1011               (gfx1011)

@@ -80,7 +80,7 @@ INSTALLER_DEPS=(rsync wget)
 # OEM kernel dependencies (Ubuntu 24.04 specific)
 # For RPM: We don't create required_deps_gfxXYZ.txt files, but we need the list for oem-kernel-archs.txt
 EXTRA_KERNEL_DEPS=()
-EXTRA_KERNEL_GFX=(gfx1103 gfx1150 gfx1151 gfx1152)
+EXTRA_KERNEL_GFX=(gfx1103 gfx1150 gfx1151 gfx1152 gfx1153)
 
 # Graphics dependencies (Mesa/amdgpu-lib for graphics use case)
 # Note: Only 64-bit library included. 32-bit (amdgpu-lib32) only needed for 32-bit app support.
@@ -97,6 +97,7 @@ ROCM_EXTRACT=0
 AMDGPU_EXTRACT=0
 EXTRACT_CONTENT=1
 CONTENT_LIST=0
+BUILD_WITH_TESTS="${BUILD_WITH_TESTS:-no}"  # Control test package extraction (set by build-runfile-installer.sh)
 
 ######## Build tags EXTRACT FROM ROCM meta package
 ROCM_VER=
@@ -1311,6 +1312,49 @@ extract_rpms() {
     echo Extracting RPMs...Complete.
 }
 
+generate_capability_mapping_file() {
+    # Create a mapping file that records: capability -> RHEL package name
+    # This allows SLES/other distros to resolve capabilities at runtime
+    # Format: capability|package (e.g., "libnuma.so.1()(64bit)|numactl-libs")
+
+    echo "=========================================="
+    echo "Generating capability mapping file..."
+    echo "=========================================="
+
+    local deps_dir="$EXTRACT_ROCM_DIR/deps"
+    local capability_map_file="$deps_dir/rocm_capability_map.txt"
+
+    # Remove previous mapping file
+    rm -f "$capability_map_file"
+
+    # Extract capability mappings from the global AUTO_DEPS_CACHE
+    # This cache was populated during batch_resolve_dependencies()
+    local mapping_count=0
+
+    for capability in "${!AUTO_DEPS_CACHE[@]}"; do
+        local pkg="${AUTO_DEPS_CACHE[$capability]}"
+
+        # Skip empty entries (filtered AMD packages)
+        [[ -z "$pkg" ]] && continue
+
+        # Skip if capability is same as package (no mapping needed)
+        [[ "$capability" == "$pkg" ]] && continue
+
+        # Write mapping: capability|package
+        echo "$capability|$pkg" >> "$capability_map_file"
+        mapping_count=$((mapping_count + 1))
+    done
+
+    # Sort the mapping file for readability
+    if [ -f "$capability_map_file" ]; then
+        sort -u "$capability_map_file" -o "$capability_map_file"
+        echo "Generated capability mapping file: $capability_map_file"
+        echo "Total capability mappings: $mapping_count"
+    else
+        echo "No capability mappings found (resolveautodeps may not be enabled)"
+    fi
+}
+
 combine_rocm_deps() {
     echo ===================================================
     echo Combining dependencies from all component-rocm subdirectories...
@@ -1486,6 +1530,9 @@ combine_rocm_deps() {
     echo "Output file: $combined_deps_file"
 
     echo Combining dependencies...Complete.
+
+    # Generate capability mapping file for cross-distro resolution
+    generate_capability_mapping_file
 }
 
 combine_components_list() {
@@ -1947,7 +1994,13 @@ combine_rocm_deps_meta() {
     # It can be extended in the future to perform additional metadata operations
 
     extract_meta_packages
-    extract_test_packages
+
+    # Extract test packages only if BUILD_WITH_TESTS is enabled
+    if [[ "$BUILD_WITH_TESTS" == "yes" ]]; then
+        extract_test_packages
+    else
+        echo "Skipping test package extraction (BUILD_WITH_TESTS=$BUILD_WITH_TESTS)"
+    fi
 
     echo "ROCm dependencies metadata combination complete."
 }
@@ -2401,6 +2454,11 @@ do
     ext-amdgpu=*)
         EXTRACT_AMDGPU_DIR="${1#*=}"
         echo "Extract AMDGPU output: $EXTRACT_AMDGPU_DIR"
+        shift
+        ;;
+    test)
+        echo "Enabling test package extraction."
+        BUILD_WITH_TESTS="yes"
         shift
         ;;
     *)

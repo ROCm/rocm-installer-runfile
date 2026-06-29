@@ -29,6 +29,7 @@ BUILD_EXTRACT="yes"
 BUILD_COMPRESS="yes"
 BUILD_INSTALLER="yes"
 BUILD_UI="yes"
+BUILD_WITH_TESTS="${BUILD_WITH_TESTS:-no}"  # Control test package extraction (passed from build-runfile-installer.sh)
 
 BUILD_DIR=../build
 BUILD_DIR_UI=../build-UI
@@ -86,7 +87,7 @@ Usage: $PROG [options]
                            is sourced by both parent and child scripts. Each script sources
                            independently, then applies command-line overrides.
 
-    noextract            = Disable package extraction.
+    noextract            = Disable package extraction (also disables compression automatically).
     norocm               = Disable ROCm package extraction.
     noamdgpu             = Disable AMDGPU package extraction.
     noextractcontent     = Disable package extraction content. (Extract only deps and scriptlets)
@@ -153,16 +154,18 @@ get_coarse_family() {
 
 initialize_gfx_family_map() {
     # Initialize GFX_FAMILY_MAP based on build type
-    # - Single-arch (nightly): 1:1 mapping from ROCM_GFX_ARCHS
-    # - Multi-arch (nightly-multiarch): Fine→coarse grouping
+    # - Single-arch (nightly-singlearch): 1:1 mapping from ROCM_GFX_ARCHS
+    # - Multi-arch (nightly): Fine→coarse grouping
 
     # Clear any existing mappings
     GFX_FAMILY_MAP=()
 
-    if [[ "${PULL_CONFIG_RELEASE_TYPE:-}" == "nightly-multiarch" ]] ; then
+    if [[ "${PULL_CONFIG_RELEASE_TYPE:-}" == "nightly" || "${PULL_CONFIG_RELEASE_TYPE:-}" == "prerelease" ]]; then
         # Multi-arch build: Use fine-grained → coarse family mappings
         echo "Initializing GFX_FAMILY_MAP for multi-arch build"
-        GFX_FAMILY_MAP=(
+
+        # Define complete mapping table
+        declare -A MULTIARCH_MAPPING=(
             ["gfx900"]="gfx900"
             ["gfx906"]="gfx906"
             ["gfx908"]="gfx908"
@@ -190,6 +193,21 @@ initialize_gfx_family_map() {
             ["gfx1200"]="gfx120x"
             ["gfx1201"]="gfx120x"
         )
+
+        # Only include mappings for architectures in ROCM_GFX_ARCHS
+        if [[ -n "${ROCM_GFX_ARCHS:-}" ]]; then
+            for arch in "${ROCM_GFX_ARCHS[@]}"; do
+                if [[ -n "${MULTIARCH_MAPPING[$arch]}" ]]; then
+                    GFX_FAMILY_MAP["$arch"]="${MULTIARCH_MAPPING[$arch]}"
+                else
+                    # Unknown arch, map to itself
+                    GFX_FAMILY_MAP["$arch"]="$arch"
+                fi
+            done
+            echo "  Mapped ${#ROCM_GFX_ARCHS[@]} architectures from ROCM_GFX_ARCHS"
+        else
+            echo "  WARNING: ROCM_GFX_ARCHS not set, using empty map"
+        fi
     else
         # Single-arch build: Use 1:1 mapping from ROCM_GFX_ARCHS
         # Each architecture maps to itself
@@ -411,6 +429,47 @@ write_version() {
     # Copy VERSION file to rocm-installer directory for makeself --help-header
     cp "$VERSION_FILE" "$EXTRACT_DIR/VERSION"
 
+    # Create BUILDINFO file from theRock manifest (before content compression)
+    # If BUILDINFO already exists (from previous build), keep it
+    local BUILDINFO_FILE="$EXTRACT_DIR/BUILDINFO"
+
+    if [[ -f "$BUILDINFO_FILE" ]]; then
+        echo "BUILDINFO already exists, using existing file"
+    else
+        # BUILDINFO doesn't exist - try to create from theRock manifest
+        local THEROCK_MANIFEST
+        THEROCK_MANIFEST=$(find "$EXTRACT_DIR/component-rocm/content/base" -path "*/share/therock/therock_manifest.json" 2>/dev/null | head -1)
+
+        if [[ -f "$THEROCK_MANIFEST" ]]; then
+            echo "Found theRock manifest: $THEROCK_MANIFEST"
+
+            # Parse JSON using grep/sed (no jq dependency needed)
+            local rocm_version pkg_version therock_commit github_run_id rocm_libs_commit rocm_sys_commit
+            rocm_version=$(grep -oP '"rocm_version":\s*"\K[^"]+' "$THEROCK_MANIFEST" || echo "unknown")
+            pkg_version=$(grep -oP '"rocm_package_version":\s*"\K[^"]+' "$THEROCK_MANIFEST" || echo "unknown")
+            therock_commit=$(grep -oP '"the_rock_commit":\s*"\K[^"]+' "$THEROCK_MANIFEST" || echo "unknown")
+            github_run_id=$(grep -oP '"github_run_id":\s*"\K[^"]+' "$THEROCK_MANIFEST" || echo "unknown")
+            rocm_libs_commit=$(grep -A3 '"submodule_name":\s*"rocm-libraries"' "$THEROCK_MANIFEST" | grep -oP '"pin_sha":\s*"\K[^"]+' || echo "unknown")
+            rocm_sys_commit=$(grep -A3 '"submodule_name":\s*"rocm-systems"' "$THEROCK_MANIFEST" | grep -oP '"pin_sha":\s*"\K[^"]+' || echo "unknown")
+
+            # Create BUILDINFO file
+            cat > "$BUILDINFO_FILE" <<EOF
+ROCm Version: $rocm_version
+Package Version: $pkg_version
+theRock Commit: $therock_commit
+rocm-libraries Commit: $rocm_libs_commit
+rocm-systems Commit: $rocm_sys_commit
+GitHub Run ID: $github_run_id
+Build Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+EOF
+            echo "Created BUILDINFO from theRock manifest"
+        else
+            # Fallback if manifest doesn't exist
+            echo "WARNING: theRock manifest not found (content may be compressed)"
+            echo "Build information not available." > "$BUILDINFO_FILE"
+        fi
+    fi
+
     echo "Installer name: $BUILD_INSTALLER_NAME"
 }
 
@@ -472,8 +531,15 @@ generate_component_lists() {
     # Create space-separated list (sorted)
     GFX_LIST=$(printf '%s\n' "${all_archs[@]}" | sort -u | tr '\n' ' ' | sed 's/ *$//')
 
-    # Component categories are fixed (defined in rocm-installer.sh)
-    COMPO_LIST="core core-dev dev-tools core-sdk opencl"
+    # Component categories (defined in rocm-installer.sh)
+    # Include "test" only if BUILD_WITH_TESTS is enabled
+    if [[ "$BUILD_WITH_TESTS" == "yes" ]]; then
+        COMPO_LIST="core core-dev dev-tools core-sdk opencl test"
+        echo "Building with test packages enabled"
+    else
+        COMPO_LIST="core core-dev dev-tools core-sdk opencl"
+        echo "Building without test packages (production build)"
+    fi
 
     echo "GFX architectures: ${GFX_LIST:-<none>}"
     echo "Component categories: $COMPO_LIST"
@@ -546,13 +612,39 @@ generate_headers() {
 
     # Generate makeself header (used for all AlmaLinux versions)
     if [ -f "rocm-makeself-header-pre.sh.template" ]; then
-        sed -e "s|@@GFX_ARCHS_LIST@@|$GFX_LIST|g" \
-            -e "s|@@COMPONENTS_LIST@@|$COMPO_LIST|g" \
-            rocm-makeself-header-pre.sh.template > rocm-makeself-header-pre.sh
-        echo "Generated: rocm-makeself-header-pre.sh (embedded GFX_ARCHS_AVAILABLE)"
+        # Use a temporary file and process substitutions one at a time to avoid sed errors
+        cp rocm-makeself-header-pre.sh.template rocm-makeself-header-pre.sh.tmp
+
+        # Replace GFX_ARCHS_LIST (using | as delimiter since paths use /)
+        sed -i "s|@@GFX_ARCHS_LIST@@|$GFX_LIST|g" rocm-makeself-header-pre.sh.tmp
+
+        # Replace COMPONENTS_LIST
+        sed -i "s|@@COMPONENTS_LIST@@|$COMPO_LIST|g" rocm-makeself-header-pre.sh.tmp
+
+        mv rocm-makeself-header-pre.sh.tmp rocm-makeself-header-pre.sh
+        chmod +x rocm-makeself-header-pre.sh
+
+        echo "Generated: rocm-makeself-header-pre.sh (embedded GFX_ARCHS_AVAILABLE and component lists)"
     else
         echo "ERROR: rocm-makeself-header-pre.sh.template not found!"
         exit 1
+    fi
+
+    # Embed BUILDINFO content directly into the header by replacing the variable assignment
+    # This is done after the template substitution to handle multi-line content correctly
+    if [[ -f "$EXTRACT_DIR/BUILDINFO" ]]; then
+        # Replace @@BUILDINFO_CONTENT@@ placeholder with actual content
+        # Use sed 'r' command to read file content
+        sed -i "/@@BUILDINFO_CONTENT@@/{
+            r $EXTRACT_DIR/BUILDINFO
+            d
+        }" rocm-makeself-header-pre.sh
+
+        echo "  Embedded BUILDINFO into header"
+    else
+        # Use default message if BUILDINFO doesn't exist
+        sed -i "s|^buildheader=.*|buildheader='Build information not available.'|" rocm-makeself-header-pre.sh
+        echo "  WARNING: BUILDINFO file not found, using default message"
     fi
 }
 
@@ -871,12 +963,26 @@ extract_rocm_packages_deb() {
         else
             echo "Using nodpkg extractor for RPM-based system ($EXTRACT_TYPE_DEB mode)"
         fi
-        PACKAGE_ROCM_DIR="$PWD/packages-rocm-deb" EXTRACT_FORMAT=deb ./package-extractor-debs-nodpkg.sh rocm ext-rocm="../rocm-installer/component-rocm-deb" $EXTRACT_TYPE_DEB
+
+        # Build extractor arguments
+        local extractor_args_deb="rocm ext-rocm=../rocm-installer/component-rocm-deb $EXTRACT_TYPE_DEB"
+        if [[ "$BUILD_WITH_TESTS" == "yes" ]]; then
+            extractor_args_deb+=" test"
+        fi
+
+        # shellcheck disable=SC2086  # extractor_args_deb intentionally unquoted for word splitting
+        PACKAGE_ROCM_DIR="$PWD/packages-rocm-deb" EXTRACT_FORMAT=deb ./package-extractor-debs-nodpkg.sh $extractor_args_deb
         extract_status=$?
     else
         # On DEB-based systems, use standard extractor
-        # shellcheck disable=SC2086  # EXTRACT_TYPE intentionally unquoted for word splitting
-        PACKAGE_ROCM_DIR="$PWD/packages-rocm-deb" EXTRACT_FORMAT=deb ./package-extractor-debs.sh rocm ext-rocm="../rocm-installer/component-rocm" $EXTRACT_TYPE
+        # Build extractor arguments
+        local extractor_args_deb="rocm ext-rocm=../rocm-installer/component-rocm $EXTRACT_TYPE"
+        if [[ "$BUILD_WITH_TESTS" == "yes" ]]; then
+            extractor_args_deb+=" test"
+        fi
+
+        # shellcheck disable=SC2086  # extractor_args_deb intentionally unquoted for word splitting
+        PACKAGE_ROCM_DIR="$PWD/packages-rocm-deb" EXTRACT_FORMAT=deb ./package-extractor-debs.sh $extractor_args_deb
         extract_status=$?
     fi
 
@@ -925,6 +1031,11 @@ extract_rocm_packages_rpm() {
 
     # Build extractor arguments with auto dependency resolution if build config is available
     local extractor_args="rocm ext-rocm=../rocm-installer $EXTRACT_TYPE"
+
+    # Add test argument if BUILD_WITH_TESTS is enabled
+    if [[ "$BUILD_WITH_TESTS" == "yes" ]]; then
+        extractor_args+=" test"
+    fi
 
     # Check if automatic dependency resolution is disabled
     if [[ "$DISABLE_AUTO_DEPS" == "yes" ]]; then
@@ -1586,13 +1697,27 @@ build_UI() {
             done
 
             # UI now reads VERSION file at runtime - no version parameters needed
+            # Build cmake command with flags
+            local CMAKE_FLAGS=""
+
             if [[ "$is_multiarch" == "true" ]]; then
                 echo "Building UI with MULTI_ARCH_BUILD support"
-                cmake -DMULTI_ARCH_BUILD=ON ../build-installer
+                CMAKE_FLAGS="-DMULTI_ARCH_BUILD=ON"
             else
                 echo "Building UI for single-arch installer"
-                cmake -DMULTI_ARCH_BUILD=OFF ../build-installer
+                CMAKE_FLAGS="-DMULTI_ARCH_BUILD=OFF"
             fi
+
+            # Add test component flag if building with tests
+            if [[ "$BUILD_WITH_TESTS" == "yes" ]]; then
+                echo "Building UI with test component support"
+                CMAKE_FLAGS="$CMAKE_FLAGS -DINCLUDE_TEST_COMPONENT=ON"
+            else
+                CMAKE_FLAGS="$CMAKE_FLAGS -DINCLUDE_TEST_COMPONENT=OFF"
+            fi
+
+            # shellcheck disable=SC2086  # CMAKE_FLAGS intentionally unquoted for word splitting
+            cmake $CMAKE_FLAGS ../build-installer
             if ! make; then
                 echo -e "\e[31mFailed GUI build.\e[0m"
                 exit 1
@@ -1695,6 +1820,8 @@ do
     noextract)
         echo "Disabling package extraction."
         BUILD_EXTRACT="no"
+        echo "Automatically disabling compression (noextract implies nocompress)."
+        BUILD_COMPRESS="no"
         shift
         ;;
     norocm)
@@ -1801,6 +1928,11 @@ do
         esac
         shift
         ;;
+    test)
+        echo "Enabling test package extraction and build."
+        BUILD_WITH_TESTS="yes"
+        shift
+        ;;
     *)
         echo "Unknown option: $1"
         shift
@@ -1823,7 +1955,16 @@ write_version
 # Compress packages if hybrid mode is enabled and compression not disabled
 if [[ "$HYBRID_COMPRESSION" == "yes" ]] && [[ "$BUILD_COMPRESS" == "yes" ]]; then
     compress_setup
-    compress_tests
+
+    # Compress test packages only if BUILD_WITH_TESTS is enabled
+    if [[ "$BUILD_WITH_TESTS" == "yes" ]]; then
+        compress_tests
+    else
+        echo "-------------------------------------------------------------"
+        echo "Skipping test compression (BUILD_WITH_TESTS=$BUILD_WITH_TESTS)"
+        echo "-------------------------------------------------------------"
+    fi
+
     compress_components
 elif [[ "$BUILD_COMPRESS" == "no" ]]; then
     echo "-------------------------------------------------------------"

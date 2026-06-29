@@ -24,6 +24,7 @@
 #include "utils.h"
 #include <stdlib.h>
 #include <string.h>
+#include <libgen.h>
 
 
 /***************** ROCm Main Menu Setup *****************/
@@ -88,6 +89,8 @@ void destroy_rocm_menu_device_window();
 void do_rocm_menu_device();
 void process_rocm_device_menu();
 void update_rocm_device_name();
+void update_rocm_device_gpu_name();
+void update_rocm_device_selection_state();
 void reset_rocm_device_name();
 void auto_select_detected_gpu();
 const char* extract_gfx_code(const char *item_name);
@@ -323,29 +326,100 @@ int find_rocm_with_progress(char *target)
 
 int check_target_for_package_install(char *target, char *rocm_loc)
 {
-    int ret = 0;
-    char rocm_core_name[LARGE_CHAR_SIZE];
-    char rocm_core_ver[SMALL_CHAR_SIZE];
+    char rocm_ver_str[SMALL_CHAR_SIZE];
+    char command[LARGE_CHAR_SIZE];
+    FILE *fp = NULL;
+    char result[SMALL_CHAR_SIZE];
 
-    // Check if the target is / and current rocm installed location is in /opt/rocm
-    if ( (strcmp(target, "/") == 0) && (is_loc_opt_rocm(rocm_loc) == 1) )
+    // Package manager installs only occur at /opt/rocm/* when target is / or /opt
+    if (((strcmp(target, "/") != 0) && (strcmp(target, "/opt") != 0)) ||
+        (is_loc_opt_rocm(rocm_loc) != 1))
     {
-        // get the rocm-core package name
-        if (get_rocm_core_pkg(g_pConfig->distroType, rocm_core_name, LARGE_CHAR_SIZE) == 0)
+        return 0;
+    }
+
+    // Extract version from path (e.g., /opt/rocm/core-7.14.0 -> "7.14.0")
+    char *last_slash = strrchr(rocm_loc, '/');
+    char *dir_name = (last_slash != NULL) ? last_slash + 1 : rocm_loc;
+    char *ver_start = NULL;
+
+    // Handle both formats: "core-X.Y.Z" and "rocm-X.Y.Z"
+    if (strstr(dir_name, "core-") != NULL)
+    {
+        ver_start = strstr(dir_name, "core-") + strlen("core-");
+    }
+    else if (strstr(dir_name, "rocm-") != NULL)
+    {
+        ver_start = strstr(dir_name, "rocm-") + strlen("rocm-");
+    }
+
+    if (ver_start == NULL)
+    {
+        return 0;
+    }
+
+    // Sanitize version string to only allow version characters (digits, dots, hyphens)
+    // This prevents command injection in the shell commands below
+    // Copy only safe characters to a clean buffer
+    int j = 0;
+    for (int i = 0; ver_start[i] != '\0' && j < (int)(sizeof(rocm_ver_str) - 1); i++)
+    {
+        char c = ver_start[i];
+        if ((c >= '0' && c <= '9') || c == '.' || c == '-')
         {
-            // check if the rocm-core package contains the loc rocm version - if yes = package manger install
-            if (get_rocm_version_str_from_path(rocm_loc, rocm_core_ver) == 0)
-            {
-                char *rocm_chk = strstr(rocm_core_name, rocm_core_ver);
-                if (NULL != rocm_chk)
-                {
-                    ret = 1;
-                }
-            }
+            rocm_ver_str[j++] = c;
+        }
+        else
+        {
+            // Stop at first invalid character (likely end of version string)
+            break;
+        }
+    }
+    rocm_ver_str[j] = '\0';
+
+    // Version string must not be empty
+    if (j == 0)
+    {
+        return 0;
+    }
+
+    // Check for theRock packages: amdrocm-core<version>-gfx<arch>
+    // Pattern: amdrocm-core<version> followed by -gfx OR end/separator
+    if (g_pConfig->distroType == eDISTRO_TYPE_DEB)
+    {
+        snprintf(command, sizeof(command),
+            "apt list --installed 2>&1 | grep -q -E 'amdrocm-core%s(-gfx|/)' && echo 'found'",
+            rocm_ver_str);
+    }
+    else
+    {
+        snprintf(command, sizeof(command),
+            "rpm -qa 2>&1 | grep -q -E 'amdrocm-core%s(-gfx|$)' && echo 'found'",
+            rocm_ver_str);
+    }
+
+    fp = popen(command, "r");
+    if (fp != NULL)
+    {
+        if (fgets(result, sizeof(result), fp) != NULL && strstr(result, "found") != NULL)
+        {
+            pclose(fp);
+            return 1;
+        }
+        pclose(fp);
+    }
+
+    // Fall back to legacy rocm-core package check
+    char rocm_core_name[LARGE_CHAR_SIZE];
+    if (get_rocm_core_pkg(g_pConfig->distroType, rocm_core_name, LARGE_CHAR_SIZE) == 0)
+    {
+        if (strstr(rocm_core_name, rocm_ver_str) != NULL)
+        {
+            return 1;
         }
     }
 
-    return ret;
+    return 0;
 }
 
 void check_rocm_install_status()
@@ -486,7 +560,15 @@ void rocm_menu_draw()
     // draw the rocm device info
     if (g_pRocmConfig->install_rocm)
     {
-        if (strlen(g_pRocmConfig->rocm_device_gpu) > 0)
+        // Count devices in comma-separated list
+        int device_count = 1;
+        for (const char *p = g_pRocmConfig->rocm_device; *p; p++)
+        {
+            if (*p == ',') device_count++;
+        }
+
+        // Show GPU name only for single device selection
+        if (device_count == 1 && strlen(g_pRocmConfig->rocm_device_gpu) > 0)
         {
             // Display both gfx code and GPU name: "gfx110x : RX 7900 XTX"
             char gpu_trimmed[DEFAULT_CHAR_SIZE];
@@ -499,7 +581,12 @@ void rocm_menu_draw()
         }
         else
         {
-            mvwprintw(pMenuWindow, ROCM_MENU_ITEM_DEVICE_ROW, ROCM_MENU_ITEM_DEVICE_COL, "%s", g_pRocmConfig->rocm_device);
+            // Multiple devices or no GPU name - show GFX list only, truncate if needed
+            char device_trimmed[DEFAULT_CHAR_SIZE];
+            int available_space = MAX_MENU_ITEM_COLS - ROCM_MENU_ITEM_DEVICE_COL;
+
+            field_trim(g_pRocmConfig->rocm_device, device_trimmed, available_space);
+            mvwprintw(pMenuWindow, ROCM_MENU_ITEM_DEVICE_ROW, ROCM_MENU_ITEM_DEVICE_COL, "%s", device_trimmed);
         }
     }
     else
@@ -1271,7 +1358,7 @@ void create_rocm_menu_device_window(WINDOW *pMenuWindow)
         // Create the ROCm Device Menu
         create_menu(&menuROCmDevice, pMenuWindow, &rocmMenuDeviceProps, &rocmMenuDeviceItems, g_pConfig);
 
-        menuROCmDevice.enableMultiSelection = false;   // single selection
+        menuROCmDevice.enableMultiSelection = true;    // multiple selection enabled
         menuROCmDevice.isMenuItemsSelectable = true;   // items are selectable
 
         // Set pointer to draw menu function when window is resized
@@ -1319,6 +1406,17 @@ void do_rocm_menu_device()
     // Update the ROCm device config on exit
     update_rocm_device_name();
 
+    // If no device is selected, re-initialize to detected GPU
+    if (strlen(g_pRocmConfig->rocm_device) == 0)
+    {
+        if (g_pConfig->gpu_detection.num_gpus > 0)
+        {
+            // auto_select_detected_gpu() sets both rocm_device and rocm_device_gpu
+            // from detection data, so no need to call update_rocm_device_name() again
+            auto_select_detected_gpu();
+        }
+    }
+
     unpost_menu(pMenu);
 
     // Clear the X that's added when user selects devices
@@ -1327,17 +1425,130 @@ void do_rocm_menu_device()
 
 void process_rocm_device_menu()
 {
-    MENU *pMenu = menuROCmDevice.pMenu;
+    // Update selection state after any selection change
+    update_rocm_device_selection_state();
 
+#if ENABLE_MENU_DEBUG
+    MENU *pMenu = menuROCmDevice.pMenu;
     ITEM *pCurrentItem = current_item(pMenu);
     int index = item_index(pCurrentItem);
-
     DEBUG_UI_MSG(&menuROCmDevice, "ROCM Device Menu: %d, itemlist %d", index, menuROCmDevice.curItemListIndex);
+#endif
+}
 
-    if (index != 0)
+// Update device selection state after user makes a selection
+// Handles mutual exclusion between "(all)" and specific devices
+// Updates rocm_device string with comma-separated GFX codes
+void update_rocm_device_selection_state()
+{
+    MENU_DATA *pMenuData = &menuROCmDevice;
+    MENU *pMenu = pMenuData->pMenu;
+    ITEM **items = pMenuData->itemList[0].items;
+
+    // Find the "(all)" option by searching for it (first item might be a header)
+    int all_index = -1;
+    bool all_selected = false;
+
+    for (int i = 0; i < item_count(pMenu); i++)
     {
-        DEBUG_UI_MSG(&menuROCm, "Unknown item index");
+        if (is_skippable_menu_item(items[i]))
+            continue;
+
+        const char *item_name_str = item_name(items[i]);
+        const char *gfx = extract_gfx_code(item_name_str);
+
+        // Check if this item is "(all)"
+        if (gfx && strstr(gfx, "all") != NULL)
+        {
+            all_index = i;
+            all_selected = item_value(items[i]);
+            break;
+        }
     }
+
+    // If "(all)" option doesn't exist, do nothing special
+    if (all_index < 0)
+    {
+        update_rocm_device_name();
+        return;
+    }
+
+    // Get the current item (the one user just clicked)
+    ITEM *current = current_item(pMenu);
+    int current_index = item_index(current);
+
+    // Check if user just selected "(all)"
+    if (current_index == all_index && all_selected)
+    {
+        // User just selected "(all)" - deselect all other devices
+        // Save current item to restore later
+        ITEM *saved_current = current;
+
+        // Deselect all items except "(all)" by toggling them like a user would
+        for (int i = 0; i < item_count(pMenu); i++)
+        {
+            if (i != all_index && !is_skippable_menu_item(items[i]))
+            {
+                // Only toggle if currently selected
+                if (item_value(items[i]) == TRUE)
+                {
+                    // Make this item current
+                    set_current_item(pMenu, items[i]);
+
+                    // Toggle it off (like user pressing space)
+                    menu_driver(pMenu, REQ_TOGGLE_ITEM);
+
+                    // Clear the bit in itemSelections
+                    TOGGLE_FALSE(pMenuData->itemSelections, i);
+
+                    // Remove the X mark
+                    delete_menu_item_selection_mark(pMenuData, items[i]);
+                }
+            }
+        }
+
+        // Restore original current item
+        set_current_item(pMenu, saved_current);
+
+        // Redraw border and separator
+        box(pMenuData->pMenuWindow, 0, 0);
+        mvwhline(pMenuData->pMenuWindow, 2, 2, ACS_HLINE, WIN_WIDTH_COLS - 4);
+
+        // Refresh the window to show changes
+        wrefresh(pMenuData->pMenuWindow);
+    }
+    else if (current_index != all_index && item_value(current) == TRUE)
+    {
+        // User just selected a specific device (not "(all)") - deselect "(all)" if it's selected
+        if (all_selected)
+        {
+            // Save current item
+            ITEM *saved_current = current;
+
+            // Make "(all)" current and toggle it off
+            set_current_item(pMenu, items[all_index]);
+            menu_driver(pMenu, REQ_TOGGLE_ITEM);
+
+            // Clear the bit in itemSelections
+            TOGGLE_FALSE(pMenuData->itemSelections, all_index);
+
+            // Remove the X mark
+            delete_menu_item_selection_mark(pMenuData, items[all_index]);
+
+            // Restore original current item
+            set_current_item(pMenu, saved_current);
+
+            // Redraw border and separator
+            box(pMenuData->pMenuWindow, 0, 0);
+            mvwhline(pMenuData->pMenuWindow, 2, 2, ACS_HLINE, WIN_WIDTH_COLS - 4);
+
+            // Refresh the window
+            wrefresh(pMenuData->pMenuWindow);
+        }
+    }
+
+    // Update rocm_device with comma-separated list of GFX codes
+    update_rocm_device_name();
 }
 
 // Extract gfx code/group from item name like "    MI325X/MI300X/MI300A (gfx94x)"
@@ -1417,24 +1628,141 @@ void clear_rocm_device_name()
     clear_str(g_pRocmConfig->rocm_device_gpu);
 }
 
+// Build comma-separated list of selected GFX codes
+// Iterates through all menu items and concatenates selected devices
+// Example output: "gfx1100,gfx1101,gfx1102"
 void update_rocm_device_name()
 {
-    int i;
     MENU_DATA *pMenuData = &menuROCmDevice;
-
     MENU *pMenu = pMenuData->pMenu;
     ITEM **items = pMenuData->itemList[0].items;
 
-    // check for any selected items in the menu
-    for(i = 0; i < item_count(pMenu); ++i)
+    // Clear existing device string
+    clear_str(g_pRocmConfig->rocm_device);
+
+    // Build comma-separated list of selected GFX codes
+    const size_t buf_size = sizeof(g_pRocmConfig->rocm_device);
+
+    for (int i = 0; i < item_count(pMenu); ++i)
     {
-        if(item_value(items[i]) == TRUE)
+        if (item_value(items[i]) == TRUE && !is_skippable_menu_item(items[i]))
         {
-            clear_rocm_device_name();
-            set_rocm_device_name(i);
+            const char *full_item_name = item_name(items[i]);
+
+            // Extract GFX code from format: "    MI325X/MI300X/MI300A (gfx94x)"
+            const char *gfx_code = extract_gfx_code(full_item_name);
+
+            if (gfx_code)
+            {
+                // Extract just the gfx code (e.g., "gfx94x")
+                const char *end = strchr(gfx_code, ')');
+                if (end)
+                {
+                    size_t gfx_len = end - gfx_code;
+                    char gfx_str[DEFAULT_CHAR_SIZE];
+
+                    if (gfx_len < DEFAULT_CHAR_SIZE)
+                    {
+                        strncpy(gfx_str, gfx_code, gfx_len);
+                        gfx_str[gfx_len] = '\0';
+
+                        // Check if this GFX code already exists in the list (filter duplicates)
+                        bool is_duplicate = false;
+                        if (strlen(g_pRocmConfig->rocm_device) > 0)
+                        {
+                            // Check if gfx_str already exists in the comma-separated list
+                            char *list_copy = strdup(g_pRocmConfig->rocm_device);
+                            char *token = strtok(list_copy, ",");
+                            while (token != NULL)
+                            {
+                                if (strcmp(token, gfx_str) == 0)
+                                {
+                                    is_duplicate = true;
+                                    break;
+                                }
+                                token = strtok(NULL, ",");
+                            }
+                            free(list_copy);
+                        }
+
+                        // Only append if not a duplicate
+                        if (!is_duplicate)
+                        {
+                            // Append to device string with comma separator
+                            size_t remaining = buf_size - strlen(g_pRocmConfig->rocm_device) - 1;
+                            if (remaining > 0)
+                            {
+                                strncat(g_pRocmConfig->rocm_device, gfx_str, remaining);
+                                remaining = buf_size - strlen(g_pRocmConfig->rocm_device) - 1;
+                                if (remaining > 0)
+                                {
+                                    strncat(g_pRocmConfig->rocm_device, ",", remaining);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Remove trailing comma if present
+    if (strlen(g_pRocmConfig->rocm_device) > 0)
+    {
+        g_pRocmConfig->rocm_device[strlen(g_pRocmConfig->rocm_device) - 1] = '\0';
+    }
+
+    // Update GPU name display (use first selected device for display)
+    update_rocm_device_gpu_name();
+}
+
+// Update GPU name for display purposes
+// Uses the first selected device's GPU name for main menu display
+// Example: "MI325X/MI300X/MI300A" from "    MI325X/MI300X/MI300A (gfx94x)"
+void update_rocm_device_gpu_name()
+{
+    MENU_DATA *pMenuData = &menuROCmDevice;
+    MENU *pMenu = pMenuData->pMenu;
+    ITEM **items = pMenuData->itemList[0].items;
+
+    // Clear existing GPU name
+    clear_str(g_pRocmConfig->rocm_device_gpu);
+
+    // Find first selected item for GPU name display
+    for (int i = 0; i < item_count(pMenu); ++i)
+    {
+        if (item_value(items[i]) == TRUE && !is_skippable_menu_item(items[i]))
+        {
+            const char *full_item_name = item_name(items[i]);
+
+            // Extract GPU name (everything before the opening parenthesis)
+            const char *paren = strchr(full_item_name, '(');
+
+            if (paren)
+            {
+                // Find start of GPU name (skip leading spaces)
+                const char *start = full_item_name;
+                while (*start == ' ' || *start == '\t') start++;
+
+                // Find end (before opening paren, trim trailing spaces)
+                const char *end_name = paren - 1;
+                while (end_name > start && (*end_name == ' ' || *end_name == '\t')) end_name--;
+
+                size_t name_len = end_name - start + 1;
+                if (name_len < DEFAULT_CHAR_SIZE)
+                {
+                    strncpy(g_pRocmConfig->rocm_device_gpu, start, name_len);
+                    g_pRocmConfig->rocm_device_gpu[name_len] = '\0';
+                }
+            }
+
+            // Use first selected device for display, then break
             break;
         }
     }
+
+    // If multiple devices selected, could append " (+N more)" to GPU name
+    // This is optional - left as future enhancement
 }
 
 void reset_rocm_device_name()
@@ -1487,13 +1815,15 @@ void create_rocm_menu_compo_window(WINDOW *pMenuWindow)
 
         i = item_count;
 
-        // Add blank separator before core-sdk
+#ifdef INCLUDE_TEST_COMPONENT
+        // Add blank separator before test
         strcpy(rocmMenuCompoOps[i], " ");
         strcpy(rocmMenuCompoDesc[i++], " ");
 
-        // Add core-sdk item
-        strcpy(rocmMenuCompoOps[i], "core-sdk");
-        strcpy(rocmMenuCompoDesc[i++], "Complete SDK (includes all components above)");
+        // Add test component
+        strcpy(rocmMenuCompoOps[i], "test");
+        strcpy(rocmMenuCompoDesc[i++], "Test packages (amdrocm-*-test)");
+#endif
 
         // Add menu system items
         strcpy(rocmMenuCompoOps[i], " ");
@@ -1561,7 +1891,7 @@ void update_rocm_compo_selection_state()
 {
     MENU *pMenu = menuROCmCompo.pMenu;
     ITEM **items = menuROCmCompo.itemList[0].items;
-    int core_sdk_index = 5;  // core-sdk is now at index 5 (after blank separator)
+    int core_sdk_index = 4;  // core-sdk is now at index 4 (core, core-dev, dev-tools, opencl, core-sdk)
 
     // Check if core-sdk is selected
     bool core_sdk_selected = item_value(items[core_sdk_index]);

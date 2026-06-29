@@ -56,6 +56,7 @@ WGET_RETRY_COUNT=5
 GCC_TOOLSET_PACKAGES_OL=(gcc-toolset-11-gcc gcc-toolset-11-gcc-c++ gcc-toolset-11-gcc-gfortran gcc-toolset-11-libquadmath-devel gcc-toolset-11-libstdc++-devel gcc-toolset-11-gcc-gdb-plugin)
 
 declare -A SLES_PKG_CACHE
+declare -A CAPABILITY_MAP_CACHE  # Maps RHEL package names to capabilities for SLES resolution
 
 # Debian kernel package URLs from snapshot.debian.org (package -> URL)
 declare -A DEBIAN_KERNEL_PKG_INFO
@@ -626,6 +627,108 @@ get_package_from_provides_zypper() {
 }
 
 # Apply SLES package name translation if needed
+# Load capability mapping file for SLES runtime resolution
+# Format: capability|rhel-package (e.g., "libnuma.so.1()(64bit)|numactl-libs")
+load_capability_mapping() {
+    local capability_map_file="$COMPONENT_DIR/component-rocm/deps/rocm_capability_map.txt"
+
+    # Only load once
+    if [[ ${#CAPABILITY_MAP_CACHE[@]} -gt 0 ]]; then
+        return 0
+    fi
+
+    if [[ ! -f "$capability_map_file" ]]; then
+        print_str "Capability mapping file not found: $capability_map_file" 2
+        print_str "Cross-distro resolution may be limited" 2
+        return 1
+    fi
+
+    print_str "Loading capability mapping for cross-distro resolution..." 1
+
+    local count=0
+    while IFS='|' read -r capability package; do
+        [[ -z "$capability" || -z "$package" ]] && continue
+
+        # Store mapping: package -> capability
+        CAPABILITY_MAP_CACHE[$package]="$capability"
+        count=$((count + 1))
+    done < "$capability_map_file"
+
+    print_str "Loaded $count capability mappings" 1
+    return 0
+}
+
+# Resolve a capability to SLES package using zypper
+# Args: $1 = capability (e.g., "libnuma.so.1()(64bit)")
+# Returns: Package name or empty if not found
+resolve_capability_sles() {
+    local capability="$1"
+    local resolved_pkg=""
+
+    # Try exact match first
+    resolved_pkg=$(zypper --quiet what-provides "$capability" 2>/dev/null | \
+                   grep -E '^\s*[a-zA-Z]' | \
+                   grep -v '^Searching' | \
+                   head -n 1 | \
+                   awk '{print $2}')
+
+    if [[ -n "$resolved_pkg" ]]; then
+        echo "$resolved_pkg"
+        return 0
+    fi
+
+    # Try with ()(64bit) suffix - RPM capabilities are stripped during extraction
+    # but zypper may need the full form
+    if [[ ! "$capability" =~ \( ]]; then
+        resolved_pkg=$(zypper --quiet what-provides "${capability}()(64bit)" 2>/dev/null | \
+                       grep -E '^\s*[a-zA-Z]' | \
+                       grep -v '^Searching' | \
+                       head -n 1 | \
+                       awk '{print $2}')
+
+        if [[ -n "$resolved_pkg" ]]; then
+            echo "$resolved_pkg"
+            return 0
+        fi
+    fi
+
+    # Try with wildcard path (e.g., "libltdl.so.7" -> "*/libltdl.so.7")
+    resolved_pkg=$(zypper --quiet what-provides "*/$capability" 2>/dev/null | \
+                   grep -E '^\s*[a-zA-Z]' | \
+                   grep -v '^Searching' | \
+                   head -n 1 | \
+                   awk '{print $2}')
+
+    if [[ -n "$resolved_pkg" ]]; then
+        echo "$resolved_pkg"
+        return 0
+    fi
+
+    # Try search --provides as fallback
+    resolved_pkg=$(zypper search --provides --match-exact "$capability" 2>/dev/null | \
+                   grep '^i\|^v' | \
+                   awk '{print $2}' | \
+                   head -n 1)
+
+    if [[ -n "$resolved_pkg" ]]; then
+        echo "$resolved_pkg"
+        return 0
+    fi
+
+    # Try with glob pattern
+    resolved_pkg=$(zypper search --provides "$capability" 2>/dev/null | \
+                   grep '^i\|^v' | \
+                   awk '{print $2}' | \
+                   head -n 1)
+
+    if [[ -n "$resolved_pkg" ]]; then
+        echo "$resolved_pkg"
+        return 0
+    fi
+
+    return 1
+}
+
 # Returns: 0 if package should be processed, 1 if should be skipped
 # Sets PKG_TRANSLATED to the translated package name
 apply_sles_translation() {
@@ -663,8 +766,27 @@ translate_package_name_sles() {
         return 0
     fi
 
-    # Based on current required_deps.txt system dependencies
+    # Try capability-based resolution first (if mapping available)
     local translated=""
+    if [[ -n "${CAPABILITY_MAP_CACHE[$pkg]+isset}" ]]; then
+        local capability="${CAPABILITY_MAP_CACHE[$pkg]}"
+        print_str "Found capability for $pkg: $capability" 2
+
+        # Resolve capability to SLES package
+        translated=$(resolve_capability_sles "$capability")
+
+        if [[ -n "$translated" ]]; then
+            print_str "Resolved via capability: $pkg -> $translated (from $capability)" 1
+            SLES_PKG_CACHE[$pkg]="$translated"
+            echo "$translated"
+            return 0
+        else
+            print_str "Warning: Could not resolve capability '$capability' for package '$pkg'" 2
+            print_str "Falling back to manual mapping..." 2
+        fi
+    fi
+
+    # Fallback to manual mapping
     case "$pkg" in
         # Packages that are part of base system on SLES
         libxcrypt)
@@ -707,6 +829,16 @@ translate_package_name_sles() {
             ;;
         elfutils-libs)
             translated="libdw1"
+            ;;
+
+        # NUMA library
+        numactl-libs)
+            translated="libnuma1"
+            ;;
+
+        # Libtool
+        libtool-ltdl)
+            translated="libtool"
             ;;
 
         # OpenCL ICD Loader
@@ -2109,6 +2241,11 @@ build_dependencies_list_for_compo() {
         if [ ! -d "$deps_dir" ]; then
             print_err "ROCm component directory does not exist: $deps_dir"
             exit 1
+        fi
+
+        # Load capability mapping for SLES cross-distro resolution
+        if [ "$DISTRO_PACKAGE_MGR" == "zypper" ]; then
+            load_capability_mapping
         fi
 
     elif [[ "$compo_type" == "amdgpu" ]]; then

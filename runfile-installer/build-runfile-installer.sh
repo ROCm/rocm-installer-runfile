@@ -37,6 +37,9 @@ BUILD_ARGS=()
 SKIP_SETUP=0
 SKIP_BUILD=0
 
+# Test package control flag
+BUILD_WITH_TESTS="no"
+
 # Build tag and run ID (captured from pulltag and pullrunid)
 # Note: These may be pre-set by config files, so only initialize if not already set
 PULL_TAG="${PULL_TAG:-}"
@@ -63,6 +66,9 @@ This script performs a complete ROCm runfile installer build:
                             - config/release.config
                             - config/dev.config
                             Config file sets both setup and build variables.
+    test                  = Build with test packages (loads config/test-packages.config).
+                            Use this to include test packages in the installer.
+                            Example: config=config/nightly.config test
 
 [Setup Options] - Passed to setup-installer.sh:
     rocm                  = Setup only ROCm packages (skip AMDGPU).
@@ -78,7 +84,7 @@ This script performs a complete ROCm runfile installer build:
                             Legacy (ROCm < 7.12): gfx90x,gfx94x,gfx950,gfx110x,gfx1150,gfx1151,gfx120x
 
     pull=<release-type>   = Pull ROCm packages from specified repository (required).
-                            Valid types: dev, nightly, nightly-multiarch, prerelease, prerelease-multiarch, release
+                            Valid types: dev, nightly, nightly-singlearch, prerelease, release
     pulltag=<tag>         = Set ROCm build tag (required for all builds).
                             - dev/nightly: Valid build date (YYYYMMDD format, e.g., 20260123)
                             - prerelease: RC tag (e.g., rc0, rc1, rc2)
@@ -136,7 +142,8 @@ This script performs a complete ROCm runfile installer build:
 
 Examples:
     # Using preset configs (recommended)
-    $0 config=config/nightly.config                           # Nightly build (7.12.0, hybrid)
+    $0 config=config/nightly.config                           # Nightly build (production, no tests)
+    $0 config=config/nightly.config test                      # Nightly build with test packages
     $0 config=config/dev.config                               # Dev build (7.12.0, gfx110x only)
     $0 config=config/prerelease.config                        # Prerelease RC0 (7.11.0, hybrid)
     $0 config=config/release.config                           # Release build (7.11.0, hybrid)
@@ -147,8 +154,8 @@ Examples:
     $0 amdgpu amdgpu-mode=single pullamdgpu=release,31.10     # AMDGPU for current distro only
 
     # Pull from specific builds (with actual values from preset configs)
-    $0 pull=nightly pulltag=20260304 pullrunid=22655273671 pullrocmver=7.12.0        # Nightly (w/ gfx908/gfx90a)
-    $0 pull=nightly-multiarch pulltag=20260602 pullrunid=26796219223 pullrocmver=7.14.0  # Nightly multiarch
+    $0 pull=nightly pulltag=20260602 pullrunid=26796219223 pullrocmver=7.14.0        # Nightly multiarch (all GPUs)
+    $0 pull=nightly-singlearch pulltag=20260304 pullrunid=22655273671 pullrocmver=7.12.0  # Nightly singlearch (coarse GPUs)
     $0 pull=dev pulltag=20260219 pullrunid=22188089855 pullrocmver=7.12.0            # Dev
     $0 pull=prerelease pulltag=rc2 pullrunid=21843385957 pullrocmver=7.11.0          # Prerelease RC2
     $0 pull=release pulltag=release pullrunid=1 pullrocmver=7.11.0                   # Release
@@ -229,11 +236,41 @@ for arg in "$@"; do
     esac
 done
 
+# Check for 'test' argument and load test packages config
+for arg in "$@"; do
+    case "$arg" in
+        test)
+            BUILD_WITH_TESTS="yes"
+
+            # Load test packages config
+            TEST_PACKAGES_CONFIG="$BUILD_INSTALLER_DIR/config/test-packages.config"
+            if [[ ! -f "$TEST_PACKAGES_CONFIG" ]]; then
+                echo -e "\e[31mERROR: Test packages config not found: $TEST_PACKAGES_CONFIG\e[0m"
+                exit 1
+            fi
+
+            echo "Loading test packages from: $TEST_PACKAGES_CONFIG"
+            # shellcheck source=/dev/null
+            source "$TEST_PACKAGES_CONFIG"
+
+            echo "Test packages loaded: ${PULL_CONFIG_PKG_EXTRA[*]}"
+            echo ""
+            break
+            ;;
+    esac
+done
+
 # Parse arguments and categorize them
 while (($#)); do
     case "$1" in
     config=*)
         # Forward to both setup and build scripts so they can source it too
+        SETUP_ARGS+=("$1")
+        BUILD_ARGS+=("$1")
+        shift
+        ;;
+    test)
+        # Already processed above, pass to child scripts
         SETUP_ARGS+=("$1")
         BUILD_ARGS+=("$1")
         shift
@@ -336,6 +373,7 @@ echo "  Script Directory:   $SCRIPT_DIR"
 echo "  Build Scripts Dir:  $BUILD_INSTALLER_DIR"
 echo "  Skip Setup Phase:   $([ $SKIP_SETUP -eq 1 ] && echo "Yes" || echo "No")"
 echo "  Skip Build Phase:   $([ $SKIP_BUILD -eq 1 ] && echo "Yes" || echo "No")"
+echo "  Build with Tests:   $BUILD_WITH_TESTS"
 echo ""
 
 # Change to build-installer directory

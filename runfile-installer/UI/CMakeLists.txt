@@ -97,6 +97,12 @@ if(MULTI_ARCH_BUILD)
     add_compile_definitions(MULTI_ARCH_BUILD)
 endif()
 
+# Test component inclusion flag - passed from build-installer.sh
+if(INCLUDE_TEST_COMPONENT)
+    message(STATUS "UI: Building with test component support")
+    add_compile_definitions(INCLUDE_TEST_COMPONENT)
+endif()
+
 # UI target settings
 target_compile_options(rocm_ui PRIVATE -Wall -Wextra -Werror)
 
@@ -127,9 +133,21 @@ set_target_properties(rocm_ui PROPERTIES LINK_FLAGS "-static-libgcc")
 
 add_dependencies(rocm_installer rocm_ui)
 
-add_custom_command(TARGET rocm_ui
-                  COMMAND echo "Copying UI to installer directory"
-                  COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/rocm_ui ${INSTALLER_DIRECTORY}/
-                  COMMAND echo "Copying rocm_menus directory to installer/UI"
-                  COMMAND ${CMAKE_COMMAND} -E make_directory ${INSTALLER_DIRECTORY}/UI
-                  COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/rocm_menus ${INSTALLER_DIRECTORY}/UI/rocm_menus/)
+if(INCLUDE_TEST_COMPONENT)
+    add_custom_command(TARGET rocm_ui
+                      POST_BUILD
+                      COMMAND echo "Copying UI to installer directory"
+                      COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/rocm_ui ${INSTALLER_DIRECTORY}/
+                      COMMAND echo "Copying rocm_menus directory to installer/UI"
+                      COMMAND ${CMAKE_COMMAND} -E make_directory ${INSTALLER_DIRECTORY}/UI
+                      COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/rocm_menus ${INSTALLER_DIRECTORY}/UI/rocm_menus/)
+else()
+    add_custom_command(TARGET rocm_ui
+                      POST_BUILD
+                      COMMAND echo "Copying UI to installer directory"
+                      COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/rocm_ui ${INSTALLER_DIRECTORY}/
+                      COMMAND echo "Copying rocm_menus directory to installer/UI"
+                      COMMAND ${CMAKE_COMMAND} -E make_directory ${INSTALLER_DIRECTORY}/UI
+                      COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/rocm_menus ${INSTALLER_DIRECTORY}/UI/rocm_menus/
+                      COMMAND sed -i "/^\\[H2\\]test/,/^$$/d" ${INSTALLER_DIRECTORY}/UI/rocm_menus/rocm_compo_help)
+endif()
