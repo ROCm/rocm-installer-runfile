@@ -555,7 +555,9 @@ get_buildinfo() {
     echo "=========================================="
     echo "ROCm Installer Build Information"
     echo "=========================================="
-    echo "\${buildheader}"
+    cat << 'BUILDINFO_END'
+@@BUILDINFO_CONTENT@@
+BUILDINFO_END
     echo "=========================================="
 }
 

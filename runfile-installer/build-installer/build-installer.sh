@@ -160,10 +160,12 @@ initialize_gfx_family_map() {
     # Clear any existing mappings
     GFX_FAMILY_MAP=()
 
-    if [[ "${PULL_CONFIG_RELEASE_TYPE:-}" == "nightly" ]]; then
+    if [[ "${PULL_CONFIG_RELEASE_TYPE:-}" == "nightly" || "${PULL_CONFIG_RELEASE_TYPE:-}" == "prerelease" ]]; then
         # Multi-arch build: Use fine-grained → coarse family mappings
         echo "Initializing GFX_FAMILY_MAP for multi-arch build"
-        GFX_FAMILY_MAP=(
+
+        # Define complete mapping table
+        declare -A MULTIARCH_MAPPING=(
             ["gfx900"]="gfx900"
             ["gfx906"]="gfx906"
             ["gfx908"]="gfx908"
@@ -191,6 +193,21 @@ initialize_gfx_family_map() {
             ["gfx1200"]="gfx120x"
             ["gfx1201"]="gfx120x"
         )
+
+        # Only include mappings for architectures in ROCM_GFX_ARCHS
+        if [[ -n "${ROCM_GFX_ARCHS:-}" ]]; then
+            for arch in "${ROCM_GFX_ARCHS[@]}"; do
+                if [[ -n "${MULTIARCH_MAPPING[$arch]}" ]]; then
+                    GFX_FAMILY_MAP["$arch"]="${MULTIARCH_MAPPING[$arch]}"
+                else
+                    # Unknown arch, map to itself
+                    GFX_FAMILY_MAP["$arch"]="$arch"
+                fi
+            done
+            echo "  Mapped ${#ROCM_GFX_ARCHS[@]} architectures from ROCM_GFX_ARCHS"
+        else
+            echo "  WARNING: ROCM_GFX_ARCHS not set, using empty map"
+        fi
     else
         # Single-arch build: Use 1:1 mapping from ROCM_GFX_ARCHS
         # Each architecture maps to itself
@@ -616,20 +633,12 @@ generate_headers() {
     # Embed BUILDINFO content directly into the header by replacing the variable assignment
     # This is done after the template substitution to handle multi-line content correctly
     if [[ -f "$EXTRACT_DIR/BUILDINFO" ]]; then
-        # Read BUILDINFO and escape it for embedding in a shell $'...' string
-        # Use awk to properly convert newlines to literal \n for $'...' syntax
-        local BUILDINFO_ESCAPED
-        # shellcheck disable=SC1003
-        BUILDINFO_ESCAPED=$(awk '
-            {
-                gsub(/\\/, "\\\\")         # Escape backslashes first
-                gsub(/'\''/, "'\''\\'\'''\''")  # Escape single quotes
-                printf "%s\\n", $0         # Add literal \n after each line
-            }
-        ' "$EXTRACT_DIR/BUILDINFO" | sed 's/\\n$//')  # Remove trailing \n
-
-        # Replace buildheader='$BUILDHEADER' with actual content using $'...' for multi-line
-        sed -i "s|^buildheader=.*|buildheader=\$'$BUILDINFO_ESCAPED'|" rocm-makeself-header-pre.sh
+        # Replace @@BUILDINFO_CONTENT@@ placeholder with actual content
+        # Use sed 'r' command to read file content
+        sed -i "/@@BUILDINFO_CONTENT@@/{
+            r $EXTRACT_DIR/BUILDINFO
+            d
+        }" rocm-makeself-header-pre.sh
 
         echo "  Embedded BUILDINFO into header"
     else

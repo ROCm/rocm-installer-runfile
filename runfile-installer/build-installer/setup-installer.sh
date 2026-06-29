@@ -788,6 +788,9 @@ setup_puller_config_rocm() {
     if [[ "${PULL_CONFIG_RELEASE_TYPE}" == "nightly" ]]; then
         package_path="packages-multi-arch/"
         echo "Using multiarch package path"
+    elif [[ "${PULL_CONFIG_RELEASE_TYPE}" == "prerelease" ]]; then
+        package_path="packages-multi-arch/"
+        echo "Using multiarch package path (distro-based)"
     fi
 
     echo "Using ROCm config type: ${PULL_CONFIG_RELEASE_TYPE}"
