@@ -5,8 +5,6 @@ Instinct:
     MI325X/MI308X/MI300X/MI300A               (gfx942)
     MI250X/MI250/MI210                        (gfx90a)
     MI100                                     (gfx908)
-    Radeon Pro VII                            (gfx906)
-    Radeon Pro WX 9100/WX 8200                (gfx900)
 Radeon Pro:
     W7900/W7800/W7900D                        (gfx1100)
     W7700                                     (gfx1101)
@@ -27,7 +25,6 @@ Radeon RX:
     RX 6500 XT/6500M/6450M/6400                  (gfx1033)
     RX 5700 XT/5700/5600 XT/5600                 (gfx1010)
     RX 5500M/5500/5300M/5300                     (gfx1012)
-    Vega 64/Vega 56/Vega 20                      (gfx900)
 Ryzen (APU):
     AI Max PRO 300 Series/AI Max 300 Series   (gfx1151)
     AI PRO 400/300 Series <9 HX PRO/9 HX>     (gfx1150)
