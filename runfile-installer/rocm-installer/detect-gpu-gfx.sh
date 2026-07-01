@@ -733,10 +733,10 @@ detect_from_pci() {
         local pci_addr
         pci_addr=$(echo "$pci_line" | awk '{print $1}')
         local rev_id=""
-        local pci_numeric
-        pci_numeric=$(lspci -n -s "$pci_addr" 2>/dev/null)
-        if [[ -n "$pci_numeric" ]]; then
-            rev_id=$(echo "$pci_numeric" | grep -oP '\(rev \K[0-9a-f]{2}(?=\))' || echo "00")
+        local pci_verbose
+        pci_verbose=$(lspci -v -s "$pci_addr" 2>/dev/null)
+        if [[ -n "$pci_verbose" ]]; then
+            rev_id=$(echo "$pci_verbose" | grep -oP '\(rev \K[0-9a-f]{2}(?=\))' || echo "00")
             rev_id=${rev_id^^}
         fi
 
@@ -794,12 +794,14 @@ list_gpus() {
 
         local gpu_count=0
         local -A pci_revisions
-        # shellcheck disable=SC2034
-        while read -r pci_addr _pci_class _pci_vendor _pci_device pci_rest; do
-            local rev
-            rev=$(echo "$pci_rest" | grep -oP '\(rev \K[0-9a-f]{2}(?=\))' || echo "00")
-            pci_revisions["$pci_addr"]="${rev^^}"
-        done < <(lspci -n -d 1002: 2>/dev/null | grep -E "03[08]0:")
+        # Build revision lookup table from lspci -v output
+        while IFS= read -r line; do
+            if [[ "$line" =~ ^([0-9a-f]{2}:[0-9a-f]{2}\.[0-9a-f]).*\(rev\ ([0-9a-f]{2})\) ]]; then
+                local addr="${BASH_REMATCH[1]}"
+                local rev="${BASH_REMATCH[2]}"
+                pci_revisions["$addr"]="${rev^^}"
+            fi
+        done < <(lspci -v -d 1002: 2>/dev/null | grep -E "VGA|Display|3D|Processing accelerators")
 
         while IFS= read -r line; do
             found_any=1
@@ -811,7 +813,12 @@ list_gpus() {
             device_id=$(echo "$line" | grep -oP '\[1002:\K[0-9a-f]{4}(?=\])')
             local rev_id="${pci_revisions[$pci_addr]:-00}"
             local gfx_arch
-            gfx_arch=$(map_device_id_to_gfx "$device_id" 2>/dev/null || echo "Unknown")
+            # Pass revision ID to enable revision-aware mapping
+            if [[ -n "$rev_id" && "$rev_id" != "00" ]]; then
+                gfx_arch=$(map_device_id_to_gfx "$device_id" "$rev_id" 2>/dev/null || echo "Unknown")
+            else
+                gfx_arch=$(map_device_id_to_gfx "$device_id" 2>/dev/null || echo "Unknown")
+            fi
             local pkg_group=""
             [[ "$gfx_arch" != "Unknown" ]] && pkg_group=$(map_gfx_to_package_group "$gfx_arch")
 
@@ -869,7 +876,12 @@ list_gpus() {
         product_name=$(cat "$card/product_name" 2>/dev/null || echo "N/A")
 
         local gfx_arch
-        gfx_arch=$(map_device_id_to_gfx "$device_id" 2>/dev/null || echo "Unknown")
+        # Pass revision ID to enable revision-aware mapping
+        if [[ -n "$rev_id" && "$rev_id" != "N/A" ]]; then
+            gfx_arch=$(map_device_id_to_gfx "$device_id" "$rev_id" 2>/dev/null || echo "Unknown")
+        else
+            gfx_arch=$(map_device_id_to_gfx "$device_id" 2>/dev/null || echo "Unknown")
+        fi
 
         # Map to package group
         local pkg_group=""
@@ -1037,12 +1049,18 @@ collect_from_sysfs() {
         device_id=$(sed 's/0x//' "$card/device" 2>/dev/null || echo "N/A")
 
         if [[ -f "$card/revision" ]]; then
-            rev_id=$(sed 's/0x//' "$card/revision" 2>/dev/null | tr '[:lower:]' '[:upper:]')
+            rev_id=$(sed 's/0x//' "$card/revision" 2>/dev/null || echo "")
+            rev_id=${rev_id^^}
         else
             rev_id="00"
         fi
 
-        gfx_arch=$(map_device_id_to_gfx "$device_id" 2>/dev/null || echo "unknown")
+        # Pass revision ID to enable revision-aware mapping
+        if [[ -n "$rev_id" && "$rev_id" != "00" ]]; then
+            gfx_arch=$(map_device_id_to_gfx "$device_id" "$rev_id" 2>/dev/null || echo "unknown")
+        else
+            gfx_arch=$(map_device_id_to_gfx "$device_id" 2>/dev/null || echo "unknown")
+        fi
 
         name="AMD GPU"
         if [[ -f "$card/product_name" ]]; then
@@ -1071,12 +1089,17 @@ collect_from_lspci() {
         device_id=$(echo "$pci_line" | grep -oP '\[1002:\K[0-9a-f]{4}(?=\])')
         [[ -z "$device_id" ]] && continue
 
-        local pci_numeric
-        pci_numeric=$(lspci -n -s "$pci_addr" 2>/dev/null)
-        rev_id=$(echo "$pci_numeric" | grep -oP '\(rev \K[0-9a-f]{2}(?=\))' | tr '[:lower:]' '[:upper:]')
+        local pci_verbose
+        pci_verbose=$(lspci -v -s "$pci_addr" 2>/dev/null)
+        rev_id=$(echo "$pci_verbose" | grep -oP '\(rev \K[0-9a-f]{2}(?=\))' | tr '[:lower:]' '[:upper:]')
         [[ -z "$rev_id" ]] && rev_id="00"
 
-        gfx_arch=$(map_device_id_to_gfx "$device_id" 2>/dev/null || echo "unknown")
+        # Pass revision ID to enable revision-aware mapping
+        if [[ -n "$rev_id" && "$rev_id" != "00" ]]; then
+            gfx_arch=$(map_device_id_to_gfx "$device_id" "$rev_id" 2>/dev/null || echo "unknown")
+        else
+            gfx_arch=$(map_device_id_to_gfx "$device_id" 2>/dev/null || echo "unknown")
+        fi
 
         name=$(lspci -s "$pci_addr" 2>/dev/null | head -1 | sed -E 's/^[0-9a-f:.]+\s+[^:]+:\s+//')
         [[ -z "$name" ]] && name=$(echo "$pci_line" | sed -E 's/^[0-9a-f:.]+\s+[^:]+:\s+//' | sed 's/\s*\[.*$//')
