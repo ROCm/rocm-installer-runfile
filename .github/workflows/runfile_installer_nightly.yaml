@@ -11,11 +11,11 @@ on:
       gfx_archs:
         description: gfx architectures to build
         type: string
-        default: "gfx110x"
+        default: "gfx1100"
       pull_amdgpu:
         description: Version of amdgpu to be packaged into runfile installer.
         type: string
-        default: "latest" # If set to latest, script automatically gets the version of the latest released amdgpu driver
+        default: "release,31.30" # If set to latest, script automatically gets the version of the latest released amdgpu driver
       pull_tag:
         description: Build date in format YYYYMMDD. If empty, will use today's date.
         type: string
