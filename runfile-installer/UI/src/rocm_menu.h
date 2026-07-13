@@ -53,7 +53,7 @@
 #ifdef MULTI_ARCH_BUILD
     #define ROCM_MENU_DEVICE_ITEMS_FILE         "./UI/rocm_menus/rocm_device_items_multiarch"
     #define ROCM_MENU_DEVICE_ITEMDECS_FILE      "./UI/rocm_menus/rocm_device_items_desc_multiarch"
-    #define ROCM_MENU_DEVICE_HELP_TITLE         "ROCm Device Help (Multi-Arch)"
+    #define ROCM_MENU_DEVICE_HELP_TITLE         "ROCm Device Help"
     #define ROCM_MENU_DEVICE_HELP_FILE          "./UI/rocm_menus/rocm_device_help_multiarch"
 #else
     #define ROCM_MENU_DEVICE_ITEMS_FILE         "./UI/rocm_menus/rocm_device_items"
