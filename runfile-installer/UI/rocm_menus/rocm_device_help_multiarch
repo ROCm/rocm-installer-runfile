@@ -1,19 +1,13 @@
 [H1]Overview:
-Select the GPU architecture that matches your hardware. Multi-arch installers
-support fine-grained architectures for precise GPU matching. Each entry
-corresponds to a specific GPU model.
+Select the GPU architecture that matches your hardware. Each entry corresponds
+to a specific GPU model. This allows you to install ROCm optimized for your
+exact GPU model, reducing installation size compared to installing all models.
+You can also choose to install all supported GPU architectures if preferred.
 
-[H1]What is Multi-Arch?
-Multi-arch installers contain components for multiple fine-grained GPU
-architectures. This allows you to install ROCm optimized for your exact GPU
-model, reducing installation size compared to installing all models.
-
-[H1]Fine-Grained Architectures:
-Unlike single-arch installers that use coarse families (gfx110x for all RDNA 3),
-multi-arch installers let you select specific models.
-
-  Single-arch example: gfx110x covers all RDNA 3 GPUs
-  Multi-arch example: gfx1100 (Navi 31), gfx1101 (Navi 32), gfx1102 (Navi 33)
+The installer supports fine-grained GPU architectures for precise matching.
+For example, RDNA 3 GPUs have separate entries: gfx1100 (Navi 31), gfx1101
+(Navi 32), and gfx1102 (Navi 33), allowing you to select the exact architecture
+for your GPU.
 
 [H1]GPU Families:
 
@@ -22,8 +16,14 @@ multi-arch installers let you select specific models.
   MI325X/MI300X/MI300A (gfx942) - CDNA 3 architecture
   MI250X/MI250/MI210   (gfx90a) - CDNA 2 architecture
   MI100                (gfx908) - CDNA 1 architecture
-  Radeon Pro VII       (gfx906) - GCN 5.0 architecture
-  Radeon Pro WX series (gfx900) - GCN 5.0 architecture
+
+[H2]Radeon PRO V (Cloud Graphics):
+
+  RDNA 3 GPUs:
+    V710                 (gfx1101) - Navi 32
+
+  RDNA 2 GPUs:
+    V620                 (gfx1030)
 
 [H2]Radeon PRO (Professional Workstation):
 
@@ -31,17 +31,11 @@ multi-arch installers let you select specific models.
     AI PRO R9700/R9600D  (gfx1201) - Navi 48
 
   RDNA 3 GPUs:
-    W7900/W7800/W7900D   (gfx1100) - Navi 31
+    W7900/W7800          (gfx1100) - Navi 31
     W7700                (gfx1101) - Navi 32
-    W7600                (gfx1102) - Navi 33
 
   RDNA 2 GPUs:
-    W6800                (gfx1030) - Sienna Cichlid
-    W6600/W6600M         (gfx1032) - Beige Goby
-    W6500M/W6400/W6300   (gfx1033) - Beige Goby
-
-  RDNA 1 GPUs:
-    W5700/W5500          (gfx1010) - Navi 10
+    W6800                (gfx1030)
 
 [H2]Radeon RX (Consumer Gaming):
 
@@ -51,31 +45,40 @@ multi-arch installers let you select specific models.
 
   RDNA 3 GPUs:
     RX 7900 series       (gfx1100) - Navi 31 high-end
-    RX 7800/7700 series  (gfx1101) - Navi 32 mid-range
-    RX 7600 series       (gfx1102) - Navi 33 mainstream
+    RX 7800 XT           (gfx1101) - Navi 32 high-end
+    RX 7700 series       (gfx1101) - Navi 32 mid-range
+    RX 7600              (gfx1102) - Navi 33 mainstream
 
   RDNA 2 GPUs:
-    RX 6950/6900/6800    (gfx1030) - Sienna Cichlid high-end
-    RX 6800S/6650/6600   (gfx1032) - Beige Goby mid-range
-    RX 6500/6450/6400    (gfx1033) - Beige Goby mainstream
-
-  RDNA 1 GPUs:
-    RX 5700/5600 series  (gfx1010) - Navi 10
-    RX 5500/5300 series  (gfx1012) - Navi 14
-
-  GCN GPUs:
-    RX Vega 64/56/20     (gfx900)  - Vega 10/20
+    RX 6950/6900/6800    (gfx1030) - high-end
 
 [H2]Ryzen APUs (Integrated Graphics):
 
   RDNA 3.5 APUs:
-    AI Max PRO/Max 300       (gfx1151) - Radeon 8060S/8050S
-    AI PRO/AI 400/300 (9 HX) (gfx1150) - Radeon 890M
-    AI PRO/AI 400/300 (7/5)  (gfx1152) - Radeon 880M/860M/840M/820M
-    AI 400/300 (Other)       (gfx1153) - Various Radeon 800M
+    AI Max+ 300 Series (gfx1151):
+      AI Max+ (PRO) 395/392/388 - Radeon 8060S
+
+    AI Max 300 Series (gfx1151):
+      AI Max (PRO) 390/385/380 - Radeon 8050S/8040S
+
+    AI 400 Series (gfx1150):
+      AI 9 HX (PRO)/PRO 475/470/465 - Radeon 890M/880M
+
+    AI 400 Series (gfx1152):
+      AI 7 (PRO) 450, AI 5 PRO 440 - Radeon 860M/840M
+
+    AI 300 Series (gfx1150):
+      AI 9 HX (PRO)/9 375/370/365 - Radeon 890M/880M
+
+    AI 300 Series (gfx1152):
+      AI 7 (PRO) 350/345, AI 5 (PRO) 340 - Radeon 860M/840M
+
+    AI 300 Series (gfx1153):
+      AI 5 330 - Radeon 820M
 
   RDNA 3 APUs:
-    200 Series           (gfx1103) - Radeon 780M/760M/740M
+    Ryzen (PRO) 200 Series (gfx1103):
+      270/260/250/240/230/220/215/210 - Radeon 780M/760M/740M
 
 [H1]How to Choose:
 
@@ -92,6 +95,8 @@ Examples:
   RX 7900 XTX: Select gfx1100
   MI300X: Select gfx942
   Ryzen AI 9 HX 370: Select gfx1150
+  Radeon PRO V710: Select gfx1101
+  Ryzen AI Max+ 395: Select gfx1151
 
 If unsure about your GPU model, after installation run 'rocminfo' or
 'amd-smi' to verify your GPU's exact gfx architecture code.
