@@ -24,16 +24,6 @@ multiple components for a customized installation.
     Selecting this option automatically includes core, core-dev, dev-tools,
     and opencl. Recommended for full ROCm development environment.
 
-[H2]test
-    Test packages for validating ROCm library functionality.
-    Architecture-independent tests (base):
-      - debugger-test, decode-test, jpeg-test, opencl-test
-      - profiler-test, rdc-test, rocshmem-test, runtime-test
-
-    GFX-specific tests (per GPU architecture):
-      - blas-test, ccl-test, dnn-test, fft-test
-      - rand-test, rccl-test, solver-test, sparse-test
-
 [H1]Usage:
 
 You can select individual components for a customized installation, or
