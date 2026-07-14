@@ -3108,8 +3108,8 @@ process_test_component() {
             [[ -z "$pkg" ]] && continue
 
             # Determine if package is GFX-specific or base by checking package name suffix
-            # GFX packages end with -gfx#### (e.g., amdrocm-blas-test7.14-gfx1100)
-            if [[ "$pkg" =~ -gfx[0-9]+$ ]]; then
+            # GFX packages end with -gfx#### (e.g., amdrocm-blas-test7.14-gfx1100, amdrocm-blas-test7.14-gfx90a)
+            if [[ "$pkg" =~ -gfx[0-9a-z]+$ ]]; then
                 # Package is GFX-specific - add to COMPONENTS_GFX if not duplicate
                 if [[ ! " $COMPONENTS_GFX " =~ \ $pkg\  ]]; then
                     COMPONENTS_GFX="$COMPONENTS_GFX $pkg"
