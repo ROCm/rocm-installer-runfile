@@ -52,7 +52,7 @@ jobs:
         working-directory: ${{ github.workspace }}/runfile-installer
     env:
       GFX_ARCHS: ${{ inputs.gfx_archs || 'gfx1100' }}
-      PULL_AMDGPU: ${{ inputs.pull_amdgpu || 'release,31.30' }}
+      PULL_AMDGPU: ${{ inputs.pull_amdgpu || 'release,31.40' }}
       PULL_TAG: ${{ inputs.pull_tag }}
       PULL_RUN_ID: ${{ inputs.pull_run_id }}
       PULL_PKG: ${{ inputs.pull_pkg || 'amdrocm-core-sdk' }}
