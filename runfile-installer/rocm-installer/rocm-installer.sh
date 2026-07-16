@@ -2697,6 +2697,12 @@ install_rocm_multiarch() {
             for compo_name in "${COMPO_LIST[@]}"; do
                 compo_name="${compo_name#"${compo_name%%[![:space:]]*}"}"
                 compo_name="${compo_name%"${compo_name##*[![:space:]]}"}"
+
+                # Skip components that don't have GFX variants
+                if [[ "$compo_name" == "dev-tools" || "$compo_name" == "opencl" || "$compo_name" == "test" ]]; then
+                    continue
+                fi
+
                 local meta_base
                 meta_base=$(get_component_meta_base "$compo_name")
                 process_gfx_component "$meta_base"
