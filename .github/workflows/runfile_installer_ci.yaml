@@ -30,4 +30,4 @@ jobs:
       pull_run_id: "29052710811"
       pull_pkg: amdrocm-core-sdk
       gfx_archs: gfx1100
-      pull_amdgpu: "release,31.30"
+      pull_amdgpu: "release,31.40"
