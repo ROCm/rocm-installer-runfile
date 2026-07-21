@@ -46,7 +46,7 @@ jobs:
   setup:
     name: Setup Parameters
     if: ${{ github.repository_owner == 'ROCm' || github.event_name != 'schedule' }}
-    runs-on: ubuntu-24.04
+    runs-on: aws-linux-scale-rocm-small
     defaults:
       run:
         working-directory: ${{ github.workspace }}/runfile-installer
