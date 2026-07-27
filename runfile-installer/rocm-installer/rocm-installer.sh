@@ -2699,7 +2699,13 @@ install_rocm_multiarch() {
                 compo_name="${compo_name%"${compo_name##*[![:space:]]}"}"
 
                 # Skip components that don't have GFX variants
-                if [[ "$compo_name" == "dev-tools" || "$compo_name" == "opencl" || "$compo_name" == "test" ]]; then
+                if [[ "$compo_name" == "dev-tools" || "$compo_name" == "opencl" ]]; then
+                    continue
+                fi
+
+                # Handle test component specially (uses different config structure)
+                if [[ "$compo_name" == "test" ]]; then
+                    process_test_component
                     continue
                 fi
 
@@ -3098,10 +3104,16 @@ process_test_component() {
     fi
 
     # Test packages require gfx= to be specified
-    if [[ -z "$INSTALL_GFX" ]]; then
+    if [[ -z "$INSTALL_GFX" && ${#GFX_INSTALL_LIST[@]} -eq 0 ]]; then
         print_err "Test packages require gfx= argument to specify architecture."
         echo "Example: $PROG compo=test gfx=gfx110x rocm"
         exit 1
+    fi
+
+    # For multi-GFX installations called from configure_rocm_install, skip processing
+    # Test components will be processed per-GFX in the multi-arch installation loop
+    if [[ ${#GFX_INSTALL_LIST[@]} -gt 1 && -z "$INSTALL_GFX" ]]; then
+        return 0
     fi
 
     # Read test config file for the specified architecture
@@ -3351,7 +3363,12 @@ configure_rocm_install() {
         echo "GFX components to install: $COMPONENTS_GFX"
     fi
 
+    # Allow empty components if doing multi-GFX test installation (will be populated in multi-arch loop)
     if [[ -z "$COMPONENTS" && -z "$COMPONENTS_GFX" ]]; then
+        if [[ ${#GFX_INSTALL_LIST[@]} -gt 1 && "$COMPO_INSTALL" =~ (^|,)test(,|$) ]]; then
+            # Multi-GFX test installation - components will be populated per-arch in the loop
+            return 0
+        fi
         print_err "No components found for installation"
         exit 1
     fi
