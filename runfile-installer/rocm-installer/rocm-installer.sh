@@ -809,6 +809,7 @@ extract_content_if_needed() {
 
 extract_tests_if_needed() {
     # Only extract tests if explicitly requested via compo=test
+    # Args: $@ = Optional list of GFX architectures (for multi-GFX mode)
     if [[ ! "$COMPO_INSTALL" =~ (^|,)test(,|$) ]]; then
         return 0
     fi
@@ -826,8 +827,12 @@ extract_tests_if_needed() {
     # Determine which GFX architectures are needed for tests
     local gfx_tags_needed="base"
 
-    # Add selected GFX tags
-    if [[ -n "$INSTALL_GFX" ]]; then
+    # Add GFX tags from arguments (multi-GFX mode) or from INSTALL_GFX (single-GFX mode)
+    if [[ $# -gt 0 ]]; then
+        # Multi-GFX mode: use provided GFX list
+        gfx_tags_needed="$gfx_tags_needed $*"
+    elif [[ -n "$INSTALL_GFX" ]]; then
+        # Single-GFX mode: use INSTALL_GFX variable
         gfx_tags_needed="$gfx_tags_needed $INSTALL_GFX"
     fi
 
@@ -2665,7 +2670,7 @@ install_rocm_multiarch() {
     # Step 1.5: Extract test packages if needed
     if [[ "$COMPO_INSTALL" =~ (^|,)test(,|$) ]]; then
         echo ""
-        extract_tests_if_needed
+        extract_tests_if_needed "${gfx_list[@]}"
     fi
 
     # Step 2: Install base packages (if not already installed)
