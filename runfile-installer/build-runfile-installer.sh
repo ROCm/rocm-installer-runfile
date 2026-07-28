@@ -80,7 +80,7 @@ This script performs a complete ROCm runfile installer build:
     rocm-mode=native      = Pull DEB packages using native OS (default).
     rocm-mode=chroot      = Pull DEB packages using Ubuntu chroot (for RPM-based OS).
     rocm-archs=<archs>    = Set GPU architectures to pull (e.g., gfx94x,gfx950).
-                            Default: gfx908,gfx90a,gfx94x,gfx950,gfx110x,gfx1150,gfx1151,gfx120x
+                            Default: gfx900,gfx906,gfx908,gfx90a,gfx90c,gfx942,gfx950,gfx1010,gfx1011,gfx1012,gfx1030,gfx1031,gfx1032,gfx1033,gfx1034,gfx1035,gfx1036,gfx1100,gfx1101,gfx1102,gfx1103,gfx1150,gfx1151,gfx1152,gfx1153,gfx1200,gfx1201,gfx1250
                             Legacy (ROCm < 7.12): gfx90x,gfx94x,gfx950,gfx110x,gfx1150,gfx1151,gfx120x
 
     pull=<release-type>   = Pull ROCm packages from specified repository (required).

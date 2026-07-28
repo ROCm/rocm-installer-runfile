@@ -170,6 +170,7 @@ initialize_gfx_family_map() {
             ["gfx906"]="gfx906"
             ["gfx908"]="gfx908"
             ["gfx90a"]="gfx90a"
+            ["gfx90c"]="gfx90c"
             ["gfx942"]="gfx94x"
             ["gfx950"]="gfx950"
             ["gfx1010"]="gfx101x"
@@ -192,6 +193,7 @@ initialize_gfx_family_map() {
             ["gfx1153"]="gfx115x"
             ["gfx1200"]="gfx120x"
             ["gfx1201"]="gfx120x"
+            ["gfx1250"]="gfx1250"
         )
 
         # Only include mappings for architectures in ROCM_GFX_ARCHS

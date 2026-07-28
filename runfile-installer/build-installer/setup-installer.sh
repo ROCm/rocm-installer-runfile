@@ -77,7 +77,7 @@ SETUP_AMDGPU_MODE="all"  # Default: all distros
 SETUP_ROCM_MODE="chroot" # Default: native (use current OS), Options: native, chroot
 
 # Configuration
-ROCM_RELEASE_TYPES=(dev nightly nightly-singlearch prerelease release)
+ROCM_RELEASE_TYPES=(dev nightly nightly-singlearch prerelease release release-singlearch)
 
 
 ###### Functions ###############################################################

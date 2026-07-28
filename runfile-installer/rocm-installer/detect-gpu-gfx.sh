@@ -21,13 +21,14 @@
 #   gfx120x - RX 9070 series (RDNA4)
 #
 # Supported Fine-Grained Archs (Multi-Arch):
-#   gfx900, gfx906 (Vega), gfx908 (MI100), gfx90a (MI250/MI210)
+#   gfx900, gfx906 (Vega), gfx908 (MI100), gfx90a (MI250/MI210), gfx90c
 #   gfx942 (MI300), gfx950 (MI350+)
 #   gfx1010, gfx1011, gfx1012 (RDNA1)
 #   gfx1030-gfx1036 (RDNA2)
 #   gfx1100-gfx1103 (RDNA3)
 #   gfx1150-gfx1153 (RDNA3.5)
 #   gfx1200, gfx1201 (RDNA4)
+#   gfx1250 (RDNA4+)
 #
 # Detection Methods (in priority order):
 #   1. ROCm tools (amd-smi, rocminfo) - most accurate
@@ -250,7 +251,8 @@ detect_installer_type() {
         if [[ -d "$content_dir"/gfx1100 ]] || [[ -d "$content_dir"/gfx1101 ]] || \
            [[ -d "$content_dir"/gfx940 ]] || [[ -d "$content_dir"/gfx941 ]] || \
            [[ -d "$content_dir"/gfx1030 ]] || [[ -d "$content_dir"/gfx1031 ]] || \
-           [[ -d "$content_dir"/gfx1200 ]] || [[ -d "$content_dir"/gfx1201 ]]; then
+           [[ -d "$content_dir"/gfx1200 ]] || [[ -d "$content_dir"/gfx1201 ]] || \
+           [[ -d "$content_dir"/gfx90c ]] || [[ -d "$content_dir"/gfx1250 ]]; then
             echo "multi"
             return 0
         fi
@@ -278,12 +280,12 @@ map_gfx_to_package_group() {
     if [[ "$INSTALLER_TYPE" == "multi" ]]; then
         case "$gfx_arch" in
             # Return supported fine-grained architectures as-is
-            gfx900|gfx906|gfx908|gfx90a|gfx942|gfx950|\
+            gfx900|gfx906|gfx908|gfx90a|gfx90c|gfx942|gfx950|\
             gfx1010|gfx1011|gfx1012|\
             gfx1030|gfx1031|gfx1032|gfx1033|gfx1034|gfx1035|gfx1036|\
             gfx1100|gfx1101|gfx1102|gfx1103|\
             gfx1150|gfx1151|gfx1152|gfx1153|\
-            gfx1200|gfx1201)
+            gfx1200|gfx1201|gfx1250)
                 echo "$gfx_arch"
                 ;;
             # Unsupported/unknown
@@ -297,6 +299,7 @@ map_gfx_to_package_group() {
             # CDNA
             gfx940|gfx941|gfx942)  echo "gfx94x" ;;  # MI300 series
             gfx90a)                echo "gfx90a" ;;  # MI250/MI210
+            gfx90c)                echo "gfx90c" ;;  # CDNA2 variant
             gfx908)                echo "gfx908" ;;  # MI100
             gfx950)                echo "gfx950" ;;  # MI350+
 
@@ -309,6 +312,7 @@ map_gfx_to_package_group() {
 
             # RDNA4
             gfx1200|gfx1201)       echo "gfx120x" ;;  # RX 9070 series
+            gfx1250)               echo "gfx1250" ;;  # RDNA4+
 
             # RDNA2 (map to family for single-arch)
             gfx1030|gfx1031|gfx1032|gfx1033|gfx1034|gfx1035|gfx1036) echo "gfx103x" ;;
