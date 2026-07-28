@@ -40,7 +40,7 @@
 // Menu Item Settings
 #define MAX_NUM_ITEM_LIST       5   // max number of items list per menu
 #define MAX_MENU_ITEM_COLS      80
-#define MAX_MENU_ITEMS          50
+#define MAX_MENU_ITEMS          65
 #define MAX_MENU_ITEMS_DISPLAY  23  // max number of items displayed (scroll limit)
 #define MAX_MENU_ITEM_NAME      MAX_MENU_ITEM_COLS - 1
 
