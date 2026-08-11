@@ -530,6 +530,8 @@ map_device_id_with_revision_to_gfx() {
         7590/c0) echo "gfx1200" ;;  # AMD Radeon 9060 XT
         7590/c1) echo "gfx1200" ;;  # AMD Radeon RX 9060 XT LP
         7590/c7) echo "gfx1200" ;;  # AMD Radeon 9060
+        7590/cf) echo "gfx1200" ;;  # AMD Radeon RX 9050
+        7590/df) echo "gfx1200" ;;  # AMD Radeon RX 9050 4GB
 
         # No revision-specific mapping found
         *) return 1 ;;
