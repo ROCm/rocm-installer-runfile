@@ -57,6 +57,7 @@ for your GPU.
   RDNA 4 GPUs:
     RX 9070 series       (gfx1201) - Navi 48 high-end
     RX 9060 series       (gfx1200) - Navi 44 mid-range
+    RX 9050 series       (gfx1200) - Navi 44 mainstream
 
   RDNA 3 GPUs:
     RX 7900 series       (gfx1100) - Navi 31 high-end
