@@ -92,6 +92,7 @@ This script performs a complete ROCm runfile installer build:
     pullrunid=<runid>     = Set ROCm component build run ID (required for all builds).
                             Examples: pullrunid=21274498502 (nightly/dev), pullrunid=21843385957 (prerelease), pullrunid=1 (release)
     pullrocmver=<version> = Set ROCm version for package names (e.g., 7.12, 7.11).
+    pullgraphicsver=<version> = Set graphics version for Mesa/amdgpu-lib packages (default: 26.12).
     pullamdgpu=<format>   = Set AMDGPU config and version (required when pulling AMDGPU).
                             Formats:
                             - release,<version>              : pullamdgpu=release,31.10
@@ -155,6 +156,7 @@ Examples:
 
     # Pull from specific builds (with actual values from preset configs)
     $0 pull=nightly pulltag=20260602 pullrunid=26796219223 pullrocmver=7.14.0        # Nightly multiarch (all GPUs)
+    $0 pull=nightly pulltag=20260602 pullrunid=26796219223 pullrocmver=7.14.0 pullgraphicsver=26.20  # With custom graphics version
     $0 pull=nightly-singlearch pulltag=20260304 pullrunid=22655273671 pullrocmver=7.12.0  # Nightly singlearch (coarse GPUs)
     $0 pull=dev pulltag=20260219 pullrunid=22188089855 pullrocmver=7.12.0            # Dev
     $0 pull=prerelease pulltag=rc2 pullrunid=21843385957 pullrocmver=7.11.0          # Prerelease RC2
@@ -317,7 +319,7 @@ while (($#)); do
         BUILD_ARGS+=("$1")
         shift
         ;;
-    amdgpu-mode=*|rocm-mode=*|rocm-archs=*|pull=*|pullrocmver=*|pullpkg=*|pullpkgextra=*|pullpkgforce=*|pullrocmpkgver=*|pullamdgpu=*)
+    amdgpu-mode=*|rocm-mode=*|rocm-archs=*|pull=*|pullrocmver=*|pullgraphicsver=*|pullpkg=*|pullpkgextra=*|pullpkgforce=*|pullrocmpkgver=*|pullamdgpu=*)
         SETUP_ARGS+=("$1")
         shift
         ;;

@@ -973,7 +973,7 @@ extract_rocm_packages_deb() {
         fi
 
         # shellcheck disable=SC2086  # extractor_args_deb intentionally unquoted for word splitting
-        PACKAGE_ROCM_DIR="$PWD/packages-rocm-deb" EXTRACT_FORMAT=deb ./package-extractor-debs-nodpkg.sh $extractor_args_deb
+        PACKAGE_ROCM_DIR="$PWD/packages-rocm-deb" EXTRACT_FORMAT=deb EXTRACT_GRAPHICS_VER="$PULL_CONFIG_GRAPHICS_VER" ./package-extractor-debs-nodpkg.sh $extractor_args_deb
         extract_status=$?
     else
         # On DEB-based systems, use standard extractor
@@ -984,7 +984,7 @@ extract_rocm_packages_deb() {
         fi
 
         # shellcheck disable=SC2086  # extractor_args_deb intentionally unquoted for word splitting
-        PACKAGE_ROCM_DIR="$PWD/packages-rocm-deb" EXTRACT_FORMAT=deb ./package-extractor-debs.sh $extractor_args_deb
+        PACKAGE_ROCM_DIR="$PWD/packages-rocm-deb" EXTRACT_FORMAT=deb EXTRACT_GRAPHICS_VER="$PULL_CONFIG_GRAPHICS_VER" ./package-extractor-debs.sh $extractor_args_deb
         extract_status=$?
     fi
 
@@ -1015,7 +1015,7 @@ extract_amdgpu_packages_deb() {
     fi
 
     # Extract the AMDGPU packages to component-amdgpu/<DISTRO_TAG>
-    if ! PACKAGE_AMDGPU_DIR="$PWD/$AMDGPU_PKG_DIR" EXTRACT_FORMAT=deb ./package-extractor-debs.sh amdgpu ext-amdgpu="${EXTRACT_DIR}/component-amdgpu/${DISTRO_TAG}"; then
+    if ! PACKAGE_AMDGPU_DIR="$PWD/$AMDGPU_PKG_DIR" EXTRACT_FORMAT=deb EXTRACT_GRAPHICS_VER="$PULL_CONFIG_GRAPHICS_VER" ./package-extractor-debs.sh amdgpu ext-amdgpu="${EXTRACT_DIR}/component-amdgpu/${DISTRO_TAG}"; then
         echo -e "\e[31mFailed extraction of AMDGPU DEB packages.\e[0m"
         exit 1
     fi
@@ -1059,7 +1059,7 @@ extract_rocm_packages_rpm() {
     fi
 
     # shellcheck disable=SC2086  # extractor_args intentionally unquoted for word splitting
-    if ! PACKAGE_ROCM_DIR="$PWD/packages-rocm-rpm" EXTRACT_FORMAT=rpm ./package-extractor-rpms.sh $extractor_args; then
+    if ! PACKAGE_ROCM_DIR="$PWD/packages-rocm-rpm" EXTRACT_FORMAT=rpm EXTRACT_GRAPHICS_VER="$PULL_CONFIG_GRAPHICS_VER" ./package-extractor-rpms.sh $extractor_args; then
         echo -e "\e[31mFailed extraction of ROCm RPM packages.\e[0m"
         exit 1
     fi
@@ -1082,7 +1082,7 @@ extract_amdgpu_packages_rpm() {
     fi
 
     # Extract the AMDGPU packages to component-amdgpu/<DISTRO_TAG>
-    if ! PACKAGE_AMDGPU_DIR="$PWD/$AMDGPU_PKG_DIR" EXTRACT_FORMAT=rpm ./package-extractor-rpms.sh amdgpu ext-amdgpu="${EXTRACT_DIR}/component-amdgpu/${DISTRO_TAG}"; then
+    if ! PACKAGE_AMDGPU_DIR="$PWD/$AMDGPU_PKG_DIR" EXTRACT_FORMAT=rpm EXTRACT_GRAPHICS_VER="$PULL_CONFIG_GRAPHICS_VER" ./package-extractor-rpms.sh amdgpu ext-amdgpu="${EXTRACT_DIR}/component-amdgpu/${DISTRO_TAG}"; then
         echo -e "\e[31mFailed extraction of AMDGPU RPM packages.\e[0m"
         exit 1
     fi

@@ -29,6 +29,7 @@ PULL_CONFIG_RELEASE_TYPE=""            # dev / nightly / prerelease / release
 PULL_CONFIG_TAG=""                     # Build tag (e.g., rc0, 20260211)
 PULL_CONFIG_RUNID=""                   # Run ID (21893116598 for nightly)
 PULL_CONFIG_ROCM_VER=""                # 7.11.0
+PULL_CONFIG_GRAPHICS_VER=""            # 26.12 (Mesa/amdgpu-lib version)
 PULL_CONFIG_PKG="amdrocm-core-sdk"     # Base package name (e.g., amdrocm-core-sdk, amdrocm-dev-tools)
 PULL_CONFIG_PKG_TYPE="arch"            # Package type: "arch" (has -gfxXYZ suffix) or "base" (no suffix)
 PULL_CONFIG_PKG_EXTRA=()               # Additional packages (array, comma-separated via pullpkgextra=)
@@ -79,6 +80,9 @@ SETUP_ROCM_MODE="chroot" # Default: native (use current OS), Options: native, ch
 # Configuration
 ROCM_RELEASE_TYPES=(dev nightly nightly-singlearch prerelease release release-singlearch)
 
+# Default values
+DEFAULT_GRAPHICS_VER="26.13"  # Default Mesa/amdgpu-lib version
+
 
 ###### Functions ###############################################################
 
@@ -120,6 +124,7 @@ Usage: $PROG [options]
     pullrunid=<runid>     = Set ROCm run ID (required for all builds).
                             Examples: pullrunid=21274498502 (nightly/dev), pullrunid=21843385957 (prerelease), pullrunid=99999 (release)
     pullrocmver=<version>    = Set ROCm version for package names (e.g., 7.12.0, 7.11.0).
+    pullgraphicsver=<version> = Set graphics version for Mesa/amdgpu-lib packages (default: 26.12).
     pullpkg=<package>        = Set base package name with optional type prefix (default: amdrocm-core-sdk).
                                Syntax: pullpkg=[type:]<package>
                                - arch:<package> = Architecture-specific (has -gfxXYZ suffix, default)
@@ -159,6 +164,7 @@ Examples:
 
     # Pull from specific builds (with actual values from preset configs)
     ./setup-installer.sh pull=nightly pulltag=20260304 pullrunid=22655273671 pullrocmver=7.12.0  # Nightly multiarch build
+    ./setup-installer.sh pull=nightly pulltag=20260304 pullrunid=22655273671 pullrocmver=7.12.0 pullgraphicsver=26.12  # With custom graphics version
     ./setup-installer.sh pull=dev pulltag=20260219 pullrunid=22188089855 pullrocmver=7.12.0      # Dev build
     ./setup-installer.sh pull=prerelease pulltag=rc2 pullrunid=21843385957 pullrocmver=7.11.0    # Prerelease RC2
     ./setup-installer.sh pull=release pulltag=release pullrunid=99999 pullrocmver=7.11.0         # Release build
@@ -364,6 +370,12 @@ validate_args() {
         echo -e "\e[31mERROR: PULL_CONFIG_ROCM_VER not set. Use pullrocmver= argument.\e[0m"
         echo "Example: pullrocmver=7.11.0"
         validation_failed=1
+    fi
+
+    # Set default graphics version if not specified
+    if [[ -z "$PULL_CONFIG_GRAPHICS_VER" ]]; then
+        PULL_CONFIG_GRAPHICS_VER="$DEFAULT_GRAPHICS_VER"
+        echo "Using default graphics version: $PULL_CONFIG_GRAPHICS_VER"
     fi
 
     if [ $validation_failed -eq 1 ]; then
@@ -1214,6 +1226,11 @@ do
     pullrocmver=*)
         PULL_CONFIG_ROCM_VER="${1#*=}"
         echo "ROCm version set to: $PULL_CONFIG_ROCM_VER"
+        shift
+        ;;
+    pullgraphicsver=*)
+        PULL_CONFIG_GRAPHICS_VER="${1#*=}"
+        echo "Graphics version set to: $PULL_CONFIG_GRAPHICS_VER"
         shift
         ;;
     pullamdgpu=*)
