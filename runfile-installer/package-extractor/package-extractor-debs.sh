@@ -63,7 +63,7 @@ EXTRA_KERNEL_GFX=(gfx1103 gfx1150 gfx1151 gfx1152 gfx1153)
 # Graphics dependencies (Mesa/amdgpu-lib for graphics use case)
 # Note: Only 64-bit library included. 32-bit (amdgpu-lib32) only needed for 32-bit app support.
 EXTRA_GRAPHICS_DEPS=(amdgpu-lib)
-EXTRA_GRAPHICS_VER="26.12"
+EXTRA_GRAPHICS_VER="${EXTRACT_GRAPHICS_VER:-26.12}"
 
 # Logs
 EXTRACT_LOGS_DIR="$PWD/logs"

@@ -140,8 +140,7 @@ os_release() {
 
 get_os_codename() {
     # Get Ubuntu codename for graphics repo
-    # Note: Debian uses Ubuntu repos - Debian 12 → jammy, Debian 13 → noble
-    # Supported: Ubuntu 22.04 (jammy), Ubuntu 24.04 (noble)
+    # Supported: Ubuntu 24.04 (noble), Ubuntu 26.04 (resolute)
 
     case "$DISTRO_NAME" in
         ubuntu)
@@ -156,16 +155,8 @@ get_os_codename() {
             fi
             # Fallback for Ubuntu based on version
             case "$DISTRO_VER" in
+                26.04) echo "resolute" ;;
                 24.04) echo "noble" ;;
-                22.04) echo "jammy" ;;
-                *) echo "unknown" ;;
-            esac
-            ;;
-        debian)
-            # Debian uses Ubuntu repos - map Debian version to Ubuntu codename
-            case "$DISTRO_MAJOR_VER" in
-                13) echo "noble" ;;   # Debian 13 → Ubuntu 24.04/noble
-                12) echo "jammy" ;;   # Debian 12 → Ubuntu 22.04/jammy
                 *) echo "unknown" ;;
             esac
             ;;
@@ -2033,32 +2024,24 @@ setup_graphics_repo() {
     echo "Graphics version: $graphics_version"
 
     if [[ $PACKAGE_TYPE == "deb" ]]; then
-        # Ubuntu/Debian setup
-        # Supported: Ubuntu 22.04 (jammy), Ubuntu 24.04 (noble), Debian 12 (jammy), Debian 13 (noble)
+        # Ubuntu setup
+        # Supported: Ubuntu 24.04 (noble), Ubuntu 26.04 (resolute)
 
-        # Check for unsupported versions
-        case "$DISTRO_NAME" in
-            ubuntu)
-                case "$DISTRO_VER" in
-                    22.04|24.04)
-                        # Supported versions
-                        ;;
-                    *)
-                        print_err "Graphics support is not available for Ubuntu ${DISTRO_VER}"
-                        return 1
-                        ;;
-                esac
+        # Check for unsupported distros
+        if [[ "$DISTRO_NAME" != "ubuntu" ]]; then
+            print_err "Graphics support is not available for ${DISTRO_NAME}"
+            return 1
+        fi
+
+        # Check for unsupported Ubuntu versions
+        case "$DISTRO_VER" in
+            24.04|26.04)
+                # Supported versions
                 ;;
-            debian)
-                case "$DISTRO_MAJOR_VER" in
-                    12|13)
-                        # Supported versions
-                        ;;
-                    *)
-                        print_err "Graphics support is not available for Debian ${DISTRO_MAJOR_VER}"
-                        return 1
-                        ;;
-                esac
+            *)
+                print_err "Graphics support is not available for Ubuntu ${DISTRO_VER}"
+                print_err "Graphics is only supported for Ubuntu 24.04 and 26.04"
+                return 1
                 ;;
         esac
 
@@ -2083,52 +2066,27 @@ EOF
         local distro_type
         local distro_path
 
-        # Determine distro type and path based on distribution
-        case "$DISTRO_NAME" in
-            sles)
-                # SLES 15 uses: sle/15.7
-                # SLES 16+ not supported (dependency conflicts)
-                distro_type="sle"
-                case "$DISTRO_MAJOR_VER" in
-                    15)
-                        distro_path="${distro_type}/15.7"
-                        ;;
-                    *)
-                        # SLES 16 and newer not supported
-                        print_err "Graphics support is not available for SLES ${DISTRO_MAJOR_VER}"
-                        return 1
-                        ;;
-                esac
+        # Check for unsupported distros
+        if [[ "$DISTRO_NAME" != "rhel" ]]; then
+            print_err "Graphics support is not available for ${DISTRO_NAME}"
+            return 1
+        fi
+
+        # RHEL-specific version checks
+        # Graphics support only for RHEL 9.8 and 10.2
+        distro_type="el"
+        case "$DISTRO_VER" in
+            9.8)
+                # RHEL 9.8 supported
+                distro_path="${distro_type}/${DISTRO_VER}"
                 ;;
-            amzn)
-                # Amazon Linux uses: amzn/23
-                distro_type="amzn"
-                distro_path="${distro_type}/${DISTRO_MAJOR_VER}"
-                ;;
-            rhel|centos|ol|rocky|almalinux|anolis|tencentos|alinux)
-                # EL-based distros
-                distro_type="el"
-                case "$DISTRO_MAJOR_VER" in
-                    8)
-                        # EL 8 uses: el/8.10
-                        distro_path="${distro_type}/8.10"
-                        ;;
-                    10)
-                        # EL 10 uses: el/10
-                        distro_path="${distro_type}/10"
-                        ;;
-                    9)
-                        # EL 9 uses: el/9.<minor> (e.g., el/9.4, el/9.6, el/9.7)
-                        distro_path="${distro_type}/${DISTRO_VER}"
-                        ;;
-                    *)
-                        # Default fallback
-                        distro_path="${distro_type}/${DISTRO_VER}"
-                        ;;
-                esac
+            10.2)
+                # RHEL 10.2 supported
+                distro_path="${distro_type}/${DISTRO_VER}"
                 ;;
             *)
-                print_err "Unsupported distribution for graphics repo: $DISTRO_NAME"
+                print_err "Graphics support is not available for RHEL ${DISTRO_VER}"
+                print_err "Graphics is only supported for RHEL 9.8 and 10.2"
                 return 1
                 ;;
         esac
