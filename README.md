@@ -8,9 +8,9 @@ A self-contained installer for ROCm and the AMDGPU driver that works without a n
 |---|---|
 | Ubuntu | 22.04, 24.04, 26.04 |
 | Debian | 12, 13 |
-| RHEL | 8.10, 9.4, 9.6, 9.7, 10.0, 10.1 |
-| Oracle Linux | 8.10, 9.7, 10.1 |
-| Rocky Linux | 9.7 |
+| RHEL | 8.10, 9.4, 9.6, 9.8, 10.0, 10.2 |
+| Oracle Linux | 8.10, 9.8, 10.2 |
+| Rocky Linux | 9.8 |
 | Amazon Linux | 2023 |
 | SLES | 15.7, 16.x |
 
