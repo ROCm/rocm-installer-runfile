@@ -4035,11 +4035,21 @@ uninstall_rocm() {
 install_amdgpu() {
     # Call external AMDGPU installer script
     "$PWD/amdgpu-installer.sh" install $AMDGPU_INSTALLER_ARGS
+    local exit_code=$?
+    if [ $exit_code -ne 0 ]; then
+        print_err "AMDGPU installer failed with exit code $exit_code"
+        exit $exit_code
+    fi
 }
 
 uninstall_amdgpu() {
     # Call external AMDGPU installer script
     "$PWD/amdgpu-installer.sh" uninstall $AMDGPU_INSTALLER_ARGS
+    local exit_code=$?
+    if [ $exit_code -ne 0 ]; then
+        print_err "AMDGPU uninstaller failed with exit code $exit_code"
+        exit $exit_code
+    fi
 }
 
 install_postint_scriptlets() {
