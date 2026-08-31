@@ -25,7 +25,7 @@
 # Package Puller Input Config
 
 # ROCm configuration type and version
-PULL_CONFIG_RELEASE_TYPE=""            # dev / nightly / prerelease / release
+PULL_CONFIG_RELEASE_TYPE=""            # dev / nightly / nightly-singlearch / nightly-multiarch / prerelease / stable / release / release-singlearch
 PULL_CONFIG_TAG=""                     # Build tag (e.g., rc0, 20260211)
 PULL_CONFIG_RUNID=""                   # Run ID (21893116598 for nightly)
 PULL_CONFIG_ROCM_VER=""                # 7.11.0
@@ -78,7 +78,7 @@ SETUP_AMDGPU_MODE="all"  # Default: all distros
 SETUP_ROCM_MODE="chroot" # Default: native (use current OS), Options: native, chroot
 
 # Configuration
-ROCM_RELEASE_TYPES=(dev nightly nightly-singlearch prerelease release release-singlearch)
+ROCM_RELEASE_TYPES=(dev nightly nightly-singlearch nightly-multiarch prerelease stable release release-singlearch)
 
 # Default values
 DEFAULT_GRAPHICS_VER="26.13"  # Default Mesa/amdgpu-lib version
@@ -97,6 +97,7 @@ Usage: $PROG [options]
                             Preset configs available in config/ directory:
                             - config/nightly.config
                             - config/prerelease.config
+                            - config/stable.config
                             - config/release.config
                             - config/dev.config
 
@@ -116,13 +117,14 @@ Usage: $PROG [options]
                             Default: gfx90x,gfx94x,gfx950,gfx110x,gfx1150,gfx1151,gfx120x
 
     pull=<release-type>   = Pull ROCm packages from specified repository (required).
-                            Valid types: dev, nightly, nightly-singlearch, prerelease, release
+                            Valid types: dev, nightly, nightly-singlearch, nightly-multiarch, prerelease, stable, release, release-singlearch
     pulltag=<tag>         = Set ROCm build tag (required for all builds).
                             - dev/nightly: Valid build date (YYYYMMDD format, e.g., 20260123)
                             - prerelease: RC tag (e.g., rc0, rc1, rc2)
+                            - stable: Version number or "stable" (e.g., 10.0.0, stable)
                             - release: "release" or version number
     pullrunid=<runid>     = Set ROCm run ID (required for all builds).
-                            Examples: pullrunid=21274498502 (nightly/dev), pullrunid=21843385957 (prerelease), pullrunid=99999 (release)
+                            Examples: pullrunid=21274498502 (nightly/dev), pullrunid=21843385957 (prerelease), pullrunid=10.0.0 (stable), pullrunid=99999 (release)
     pullrocmver=<version>    = Set ROCm version for package names (e.g., 7.12.0, 7.11.0).
     pullgraphicsver=<version> = Set graphics version for Mesa/amdgpu-lib packages (default: 26.12).
     pullpkg=<package>        = Set base package name with optional type prefix (default: amdrocm-core-sdk).
@@ -163,10 +165,12 @@ Examples:
     ./setup-installer.sh config=config/release.config         # Use release preset
 
     # Pull from specific builds (with actual values from preset configs)
-    ./setup-installer.sh pull=nightly pulltag=20260304 pullrunid=22655273671 pullrocmver=7.12.0  # Nightly multiarch build
+    ./setup-installer.sh pull=nightly pulltag=20260304 pullrunid=22655273671 pullrocmver=7.12.0  # Nightly singlearch build
+    ./setup-installer.sh pull=nightly-multiarch pulltag=20260731 pullrunid=30593152899 pullrocmver=10.1.0  # Nightly multiarch build
     ./setup-installer.sh pull=nightly pulltag=20260304 pullrunid=22655273671 pullrocmver=7.12.0 pullgraphicsver=26.12  # With custom graphics version
     ./setup-installer.sh pull=dev pulltag=20260219 pullrunid=22188089855 pullrocmver=7.12.0      # Dev build
     ./setup-installer.sh pull=prerelease pulltag=rc2 pullrunid=21843385957 pullrocmver=7.11.0    # Prerelease RC2
+    ./setup-installer.sh pull=stable pulltag=10.0.0 pullrunid=10.0.0 pullrocmver=10.0.0          # Stable build
     ./setup-installer.sh pull=release pulltag=release pullrunid=99999 pullrocmver=7.11.0         # Release build
 
     # Custom packages
@@ -341,6 +345,9 @@ validate_args() {
             prerelease)
                 echo "Example: pulltag=rc0"
                 ;;
+            stable)
+                echo "Example: pulltag=10.0.0 or pulltag=stable"
+                ;;
             release)
                 echo "Example: pulltag=release or pulltag=7.11.0"
                 ;;
@@ -357,6 +364,9 @@ validate_args() {
                 ;;
             prerelease)
                 echo "Example: pullrunid=21843385957"
+                ;;
+            stable)
+                echo "Example: pullrunid=10.0.0 or pullrunid=stable"
                 ;;
             release)
                 echo "Example: pullrunid=1 or pullrunid=99999"
@@ -757,18 +767,12 @@ setup_puller_config_rocm() {
     BUILD_CONFIG_DIR="../build-config"
     mkdir -p "$BUILD_CONFIG_DIR"
 
-    # Normalize release type for template directory (nightly-singlearch uses nightly templates)
-    local template_release_type="${PULL_CONFIG_RELEASE_TYPE}"
-    if [[ "${PULL_CONFIG_RELEASE_TYPE}" == "nightly-singlearch" ]]; then
-        template_release_type="nightly"
-    fi
-
     # Template directory for ROCm configs
-    TEMPLATE_DIR="../package-puller/config/therock/rocm/${template_release_type}"
+    TEMPLATE_DIR="../package-puller/config/therock/rocm/${PULL_CONFIG_RELEASE_TYPE}"
 
     # Template files
-    TEMPLATE_DEB="${TEMPLATE_DIR}/rocm-${template_release_type}-deb.config"
-    TEMPLATE_RPM="${TEMPLATE_DIR}/rocm-${template_release_type}-rpm.config"
+    TEMPLATE_DEB="${TEMPLATE_DIR}/rocm-${PULL_CONFIG_RELEASE_TYPE}-deb.config"
+    TEMPLATE_RPM="${TEMPLATE_DIR}/rocm-${PULL_CONFIG_RELEASE_TYPE}-rpm.config"
 
     # Build version string from tag and runid
     local version_string=""
@@ -1165,6 +1169,36 @@ os_release
 # Load config file if specified (allows command-line args to override)
 read_config "$@"
 
+# Function to determine appropriate test config based on release type
+determine_test_config() {
+    local release_type="${PULL_CONFIG_RELEASE_TYPE:-}"
+    local test_config=""
+
+    if [[ -z "$release_type" ]]; then
+        echo -e "\e[31mERROR: Cannot determine test config - PULL_CONFIG_RELEASE_TYPE is not set.\e[0m" >&2
+        echo -e "\e[31mPlease specify a config file with 'config=' argument.\e[0m" >&2
+        exit 1
+    fi
+
+    # Map release type to test config
+    case "$release_type" in
+        nightly|nightly-multiarch|prerelease|dev|stable)
+            test_config="config/${release_type}-test.config"
+            ;;
+        nightly-singlearch|release|release-singlearch)
+            echo -e "\e[31mERROR: Test packages are not available for $release_type builds.\e[0m" >&2
+            exit 1
+            ;;
+        *)
+            echo -e "\e[31mERROR: No test config defined for release type: $release_type\e[0m" >&2
+            echo -e "\e[31mPlease create: config/${release_type}-test.config\e[0m" >&2
+            exit 1
+            ;;
+    esac
+
+    echo "$test_config"
+}
+
 # parse args
 while (($#))
 do
@@ -1299,8 +1333,10 @@ do
         ;;
     test)
         echo "Enabling test package pull."
-        # Load test packages config (relative to current directory which is build-installer)
-        TEST_PACKAGES_CONFIG="config/test-packages.config"
+
+        # Determine appropriate test config based on release type
+        TEST_PACKAGES_CONFIG=$(determine_test_config)
+
         if [[ ! -f "$TEST_PACKAGES_CONFIG" ]]; then
             echo -e "\e[31mERROR: Test packages config not found: $TEST_PACKAGES_CONFIG\e[0m"
             exit 1

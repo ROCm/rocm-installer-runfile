@@ -62,7 +62,9 @@ This script performs a complete ROCm runfile installer build:
     config=<file>         = Load configuration from file (command-line args override config).
                             Preset configs available in build-installer/config/ directory:
                             - config/nightly.config
+                            - config/nightly-multiarch.config
                             - config/prerelease.config
+                            - config/stable.config
                             - config/release.config
                             - config/dev.config
                             Config file sets both setup and build variables.
@@ -84,13 +86,14 @@ This script performs a complete ROCm runfile installer build:
                             Legacy (ROCm < 7.12): gfx90x,gfx94x,gfx950,gfx110x,gfx1150,gfx1151,gfx120x
 
     pull=<release-type>   = Pull ROCm packages from specified repository (required).
-                            Valid types: dev, nightly, nightly-singlearch, prerelease, release
+                            Valid types: dev, nightly, nightly-singlearch, nightly-multiarch, prerelease, stable, release, release-singlearch
     pulltag=<tag>         = Set ROCm build tag (required for all builds).
                             - dev/nightly: Valid build date (YYYYMMDD format, e.g., 20260123)
                             - prerelease: RC tag (e.g., rc0, rc1, rc2)
+                            - stable: Version number or "stable" (e.g., 10.0.0, stable)
                             - release: "release" or version number
     pullrunid=<runid>     = Set ROCm component build run ID (required for all builds).
-                            Examples: pullrunid=21274498502 (nightly/dev), pullrunid=21843385957 (prerelease), pullrunid=1 (release)
+                            Examples: pullrunid=21274498502 (nightly/dev), pullrunid=21843385957 (prerelease), pullrunid=10.0.0 (stable), pullrunid=1 (release)
     pullrocmver=<version> = Set ROCm version for package names (e.g., 7.12, 7.11).
     pullgraphicsver=<version> = Set graphics version for Mesa/amdgpu-lib packages (default: 26.12).
     pullamdgpu=<format>   = Set AMDGPU config and version (required when pulling AMDGPU).
@@ -155,11 +158,13 @@ Examples:
     $0 amdgpu amdgpu-mode=single pullamdgpu=release,31.10     # AMDGPU for current distro only
 
     # Pull from specific builds (with actual values from preset configs)
-    $0 pull=nightly pulltag=20260602 pullrunid=26796219223 pullrocmver=7.14.0        # Nightly multiarch (all GPUs)
+    $0 pull=nightly pulltag=20260602 pullrunid=26796219223 pullrocmver=7.14.0        # Nightly singlearch (coarse GPUs)
+    $0 pull=nightly-multiarch pulltag=20260731 pullrunid=30593152899 pullrocmver=10.1.0  # Nightly multiarch (fine-grained GPUs)
     $0 pull=nightly pulltag=20260602 pullrunid=26796219223 pullrocmver=7.14.0 pullgraphicsver=26.20  # With custom graphics version
-    $0 pull=nightly-singlearch pulltag=20260304 pullrunid=22655273671 pullrocmver=7.12.0  # Nightly singlearch (coarse GPUs)
+    $0 pull=nightly-singlearch pulltag=20260304 pullrunid=22655273671 pullrocmver=7.12.0  # Nightly singlearch (explicit)
     $0 pull=dev pulltag=20260219 pullrunid=22188089855 pullrocmver=7.12.0            # Dev
     $0 pull=prerelease pulltag=rc2 pullrunid=21843385957 pullrocmver=7.11.0          # Prerelease RC2
+    $0 pull=stable pulltag=10.0.0 pullrunid=10.0.0 pullrocmver=10.0.0                # Stable
     $0 pull=release pulltag=release pullrunid=1 pullrocmver=7.11.0                   # Release
 
     # GPU architectures
@@ -238,14 +243,45 @@ for arg in "$@"; do
     esac
 done
 
+# Function to determine appropriate test config based on release type
+determine_test_config() {
+    local release_type="${PULL_CONFIG_RELEASE_TYPE:-}"
+    local test_config=""
+
+    if [[ -z "$release_type" ]]; then
+        echo -e "\e[31mERROR: Cannot determine test config - PULL_CONFIG_RELEASE_TYPE is not set.\e[0m" >&2
+        echo -e "\e[31mPlease specify a config file with 'config=' argument.\e[0m" >&2
+        exit 1
+    fi
+
+    # Map release type to test config
+    case "$release_type" in
+        nightly|nightly-multiarch|prerelease|dev|stable)
+            test_config="$BUILD_INSTALLER_DIR/config/${release_type}-test.config"
+            ;;
+        nightly-singlearch|release|release-singlearch)
+            echo -e "\e[31mERROR: Test packages are not available for $release_type builds.\e[0m" >&2
+            exit 1
+            ;;
+        *)
+            echo -e "\e[31mERROR: No test config defined for release type: $release_type\e[0m" >&2
+            echo -e "\e[31mPlease create: $BUILD_INSTALLER_DIR/config/${release_type}-test.config\e[0m" >&2
+            exit 1
+            ;;
+    esac
+
+    echo "$test_config"
+}
+
 # Check for 'test' argument and load test packages config
 for arg in "$@"; do
     case "$arg" in
         test)
             BUILD_WITH_TESTS="yes"
 
-            # Load test packages config
-            TEST_PACKAGES_CONFIG="$BUILD_INSTALLER_DIR/config/test-packages.config"
+            # Determine appropriate test config based on release type
+            TEST_PACKAGES_CONFIG=$(determine_test_config)
+
             if [[ ! -f "$TEST_PACKAGES_CONFIG" ]]; then
                 echo -e "\e[31mERROR: Test packages config not found: $TEST_PACKAGES_CONFIG\e[0m"
                 exit 1
