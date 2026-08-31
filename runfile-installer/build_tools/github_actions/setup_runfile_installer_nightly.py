@@ -41,7 +41,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from github_actions_utils import gha_set_output, gha_append_step_summary
 
-NIGHTLY_BASE_URL = "https://rocm.nightlies.amd.com/packages-multi-arch"
+NIGHTLY_BASE_URL = "https://nightly.repo.amd.com/rocm/core/packages"
 
 
 def fetch_index(url: str, retries: int = 3) -> str:
