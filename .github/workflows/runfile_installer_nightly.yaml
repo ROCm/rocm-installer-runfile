@@ -15,7 +15,7 @@ on:
       pull_amdgpu:
         description: Version of amdgpu to be packaged into runfile installer. If set to latest, it will automatically get version of latest released amdgpu driver from https://instinct.docs.amd.com/projects/amdgpu-docs/en/latest/
         type: string
-        default: "latest" # If set to latest, script automatically gets the version of the latest released amdgpu driver
+        default: "release,31.50" # If set to latest, script automatically gets the version of the latest released amdgpu driver
       pull_tag:
         description: Build date in format YYYYMMDD. If empty, will use today's date.
         type: string
@@ -96,7 +96,7 @@ jobs:
       pull_run_id: ${{ needs.setup.outputs.pull_run_id }}
       pull_pkg: ${{ needs.setup.outputs.pull_pkg }}
       gfx_archs: ${{ needs.setup.outputs.gfx_archs }}
-      pull_amdgpu: ${{ needs.setup.outputs.pull_amdgpu }}
+      pull_amdgpu: ${{ needs.setup.outputs.pull_amdgpu || 'release,31.50' }}
     permissions:
       id-token: write
       contents: read
