@@ -13,9 +13,9 @@ on:
         type: string
         default: "gfx1100"
       pull_amdgpu:
-        description: Version of amdgpu to be packaged into runfile installer.
+        description: Version of amdgpu to be packaged into runfile installer. If set to latest, it will automatically get version of latest released amdgpu driver from https://instinct.docs.amd.com/projects/amdgpu-docs/en/latest/
         type: string
-        default: "release,31.30" # If set to latest, script automatically gets the version of the latest released amdgpu driver
+        default: "latest" # If set to latest, script automatically gets the version of the latest released amdgpu driver
       pull_tag:
         description: Build date in format YYYYMMDD. If empty, will use today's date.
         type: string
