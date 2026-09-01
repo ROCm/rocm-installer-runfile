@@ -41,7 +41,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from github_actions_utils import gha_set_output, gha_append_step_summary
 
-NIGHTLY_BASE_URL = "https://rocm.nightlies.amd.com/packages-multi-arch"
+NIGHTLY_BASE_URL = "https://nightly.repo.amd.com/rocm/core/packages"
 
 
 def fetch_index(url: str, retries: int = 3) -> str:
@@ -218,6 +218,21 @@ def get_amdgpu_driver_version() -> str | None:
     if match:
         latest_released_amdgpu = match.group(1)
         print(f"Latest released AMDGPU driver: {latest_released_amdgpu}")
+        # If there's a patched version in banner and it ends in 0 (eg 31.50.0)
+        # then drop the .0 when setting amdgpu value because https://repo.radeon.com/amdgpu/
+        # doesn't list patch versions if they end in .0
+        latest_released_amdgpu_split = latest_released_amdgpu.split(".")
+        if len(latest_released_amdgpu_split) == 3:
+            major, minor, patch = (
+                latest_released_amdgpu_split[0],
+                latest_released_amdgpu_split[1],
+                latest_released_amdgpu_split[2],
+            )
+            if patch == "0":
+                print(
+                    f"Set latest_released_amdgpu to {latest_released_amdgpu} by dropping patch version because patch version ends in .0"
+                )
+                latest_released_amdgpu = f"{major}.{minor}"
         return f"release,{latest_released_amdgpu}"
     print(
         f"ERROR: Unable to auto-detect the latest release version of the amdgpu driver here: {url}"
