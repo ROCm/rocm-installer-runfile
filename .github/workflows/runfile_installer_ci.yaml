@@ -23,11 +23,11 @@ jobs:
     name: Basic Runfile Installer Build
     uses: ./.github/workflows/build_linux_runfile_installer.yaml
     with:
-      rocm_version: "7.14.0"
+      rocm_version: "10.0.0"
       release_type: dev
-      pull_type: prerelease
-      pull_tag: rc3
-      pull_run_id: "29052710811"
+      pull_type: stable
+      # pull_tag: rc3
+      # pull_run_id: "29052710811"
       pull_pkg: amdrocm-core-sdk
-      gfx_archs: gfx1100
-      pull_amdgpu: "release,31.40"
+      # gfx_archs: gfx1100
+      pull_amdgpu: "release,31.50"
