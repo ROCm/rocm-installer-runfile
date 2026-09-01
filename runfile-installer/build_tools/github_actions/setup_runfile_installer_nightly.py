@@ -223,10 +223,16 @@ def get_amdgpu_driver_version() -> str | None:
         # doesn't list patch versions if they end in .0
         latest_released_amdgpu_split = latest_released_amdgpu.split(".")
         if len(latest_released_amdgpu_split) == 3:
-            major, minor, patch = latest_released_amdgpu_split[0], latest_released_amdgpu_split[1], latest_released_amdgpu_split[2]
+            major, minor, patch = (
+                latest_released_amdgpu_split[0],
+                latest_released_amdgpu_split[1],
+                latest_released_amdgpu_split[2],
+            )
             if patch == "0":
-               print(f"Set latest_released_amdgpu to {latest_released_amdgpu} by dropping patch version because patch version ends in .0")
-               latest_released_amdgpu = f"{major}.{minor}"
+                print(
+                    f"Set latest_released_amdgpu to {latest_released_amdgpu} by dropping patch version because patch version ends in .0"
+                )
+                latest_released_amdgpu = f"{major}.{minor}"
         return f"release,{latest_released_amdgpu}"
     print(
         f"ERROR: Unable to auto-detect the latest release version of the amdgpu driver here: {url}"
