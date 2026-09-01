@@ -132,6 +132,13 @@ jobs:
           if [[ -n "$PULL_AMDGPU" ]]; then
             args="$args pullamdgpu=$PULL_AMDGPU"
           fi
+          if [[ -n "$PULL_TAG" ]]; then
+            args="$args pulltag=$PULL_TAG"
+          fi
+          if [[ -n "$PULL_RUN_ID" ]]; then
+            args="$args pullrunid=$PULL_RUN_ID"
+          fi
+
           echo "ARGS=$args" >> $GITHUB_ENV
 
       - name: Run build-runfile-installer.sh
@@ -142,8 +149,6 @@ jobs:
 
           bash build-runfile-installer.sh \
             config=$RUNFILE_CONFIG \
-            pulltag=$PULL_TAG \
-            pullrunid=$PULL_RUN_ID \
             pullrocmver=$ROCM_VERSION \
             pullpkg=$PULL_PKG \
             buildrunid=$BUILD_RUNID \
