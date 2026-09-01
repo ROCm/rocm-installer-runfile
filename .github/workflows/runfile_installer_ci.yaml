@@ -25,9 +25,9 @@ jobs:
     with:
       rocm_version: "10.0.0"
       release_type: dev
-      pull_type: prerelease
-      pull_tag: rc4
-      pull_run_id: "32424980240"
+      pull_type: stable
+      # pull_tag: rc3
+      # pull_run_id: "29052710811"
       pull_pkg: amdrocm-core-sdk
-      gfx_archs: gfx1100
+      # gfx_archs: gfx1100
       pull_amdgpu: "release,31.50"
