@@ -37,7 +37,7 @@ jobs:
 
      - name: Setup parameters
        id: params
-       run: python ./build_tools/github_actions/setup_runfile_installer_ci.py
+       run: python ./runfile-installer/build_tools/github_actions/setup_runfile_installer_ci.py
 
   runfile_installer_ci:
     name: Basic Runfile Installer Build
