@@ -69,7 +69,6 @@ def fetch_latest_rocm_version() -> str:
     return latest
 
 
-
 def get_amdgpu_driver_version() -> str:
     """Fetch the latest released AMDGPU driver version from AMD instinct docs."""
     url = "https://instinct.docs.amd.com/projects/amdgpu-docs/en/latest/"
