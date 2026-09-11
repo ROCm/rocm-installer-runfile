@@ -256,7 +256,7 @@ determine_test_config() {
 
     # Map release type to test config
     case "$release_type" in
-        nightly|nightly-multiarch|prerelease|dev|stable)
+        nightly|nightly-multiarch|prerelease|rc|dev|stable)
             test_config="$BUILD_INSTALLER_DIR/config/${release_type}-test.config"
             ;;
         nightly-singlearch|release|release-singlearch)
