@@ -47,8 +47,6 @@ jobs:
       rocm_version: ${{ needs.setup.outputs.rocm_version }}
       release_type: dev
       pull_type: stable
-      # pull_tag: rc3
-      # pull_run_id: "29052710811"
       pull_pkg: amdrocm-core-sdk
       gfx_archs: gfx1100
       pull_amdgpu: ${{ needs.setup.outputs.pull_amdgpu }}
