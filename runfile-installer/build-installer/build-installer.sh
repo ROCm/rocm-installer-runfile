@@ -160,7 +160,7 @@ initialize_gfx_family_map() {
     # Clear any existing mappings
     GFX_FAMILY_MAP=()
 
-    if [[ "${PULL_CONFIG_RELEASE_TYPE:-}" == "nightly" || "${PULL_CONFIG_RELEASE_TYPE:-}" == "prerelease" ]]; then
+    if [[ "${PULL_CONFIG_RELEASE_TYPE:-}" == "nightly" || "${PULL_CONFIG_RELEASE_TYPE:-}" == "prerelease" || "${PULL_CONFIG_RELEASE_TYPE:-}" == "rc" || "${PULL_CONFIG_RELEASE_TYPE:-}" == "stable" ]]; then
         # Multi-arch build: Use fine-grained → coarse family mappings
         echo "Initializing GFX_FAMILY_MAP for multi-arch build"
 
