@@ -19,15 +19,34 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  setup:
+    name: Get latest ROCm and AMDGPU Driver Version
+    runs-on: ubuntu-24.04
+    outputs:
+      rocm_version: ${{ steps.params.outputs.rocm_version }}  # Set by script setup_runfile_installer_ci.py
+      pull_amdgpu: ${{ steps.params.outputs.pull_amdgpu }}
+
+    steps:
+     - name: Checkout repository
+       uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+     - name: Setup Python
+       uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+       with:
+         python-version: 3.12
+
+     - name: Setup parameters
+       id: params
+       run: python ./runfile-installer/build_tools/github_actions/setup_runfile_installer_ci.py
+
   runfile_installer_ci:
     name: Basic Runfile Installer Build
+    needs: setup
     uses: ./.github/workflows/build_linux_runfile_installer.yaml
     with:
-      rocm_version: "10.0.0"
+      rocm_version: ${{ needs.setup.outputs.rocm_version }}
       release_type: dev
-      pull_type: prerelease
-      pull_tag: rc4
-      pull_run_id: "32424980240"
+      pull_type: stable
       pull_pkg: amdrocm-core-sdk
       gfx_archs: gfx1100
-      pull_amdgpu: "release,31.50"
+      pull_amdgpu: ${{ needs.setup.outputs.pull_amdgpu }}
