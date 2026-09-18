@@ -99,7 +99,7 @@ jobs:
     permissions:
       id-token: write
       contents: read
-  
+
   build_runfile_installer_test_packages:
     name: Build Runfile Installer (with test packages)
     needs: setup

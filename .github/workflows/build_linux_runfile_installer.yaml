@@ -184,13 +184,13 @@ jobs:
             buildworkflow=$BUILD_WORKFLOW_NUM \
             buildname=$BUILDNAME \
             $ARGS
-      
+
       - name: Configure AWS Credentials for runfile S3 bucket
         uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7
         with:
           aws-region: us-east-1
           role-to-assume: arn:aws:iam::324352301041:role/therock-repo-${{ inputs.release_type }}-core-linux-installers
-      
+
       - name: Upload runfile to S3 bucket
         if: ${{ env.UPLOAD_TO_S3 == 'true' }}
         run: |
@@ -199,5 +199,4 @@ jobs:
             aws s3 cp "$runfile" s3://therock-repo-amd-${{ inputs.release_type }}-core-linux-installers/v5/rocm/core/linux-installers/
           fi
 
-      
 
