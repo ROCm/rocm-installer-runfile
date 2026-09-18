@@ -198,5 +198,3 @@ jobs:
           if [[ -n $runfile ]]; then
             aws s3 cp "$runfile" s3://therock-repo-amd-${{ inputs.release_type }}-core-linux-installers/v5/rocm/core/linux-installers/
           fi
-
-
