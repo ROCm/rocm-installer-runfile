@@ -22,7 +22,7 @@ on:
         description: Workflow run id. If empty, will be auto-detected from nightly indexes.
         type: string
       pull_pkg:
-        description: Base package name with optional type prefix.
+        description: Base package name with optional type prefix. Can set it to base:amdrocm-amdsmi to quickly test your code.
         type: string
         default: "amdrocm-core-sdk"
       release_type:
@@ -113,7 +113,7 @@ jobs:
       pull_pkg: ${{ needs.setup.outputs.pull_pkg }}
       gfx_archs: ${{ needs.setup.outputs.gfx_archs }}
       pull_amdgpu: ${{ needs.setup.outputs.pull_amdgpu || 'latest' }}
-      include_test_package: true
+      include_test_packages: true
     permissions:
       id-token: write
       contents: read
