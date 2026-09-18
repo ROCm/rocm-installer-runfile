@@ -41,6 +41,11 @@ on:
         required: false
         type: boolean
         default: true
+      include_test_packages:
+        description: If true, the test packages (packages ending in -test) will be included. Otherwise, they will be excluded.
+        required: false
+        type: boolean
+        default: false
   workflow_dispatch:
     inputs:
       rocm_version:
@@ -92,6 +97,11 @@ on:
         required: false
         type: boolean
         default: true
+      include_test_packages:
+        description: If true, the test packages (packages ending in -test) will be included. Otherwise, they will be excluded.
+        required: false
+        type: boolean
+        default: false
 permissions:
   id-token: write
   contents: read
@@ -121,6 +131,7 @@ jobs:
       PULL_AMDGPU: ${{ inputs.pull_amdgpu }}
       PULL_TYPE: ${{ inputs.pull_type }}
       UPLOAD_TO_S3: ${{ inputs.upload_to_s3 }}
+      INCLUDE_TEST_PACKAGES: ${{ inputs.include_test_packages }}
       # Config file derived from pull_type (e.g., nightly -> config/nightly.config)
       RUNFILE_CONFIG: ${{ format('config/{0}.config', inputs.pull_type) }}
     steps:
@@ -135,6 +146,7 @@ jobs:
 
       - name: Build args
         run: |
+          BUILDNAME="$PULL_TAG-$PULL_RUN_ID"
           args=""
           if [[ -n "$GFX_ARCHS" ]]; then
             args="$args rocm-archs=$GFX_ARCHS"
@@ -149,13 +161,20 @@ jobs:
             args="$args pullrunid=$PULL_RUN_ID"
           fi
 
+          if [[ $INCLUDE_TEST_PACKAGES == "true" ]]; then
+            echo "Include test packages in runfile build"
+            args="$args test"
+            BUILDNAME="$BUILDNAME-test"
+          fi
+
           echo "ARGS=$args" >> $GITHUB_ENV
+          echo "BUILDNAME=$BUILDNAME" >> $GITHUB_ENV
 
       - name: Run build-runfile-installer.sh
         run: |
           echo "### Runfile Build Options" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "\`bash build-runfile-installer.sh config=$RUNFILE_CONFIG pulltag=$PULL_TAG pullrunid=$PULL_RUN_ID pullrocmver=$ROCM_VERSION pullpkg=$PULL_PKG buildrunid=$BUILD_RUNID buildworkflow=$BUILD_WORKFLOW_NUM buildname=$PULL_TAG-$PULL_RUN_ID $ARGS\`" >> $GITHUB_STEP_SUMMARY
+          echo "\`bash build-runfile-installer.sh config=$RUNFILE_CONFIG pulltag=$PULL_TAG pullrunid=$PULL_RUN_ID pullrocmver=$ROCM_VERSION pullpkg=$PULL_PKG buildrunid=$BUILD_RUNID buildworkflow=$BUILD_WORKFLOW_NUM buildname=$BUILDNAME $ARGS\`" >> $GITHUB_STEP_SUMMARY
 
           bash build-runfile-installer.sh \
             config=$RUNFILE_CONFIG \
@@ -163,7 +182,7 @@ jobs:
             pullpkg=$PULL_PKG \
             buildrunid=$BUILD_RUNID \
             buildworkflow=$BUILD_WORKFLOW_NUM \
-            buildname=$PULL_TAG-$PULL_RUN_ID \
+            buildname=$BUILDNAME \
             $ARGS
       
       - name: Configure AWS Credentials for runfile S3 bucket
