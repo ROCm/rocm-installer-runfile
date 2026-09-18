@@ -36,6 +36,11 @@ on:
         description: Package source - determines which repo to pull from (rocm.devreleases.amd.com, rocm.nightlies.amd.com, rocm.prereleases.amd.com, or repo.amd.com) which config file to use
         required: true
         type: string
+      upload_to_s3:
+        description: Whether to upload the runfile to S3 bucket
+        required: false
+        type: boolean
+        default: true
   workflow_dispatch:
     inputs:
       rocm_version:
@@ -82,6 +87,11 @@ on:
           - rc              # rc.repo.amd.com
           - stable          # stable.repo.amd.com
         default: nightly
+      upload_to_s3:
+        description: Whether to upload the runfile to S3 bucket
+        required: false
+        type: boolean
+        default: true
 permissions:
   id-token: write
   contents: read
@@ -110,6 +120,7 @@ jobs:
       GFX_ARCHS: ${{ inputs.gfx_archs }}
       PULL_AMDGPU: ${{ inputs.pull_amdgpu }}
       PULL_TYPE: ${{ inputs.pull_type }}
+      UPLOAD_TO_S3: ${{ inputs.upload_to_s3 }}
       # Config file derived from pull_type (e.g., nightly -> config/nightly.config)
       RUNFILE_CONFIG: ${{ format('config/{0}.config', inputs.pull_type) }}
     steps:
@@ -162,6 +173,7 @@ jobs:
           role-to-assume: arn:aws:iam::324352301041:role/therock-repo-${{ inputs.release_type }}-core-linux-installers
       
       - name: Upload runfile to S3 bucket
+        if: ${{ env.UPLOAD_TO_S3 == 'true' }}
         run: |
           runfile=$(find . -name "*.run" -type f)
           if [[ -n $runfile ]]; then
