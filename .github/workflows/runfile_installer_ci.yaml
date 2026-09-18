@@ -50,3 +50,4 @@ jobs:
       pull_pkg: amdrocm-core-sdk
       gfx_archs: gfx1100
       pull_amdgpu: ${{ needs.setup.outputs.pull_amdgpu }}
+      upload_to_s3: false
