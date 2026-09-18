@@ -77,11 +77,10 @@ on:
         required: true
         type: choice
         options:
-          - dev             # dev.devreleases.amd.com
-          - nightly         # rocm.nightlies.amd.com/packages-multi-arch/
-          - prerelease      # rocm.prereleases.amd.com/packages-multi-arch/
-          - release         # repo.amd.com
-          - nightly-singlearch # rocm.nightlies.amd.com
+          - dev             # dev.repo.amd.com
+          - nightly         # nightly.repo.amd.com
+          - rc              # rc.repo.amd.com
+          - stable          # stable.repo.amd.com
         default: nightly
 permissions:
   id-token: write
