@@ -36,6 +36,16 @@ on:
         description: Package source - determines which repo to pull from (rocm.devreleases.amd.com, rocm.nightlies.amd.com, rocm.prereleases.amd.com, or repo.amd.com) which config file to use
         required: true
         type: string
+      upload_to_s3:
+        description: Whether to upload the runfile to S3 bucket
+        required: false
+        type: boolean
+        default: true
+      include_test_packages:
+        description: If true, the test packages (packages ending in -test) will be included. Otherwise, they will be excluded.
+        required: false
+        type: boolean
+        default: false
   workflow_dispatch:
     inputs:
       rocm_version:
@@ -77,12 +87,21 @@ on:
         required: true
         type: choice
         options:
-          - dev             # dev.devreleases.amd.com
-          - nightly         # rocm.nightlies.amd.com/packages-multi-arch/
-          - prerelease      # rocm.prereleases.amd.com/packages-multi-arch/
-          - release         # repo.amd.com
-          - nightly-singlearch # rocm.nightlies.amd.com
+          - dev             # dev.repo.amd.com
+          - nightly         # nightly.repo.amd.com
+          - rc              # rc.repo.amd.com
+          - stable          # stable.repo.amd.com
         default: nightly
+      upload_to_s3:
+        description: Whether to upload the runfile to S3 bucket
+        required: false
+        type: boolean
+        default: true
+      include_test_packages:
+        description: If true, the test packages (packages ending in -test) will be included. Otherwise, they will be excluded.
+        required: false
+        type: boolean
+        default: false
 permissions:
   id-token: write
   contents: read
@@ -111,6 +130,8 @@ jobs:
       GFX_ARCHS: ${{ inputs.gfx_archs }}
       PULL_AMDGPU: ${{ inputs.pull_amdgpu }}
       PULL_TYPE: ${{ inputs.pull_type }}
+      UPLOAD_TO_S3: ${{ inputs.upload_to_s3 }}
+      INCLUDE_TEST_PACKAGES: ${{ inputs.include_test_packages }}
       # Config file derived from pull_type (e.g., nightly -> config/nightly.config)
       RUNFILE_CONFIG: ${{ format('config/{0}.config', inputs.pull_type) }}
     steps:
@@ -125,6 +146,7 @@ jobs:
 
       - name: Build args
         run: |
+          BUILDNAME="$PULL_TAG-$PULL_RUN_ID"
           args=""
           if [[ -n "$GFX_ARCHS" ]]; then
             args="$args rocm-archs=$GFX_ARCHS"
@@ -139,13 +161,20 @@ jobs:
             args="$args pullrunid=$PULL_RUN_ID"
           fi
 
+          if [[ $INCLUDE_TEST_PACKAGES == "true" ]]; then
+            echo "Include test packages in runfile build"
+            args="$args test"
+            BUILDNAME="$BUILDNAME-test"
+          fi
+
           echo "ARGS=$args" >> $GITHUB_ENV
+          echo "BUILDNAME=$BUILDNAME" >> $GITHUB_ENV
 
       - name: Run build-runfile-installer.sh
         run: |
           echo "### Runfile Build Options" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "\`bash build-runfile-installer.sh config=$RUNFILE_CONFIG pulltag=$PULL_TAG pullrunid=$PULL_RUN_ID pullrocmver=$ROCM_VERSION pullpkg=$PULL_PKG buildrunid=$BUILD_RUNID buildworkflow=$BUILD_WORKFLOW_NUM buildname=$PULL_TAG-$PULL_RUN_ID $ARGS\`" >> $GITHUB_STEP_SUMMARY
+          echo "\`bash build-runfile-installer.sh config=$RUNFILE_CONFIG pulltag=$PULL_TAG pullrunid=$PULL_RUN_ID pullrocmver=$ROCM_VERSION pullpkg=$PULL_PKG buildrunid=$BUILD_RUNID buildworkflow=$BUILD_WORKFLOW_NUM buildname=$BUILDNAME $ARGS\`" >> $GITHUB_STEP_SUMMARY
 
           bash build-runfile-installer.sh \
             config=$RUNFILE_CONFIG \
@@ -153,8 +182,19 @@ jobs:
             pullpkg=$PULL_PKG \
             buildrunid=$BUILD_RUNID \
             buildworkflow=$BUILD_WORKFLOW_NUM \
-            buildname=$PULL_TAG-$PULL_RUN_ID \
+            buildname=$BUILDNAME \
             $ARGS
 
-      - name: Show .run file
-        run: find . -name "*.run" -type f -exec ls -lctrh {} \;
+      - name: Configure AWS Credentials for runfile S3 bucket
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7
+        with:
+          aws-region: us-east-1
+          role-to-assume: arn:aws:iam::324352301041:role/therock-repo-${{ inputs.release_type }}-core-linux-installers
+
+      - name: Upload runfile to S3 bucket
+        if: ${{ env.UPLOAD_TO_S3 == 'true' }}
+        run: |
+          runfile=$(find . -name "*.run" -type f)
+          if [[ -n $runfile ]]; then
+            aws s3 cp "$runfile" s3://therock-repo-amd-${{ inputs.release_type }}-core-linux-installers/v5/rocm/core/linux-installers/
+          fi

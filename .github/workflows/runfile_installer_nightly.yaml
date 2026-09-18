@@ -22,7 +22,7 @@ on:
         description: Workflow run id. If empty, will be auto-detected from nightly indexes.
         type: string
       pull_pkg:
-        description: Base package name with optional type prefix.
+        description: Base package name with optional type prefix. Can set it to base:amdrocm-amdsmi to quickly test your code.
         type: string
         default: "amdrocm-core-sdk"
       release_type:
@@ -31,7 +31,7 @@ on:
         options:
           - dev
           - nightly
-        default: "nightly"
+        default: "dev"
 
 permissions:
   contents: read
@@ -96,6 +96,24 @@ jobs:
       pull_pkg: ${{ needs.setup.outputs.pull_pkg }}
       gfx_archs: ${{ needs.setup.outputs.gfx_archs }}
       pull_amdgpu: ${{ needs.setup.outputs.pull_amdgpu || 'latest' }}
+    permissions:
+      id-token: write
+      contents: read
+
+  build_runfile_installer_test_packages:
+    name: Build Runfile Installer (with test packages)
+    needs: setup
+    uses: ./.github/workflows/build_linux_runfile_installer.yaml
+    with:
+      rocm_version: ${{ needs.setup.outputs.rocm_version }}
+      release_type: ${{ inputs.release_type || 'nightly' }}
+      pull_type: nightly
+      pull_tag: ${{ needs.setup.outputs.pull_tag }}
+      pull_run_id: ${{ needs.setup.outputs.pull_run_id }}
+      pull_pkg: ${{ needs.setup.outputs.pull_pkg }}
+      gfx_archs: ${{ needs.setup.outputs.gfx_archs }}
+      pull_amdgpu: ${{ needs.setup.outputs.pull_amdgpu || 'latest' }}
+      include_test_packages: true
     permissions:
       id-token: write
       contents: read
