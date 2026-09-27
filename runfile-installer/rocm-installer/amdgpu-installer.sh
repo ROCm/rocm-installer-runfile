@@ -529,11 +529,72 @@ install_amdgpu_component() {
 
     echo Copying content component: "$component"...
 
+    # Check for broken rsync version (TencentOS 4 rsync 3.2.7-11 has --keep-dirlinks bug)
+    USE_CP_FALLBACK=0
+    if [[ "$DISTRO_NAME" == "tencentos" ]] && [[ "$DISTRO_MAJOR_VER" == "4" ]]; then
+        # TencentOS 4 detected, check for broken rsync version
+        if rpm -q rsync-3.2.7-11.tl4 &>/dev/null 2>&1; then
+            echo "Detected TencentOS 4 with rsync 3.2.7-11.tl4 (--keep-dirlinks bug), using cp fallback"
+            USE_CP_FALLBACK=1
+        fi
+    fi
+
     # Copy the component content/data to the target location
-    # shellcheck disable=SC2086
-    if ! $SUDO rsync $RSYNC_OPTS_AMDGPU "$content_dir/"* "$TARGET_DIR"; then
-        print_err "rsync error."
-        exit 1
+    if [[ $USE_CP_FALLBACK -eq 1 ]]; then
+        # Safety check: Verify /lib is a symlink pointing to usr/lib before proceeding
+        if [[ ! -L "/lib" ]]; then
+            print_err "/lib is not a symlink. Expected /lib -> usr/lib on TencentOS 4."
+            echo "Current /lib state: $(file /lib 2>/dev/null || echo 'does not exist')"
+            exit 1
+        fi
+
+        if [[ "$(readlink /lib)" != "usr/lib" ]]; then
+            print_err "/lib symlink points to '$(readlink /lib)', expected 'usr/lib'"
+            exit 1
+        fi
+
+        # Workaround for broken rsync --keep-dirlinks: use rsync on each lib subdirectory to /usr/lib/
+        # This bypasses the /lib -> usr/lib symlink while using rsync without --keep-dirlinks
+        for item in "$content_dir"/*; do
+            [[ -e "$item" ]] || continue  # Skip if no files match
+            item_name=$(basename "$item")
+
+            if [[ "$item_name" == "lib" ]]; then
+                # For lib/, copy each subdirectory to /usr/lib/ using rsync (without --keep-dirlinks)
+                for lib_subdir in "$item"/*; do
+                    [[ -e "$lib_subdir" ]] || continue
+                    lib_subdir_name=$(basename "$lib_subdir")
+
+                    # Use rsync to copy into /usr/lib/<subdir>/ without --keep-dirlinks
+                    # This preserves system directory attributes while adding our files
+                    if ! $SUDO rsync -a --no-perms --no-owner --no-group --omit-dir-times "$lib_subdir/" "/usr/lib/$lib_subdir_name/"; then
+                        print_err "rsync error copying $lib_subdir_name to /usr/lib/$lib_subdir_name/"
+                        exit 1
+                    fi
+                done
+            else
+                # Copy other directories using rsync without --keep-dirlinks
+                if ! $SUDO rsync -a --no-perms --no-owner --no-group --omit-dir-times "$item/" "$TARGET_DIR/$item_name/"; then
+                    print_err "rsync error copying $item_name to $TARGET_DIR/"
+                    exit 1
+                fi
+            fi
+        done
+
+        # Post-copy safety check: Verify /lib symlink is still intact
+        if [[ ! -L "/lib" ]] || [[ "$(readlink /lib)" != "usr/lib" ]]; then
+            print_err "/lib symlink was corrupted during copy operation!"
+            echo "Current state: $(file /lib 2>/dev/null || echo '/lib does not exist')"
+            exit 1
+        fi
+
+    else
+        # Normal rsync path with --keep-dirlinks to preserve directory symlinks
+        # shellcheck disable=SC2086
+        if ! $SUDO rsync $RSYNC_OPTS_AMDGPU "$content_dir/"* "$TARGET_DIR"; then
+            print_err "rsync error."
+            exit 1
+        fi
     fi
 
     # Workaround for amdgpu-dkms: amdgpu_firmware may be called via amdgpu-dkms.amdgpu_firmware
