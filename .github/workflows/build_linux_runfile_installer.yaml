@@ -135,7 +135,7 @@ jobs:
       # Config file derived from pull_type (e.g., nightly -> config/nightly.config)
       RUNFILE_CONFIG: ${{ format('config/{0}.config', inputs.pull_type) }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
          persist-credentials: false
 
@@ -189,7 +189,7 @@ jobs:
 
       - name: Configure AWS Credentials for runfile S3 bucket
         if: ${{ env.UPLOAD_TO_S3 == 'true' }}
-        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd
         with:
           aws-region: us-east-1
           role-to-assume: arn:aws:iam::324352301041:role/therock-repo-${{ inputs.release_type }}-core-linux-installers
