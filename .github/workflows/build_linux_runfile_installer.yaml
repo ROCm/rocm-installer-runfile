@@ -186,6 +186,7 @@ jobs:
             $ARGS
 
       - name: Configure AWS Credentials for runfile S3 bucket
+        if: ${{ env.UPLOAD_TO_S3 == 'true' }}
         uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7
         with:
           aws-region: us-east-1
@@ -196,5 +197,5 @@ jobs:
         run: |
           runfile=$(find . -name "*.run" -type f)
           if [[ -n $runfile ]]; then
-            aws s3 cp "$runfile" s3://therock-repo-amd-${{ inputs.release_type }}-core-linux-installers/v5/rocm/core/linux-installers/
+            aws s3 cp "$runfile" "s3://therock-repo-amd-${RELEASE_TYPE}-core-linux-installers/v5/rocm/core/linux-installers/"
           fi
