@@ -45,7 +45,7 @@ jobs:
     needs: setup
     permissions:
       contents: read
-    uses: ./.github/workflows/build_linux_runfile_installer.yaml
+    uses: $/.github/workflows/build_linux_runfile_installer.yaml
     with:
       rocm_version: ${{ needs.setup.outputs.rocm_version }}
       release_type: dev
