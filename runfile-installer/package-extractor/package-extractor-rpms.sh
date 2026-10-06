@@ -796,6 +796,134 @@ resolve_auto_deps() {
     RESOLVED_AUTO_DEPS="$resolved_pkgs"
 }
 
+# Extract dependencies with forced auto-resolution for .so libraries
+# This handles packages where rpm incorrectly marks all dependencies as "manual"
+# instead of "auto" (packaging bug in some stable releases)
+extract_dependencies_forced_auto() {
+    local package="$1"
+
+    echo "=========================================" >&2
+    echo "Using forced auto-resolution for .so libraries" >&2
+    echo "Package: $(basename "$package")" >&2
+    echo "=========================================" >&2
+
+    # Get full dependency list with version constraints
+    local rpm_deps_raw
+    rpm_deps_raw=$(rpm -qpR --nosignature "$package" 2>/dev/null)
+
+    # Separate dependencies into categories
+    local manual_deps=""        # Non-.so manual deps (python3, perl, etc.) and AMD packages
+    local auto_deps_to_resolve="" # .so files and parenthesized deps to be auto-resolved (stripped)
+
+    while IFS= read -r dep_full; do
+        [[ -z "$dep_full" ]] && continue
+
+        # Skip rpmlib dependencies
+        [[ "$dep_full" =~ ^rpmlib ]] && continue
+
+        # Extract base dependency name (strip version constraints for checking)
+        local dep_base
+        dep_base=$(echo "$dep_full" | sed 's/(.*//' | sed 's/[<>=].*//' | tr -d ' ')
+
+        [[ -z "$dep_base" ]] && continue
+
+        # Skip dependencies that don't need resolution (/bin/bash, /usr/bin/env, rtld, etc.)
+        # Exception: python3 (without dot) should NOT be skipped - it's a real package dependency
+        if should_skip_dep "$dep_base" && [[ ! "$dep_base" =~ ^python3$ ]]; then
+            echo "  skip: $dep_full" >&2
+            continue
+        fi
+
+        # Keep AMD ROCm packages as manual dependencies (no resolution needed)
+        if [[ "$dep_base" =~ ^(amdrocm-|rocm-) ]]; then
+            [[ -n "$manual_deps" ]] && manual_deps+=", "
+            manual_deps+="$dep_full"
+            echo "  manual (AMD): $dep_full" >&2
+            continue
+        fi
+
+        # Force .so files to auto-resolution (regardless of rpm's marking)
+        if [[ "$dep_base" =~ \.so ]]; then
+            [[ -n "$auto_deps_to_resolve" ]] && auto_deps_to_resolve+=$'\n'
+            auto_deps_to_resolve+="$dep_base"
+            echo "  auto (forced .so): $dep_base (from $dep_full)" >&2
+        # Also force dependencies with parentheses like perl(Cwd) to auto-resolution
+        # Check against dep_full (not dep_base which has parens stripped)
+        elif [[ "$dep_full" =~ \( ]]; then
+            [[ -n "$auto_deps_to_resolve" ]] && auto_deps_to_resolve+=$'\n'
+            auto_deps_to_resolve+="$dep_base"
+            echo "  auto (forced with parens): $dep_base (from $dep_full)" >&2
+        else
+            # Non-.so dependencies without parentheses: keep as-is with version constraints
+            # (python3 >= 3.6.8, perl, zlib, etc.)
+            # BUT: should_skip_dep incorrectly skips python3, so we need to add it back
+            [[ -n "$manual_deps" ]] && manual_deps+=", "
+            manual_deps+="$dep_full"
+            echo "  manual (package name): $dep_full" >&2
+        fi
+    done <<< "$rpm_deps_raw"
+
+    # Resolve .so dependencies to package names using existing infrastructure
+    local resolved_deps=""
+    if [[ -n "$auto_deps_to_resolve" ]]; then
+        local dep_count
+        dep_count=$(echo "$auto_deps_to_resolve" | wc -l)
+        echo "-----------------------------------------" >&2
+        echo "Resolving $dep_count dependencies to package names..." >&2
+        echo "-----------------------------------------" >&2
+
+        # Use existing resolve_auto_deps infrastructure
+        local repo_baseurl=""
+        if [[ -n "$BUILD_CONFIG_FILE" ]] && [[ -f "$BUILD_CONFIG_FILE" ]]; then
+            # shellcheck source=/dev/null
+            source "$BUILD_CONFIG_FILE"
+            repo_baseurl=$(echo "$ROCM_REPO" | grep '^baseurl=' | sed 's/baseurl=//')
+        fi
+
+        if [[ -n "$repo_baseurl" ]]; then
+            # Filter and check cache
+            local uncached_file
+            uncached_file=$(mktemp)
+            filter_and_check_cache "$auto_deps_to_resolve" "$uncached_file"
+
+            resolved_deps="$FILTER_RESOLVED_PKGS"
+            local resolved_count=$FILTER_DEP_COUNT
+            local cached_count=$FILTER_CACHED_COUNT
+
+            # Batch resolve uncached dependencies
+            if [[ -s "$uncached_file" ]]; then
+                batch_resolve_dependencies "$repo_baseurl" < "$uncached_file"
+
+                if [[ -n "$BATCH_RESOLVED_PKGS" ]]; then
+                    [[ -n "$resolved_deps" ]] && resolved_deps+=", "
+                    resolved_deps+="$BATCH_RESOLVED_PKGS"
+                fi
+                resolved_count=$((resolved_count + BATCH_DEP_COUNT))
+            fi
+
+            rm -f "$uncached_file"
+
+            local queried_count=${BATCH_QUERIED_COUNT:-0}
+            echo "Resolved $resolved_count system package dependencies ($cached_count cached, $queried_count queried)" >&2
+        fi
+    fi
+
+    # Combine manual and resolved dependencies
+    local combined_deps=""
+    if [[ -n "$manual_deps" ]]; then
+        combined_deps="$manual_deps"
+    fi
+    if [[ -n "$resolved_deps" ]]; then
+        [[ -n "$combined_deps" ]] && combined_deps+=", "
+        combined_deps+="$resolved_deps"
+    fi
+
+    echo "=========================================" >&2
+
+    # Return combined dependencies in DEPS global variable
+    DEPS="$combined_deps"
+}
+
 extract_deps() {
     echo --------------------------------
     echo Extracting all dependencies
@@ -821,22 +949,29 @@ extract_deps() {
     rpm -qpRv --nosignature "$PACKAGE"
     echo --------------------------------
 
-    # Extract manual dependencies (AMD ROCm packages)
-    DEPS=$(rpm -qpRv --nosignature "$PACKAGE" | grep -E 'manual' | sed 's/manual: /,/')
+    # Check if forced auto-resolution for .so libraries is enabled
+    if [[ "${EXTRACT_FORCE_AUTO_RESOLVE_SOLIBS:-0}" -eq 1 ]]; then
+        # New path: Force .so files to be auto-resolved (handles packaging bug in stable releases)
+        extract_dependencies_forced_auto "$PACKAGE"
+    else
+        # Current path: Respect rpm's auto/manual marking (existing behavior)
+        # Extract manual dependencies (AMD ROCm packages)
+        DEPS=$(rpm -qpRv --nosignature "$PACKAGE" | grep -E 'manual' | sed 's/manual: /,/')
 
-    # Resolve automatic dependencies to package names
-    if [[ $RESOLVE_AUTO_DEPS -eq 1 ]]; then
-        # Call directly (no subshell) so AUTO_DEPS_CACHE persists across packages
-        RESOLVED_AUTO_DEPS=""
-        resolve_auto_deps "$PACKAGE"
+        # Resolve automatic dependencies to package names
+        if [[ $RESOLVE_AUTO_DEPS -eq 1 ]]; then
+            # Call directly (no subshell) so AUTO_DEPS_CACHE persists across packages
+            RESOLVED_AUTO_DEPS=""
+            resolve_auto_deps "$PACKAGE"
 
-        # Combine manual and resolved automatic dependencies
-        if [[ -n "$RESOLVED_AUTO_DEPS" ]]; then
-            # Add comma separator if DEPS is not empty
-            if [[ -n "$DEPS" ]]; then
-                DEPS+=", $RESOLVED_AUTO_DEPS"
-            else
-                DEPS="$RESOLVED_AUTO_DEPS"
+            # Combine manual and resolved automatic dependencies
+            if [[ -n "$RESOLVED_AUTO_DEPS" ]]; then
+                # Add comma separator if DEPS is not empty
+                if [[ -n "$DEPS" ]]; then
+                    DEPS+=", $RESOLVED_AUTO_DEPS"
+                else
+                    DEPS="$RESOLVED_AUTO_DEPS"
+                fi
             fi
         fi
     fi
