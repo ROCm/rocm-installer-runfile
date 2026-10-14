@@ -177,6 +177,7 @@ Examples:
     ./setup-installer.sh pullpkg=arch:amdrocm-core                                               # Arch-specific package
     ./setup-installer.sh pullpkg=base:amdrocm-amdsmi                                             # Base package
     ./setup-installer.sh pullpkgextra=arch:amdrocm-opencl,base:amdrocm-llvm                      # Extra packages
+    ./setup-installer.sh pullpkgextra=gfx[900,906,1100]:amdrocm-rccl-test                        # Specific GFX list
     ./setup-installer.sh pullpkgforce=amdrocm-fft-test,amdrocm-blas-test                         # Problem packages
 
 END_USAGE
@@ -642,16 +643,29 @@ generate_package_lists_extra() {
     # Process each extra package
     echo "Processing extra packages: ${PULL_CONFIG_PKG_EXTRA[*]}"
     for pkg_with_type in "${PULL_CONFIG_PKG_EXTRA[@]}"; do
-        # Parse optional type prefix (base: or arch:)
+        # Parse optional type prefix (base:, arch:, or gfx[list]:)
         local pkg_type="arch"  # Default type
         local pkg_name="$pkg_with_type"
+        local gfx_list=()
 
-        if [[ "$pkg_with_type" =~ ^(base|arch):(.+)$ ]]; then
+        # Check for gfx[...]: prefix first (e.g., gfx[900,906,1100]:amdrocm-rccl-test)
+        if [[ "$pkg_with_type" =~ ^gfx\[([^]]+)\]:(.+)$ ]]; then
+            pkg_type="gfxlist"
+            local gfx_str="${BASH_REMATCH[1]}"
+            pkg_name="${BASH_REMATCH[2]}"
+
+            # Parse comma-separated GFX list
+            IFS=',' read -ra gfx_list <<< "$gfx_str"
+
+            echo "  Package: $pkg_name (type: gfxlist, archs: ${gfx_list[*]})"
+        # Check for base: or arch: prefix
+        elif [[ "$pkg_with_type" =~ ^(base|arch):(.+)$ ]]; then
             pkg_type="${BASH_REMATCH[1]}"
             pkg_name="${BASH_REMATCH[2]}"
+            echo "  Package: $pkg_name (type: $pkg_type)"
+        else
+            echo "  Package: $pkg_name (type: $pkg_type)"
         fi
-
-        echo "  Package: $pkg_name (type: $pkg_type)"
 
         # Normalize package name for RPM/DEB
         local normalized
@@ -669,6 +683,21 @@ generate_package_lists_extra() {
             # Base package: no architecture suffix
             rpm_packages="$rpm_packages ${pull_pkg_rpm}${rocm_ver}"
             deb_packages="$deb_packages ${pull_pkg_deb}${rocm_ver}"
+        elif [[ "$pkg_type" == "gfxlist" ]]; then
+            # GFX list: add architecture suffix only for specified GFX architectures
+            for gfx_arch in "${gfx_list[@]}"; do
+                # Trim whitespace
+                gfx_arch="${gfx_arch#"${gfx_arch%%[![:space:]]*}"}"
+                gfx_arch="${gfx_arch%"${gfx_arch##*[![:space:]]}"}"
+
+                # Prepend "gfx" if not already present
+                if [[ ! "$gfx_arch" =~ ^gfx ]]; then
+                    gfx_arch="gfx${gfx_arch}"
+                fi
+
+                rpm_packages="$rpm_packages ${pull_pkg_rpm}${rocm_ver}-${gfx_arch}"
+                deb_packages="$deb_packages ${pull_pkg_deb}${rocm_ver}-${gfx_arch}"
+            done
         else
             # Arch-specific package: add architecture suffix for each GPU arch
             for gfx_arch in "${ROCM_GFX_ARCHS[@]}"; do
@@ -1297,10 +1326,10 @@ do
             echo "Extra ROCm packages cleared (none specified)"
         else
             # Convert comma-separated string to array
-            # Each element can have optional type prefix (e.g., "base:pkg" or "arch:pkg")
+            # Each element can have optional type prefix (e.g., "base:pkg", "arch:pkg", or "gfx[list]:pkg")
             IFS=',' read -ra PULL_CONFIG_PKG_EXTRA <<< "$PKGS_INPUT"
             echo "Extra ROCm packages set to: ${PULL_CONFIG_PKG_EXTRA[*]}"
-            echo "Note: Use [type:]package syntax - arch:package (default) or base:package"
+            echo "Note: Use [type:]package syntax - arch:package (default), base:package, or gfx[900,906,...]:package"
         fi
         shift
         ;;

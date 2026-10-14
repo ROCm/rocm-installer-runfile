@@ -827,18 +827,19 @@ extract_dependencies_forced_auto() {
 
         [[ -z "$dep_base" ]] && continue
 
-        # Skip dependencies that don't need resolution (/bin/bash, /usr/bin/env, rtld, etc.)
-        # Exception: python3 (without dot) should NOT be skipped - it's a real package dependency
-        if should_skip_dep "$dep_base" && [[ ! "$dep_base" =~ ^python3$ ]]; then
-            echo "  skip: $dep_full" >&2
-            continue
-        fi
-
         # Keep AMD ROCm packages as manual dependencies (no resolution needed)
+        # Check this BEFORE should_skip_dep since should_skip_dep also has AMD patterns
         if [[ "$dep_base" =~ ^(amdrocm-|rocm-) ]]; then
             [[ -n "$manual_deps" ]] && manual_deps+=", "
             manual_deps+="$dep_full"
             echo "  manual (AMD): $dep_full" >&2
+            continue
+        fi
+
+        # Skip dependencies that don't need resolution (/bin/bash, /usr/bin/env, rtld, etc.)
+        # Exception: python3 (without dot) should NOT be skipped - it's a real package dependency
+        if should_skip_dep "$dep_base" && [[ ! "$dep_base" =~ ^python3$ ]]; then
+            echo "  skip: $dep_full" >&2
             continue
         fi
 
