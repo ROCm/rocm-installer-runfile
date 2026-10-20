@@ -1,5 +1,11 @@
-Core ROCm components (amdrocm-core)
-Core development components (amdrocm-core-devel)
-Developer tools (amdrocm-developer-tools)
-OpenCL runtime (amdrocm-opencl)
-Complete SDK (includes all components above)
+Core ROCm Components
+    Complete SDK (includes all core components below)
+        Core ROCm components (amdrocm-core)
+        Core development components (amdrocm-core-devel)
+        Developer tools (amdrocm-developer-tools)
+        OpenCL runtime (amdrocm-opencl)
+ 
+ROCm Expansion Components
+    HPC SDK (includes hipTensor + rocAlution)
+        hipTensor library (amdrocm-hiptensor)
+        rocAlution library (amdrocm-rocalution)

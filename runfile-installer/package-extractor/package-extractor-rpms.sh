@@ -63,6 +63,9 @@ GFX_META_PACKAGES=(
     "amdrocm-core"
     "amdrocm-core-sdk"
     "amdrocm-core-devel"
+    "amdrocm-hpc-sdk"
+    "amdrocm-hiptensor"
+    "amdrocm-rocalution"
 )
 
 # Meta packages - Base (extracted from base directory)

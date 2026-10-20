@@ -248,16 +248,28 @@ Usage:
             <component_list> = Comma-separated list of ROCm components to install.
                                If not specified, defaults to 'core'.
                                Use compo=list to see available component categories.
-                               Available components:
-                                   core      = Core ROCm components (amdrocm-core)
-                                   core-dev  = Core development components (amdrocm-core-devel)
-                                   dev-tools = Developer tools (amdrocm-developer-tools)
-                                   core-sdk  = Core SDK components (amdrocm-core-sdk)
-                                   opencl    = OpenCL runtime (amdrocm-opencl)
+
+                               Core components:
+                                   core       = Core ROCm components (amdrocm-core)
+                                   core-dev   = Core development components (amdrocm-core-devel)
+                                   dev-tools  = Developer tools (amdrocm-developer-tools)
+                                   core-sdk   = Core SDK components (amdrocm-core-sdk)
+                                   opencl     = OpenCL runtime (amdrocm-opencl)
+
+                               Expansion components:
+
+                                   hpc-sdk    = HPC SDK components (includes hiptensor + rocalution)
+                                   hiptensor  = hipTensor library (amdrocm-hiptensor)
+                                   rocalution = rocAlution library (amdrocm-rocalution)
+
                                Examples:
                                    compo=core
                                    compo=core,dev-tools
                                    compo=core-sdk,dev-tools
+                                   compo=hpc-sdk
+                                   compo=hiptensor
+                                   compo=rocalution
+                                   compo=hiptensor,rocalution
                                    compo=opencl
 
     Post Install:

@@ -1,7 +1,7 @@
 Select the ROCm component categories you want to install. You can select
 multiple components for a customized installation.
 
-[H1]Component Categories:
+[H1]Core Component Categories:
 
 [H2]core
     Core ROCm components required for basic ROCm functionality.
@@ -19,15 +19,37 @@ multiple components for a customized installation.
     OpenCL runtime support for ROCm.
     Enables OpenCL applications to run on AMD GPUs.
 
-[H2]core-sdk (Select All)
-    Complete ROCm SDK with all components above.
+[H2]core-sdk (Select All Core)
+    Complete ROCm SDK with all core components above.
     Selecting this option automatically includes core, core-dev, dev-tools,
     and opencl. Recommended for full ROCm development environment.
+
+[H1]Expansion Component Categories:
+
+[H2]hpc-sdk (HPC SDK)
+    AMD ROCm HPC SDK provides high-performance computing libraries and
+    tools for AMD Instinct GPUs. Selecting this option automatically
+    includes hipTensor and rocAlution libraries.
+
+[H2]hiptensor
+    hipTensor is a high-performance HIP C++ library for accelerating tensor
+    primitives. It leverages specialized GPU matrix cores on the latest AMD
+    discrete GPUs. The hipTensor API is designed to be portable with other
+    similar libraries, letting other library users easily migrate to the
+    AMD platform.
+
+[H2]rocalution
+    rocALUTION is a sparse linear algebra library that can be used to explore
+    fine-grained parallelism on top of the ROCm platform runtime and toolchains.
+    Based on C++ and HIP, rocALUTION provides a portable, generic, and flexible
+    design that allows seamless integration with other scientific software
+    packages.
 
 [H1]Usage:
 
 You can select individual components for a customized installation, or
-select 'core-sdk' to install all components at once.
+select 'core-sdk' to install all core components at once, or select
+'hpc-sdk' to install HPC libraries.
 
 The 'core' component is recommended as the minimum installation.
 

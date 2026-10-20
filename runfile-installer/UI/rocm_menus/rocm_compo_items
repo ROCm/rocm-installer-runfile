@@ -1,5 +1,11 @@
-core
-core-dev
-dev-tools
-opencl
-core-sdk
+ROCm Core:
+    core-sdk
+        core
+        core-dev
+        dev-tools
+        opencl
+ 
+ROCm Expansion:
+    hpc-sdk
+        hiptensor
+        rocalution

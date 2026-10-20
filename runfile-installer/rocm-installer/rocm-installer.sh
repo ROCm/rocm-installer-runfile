@@ -60,7 +60,7 @@ TARGET_ROCM_DEFAULT_DIR="/opt"
 TARGET_ROCM_DIR="$TARGET_ROCM_DEFAULT_DIR"
 
 # Component Configuration
-COMPO_INSTALL="core"  # Default component: core, core-dev, dev-tools, core-sdk, opencl (test only if available)
+COMPO_INSTALL="core"  # Default component: core, core-dev, dev-tools, core-sdk, hpc-sdk, hiptensor, rocalution, opencl (test only if available)
 COMPO_META_DIR="$EXTRACT_ROCM_DIR/deps/meta"
 COMPO_TEST_DIR="$EXTRACT_ROCM_DIR/deps/test"
 COMPO_VER_FILE="component-versions.txt"
@@ -165,16 +165,28 @@ Usage: bash $PROG [options]
             <component_list> = Comma-separated list of ROCm components to install.
                                If not specified, defaults to 'core'.
                                Use compo=list to see available component categories.
-                               Available components:
-                                   core      = Core ROCm components (amdrocm-core)
-                                   core-dev  = Core development components (amdrocm-core-devel)
-                                   dev-tools = Developer tools (amdrocm-developer-tools)
-                                   core-sdk  = Core SDK components (amdrocm-core-sdk)
-                                   opencl    = OpenCL runtime (amdrocm-opencl)
+
+                               Core components:
+                                   core       = Core ROCm components (amdrocm-core)
+                                   core-dev   = Core development components (amdrocm-core-devel)
+                                   dev-tools  = Developer tools (amdrocm-developer-tools)
+                                   core-sdk   = Core SDK components (amdrocm-core-sdk)
+                                   opencl     = OpenCL runtime (amdrocm-opencl)
+
+                               Expansion components:
+
+                                   hpc-sdk    = HPC SDK components (includes hiptensor + rocalution)
+                                   hiptensor  = hipTensor library (amdrocm-hiptensor)
+                                   rocalution = rocAlution library (amdrocm-rocalution)
+
                                Examples:
                                    compo=core
                                    compo=core,dev-tools
                                    compo=core-sdk,dev-tools
+                                   compo=hpc-sdk
+                                   compo=hiptensor
+                                   compo=rocalution
+                                   compo=hiptensor,rocalution
                                    compo=opencl
 
     Post Install:
@@ -1101,9 +1113,9 @@ get_available_components() {
     # These are the high-level component categories, not individual packages
     # Include "test" only if this installer was built with test packages
     if [[ "$INSTALLER_HAS_TESTS" == "yes" ]]; then
-        local components=("core" "core-dev" "dev-tools" "core-sdk" "opencl" "test")
+        local components=("core" "core-dev" "dev-tools" "core-sdk" "hpc-sdk" "hiptensor" "rocalution" "opencl" "test")
     else
-        local components=("core" "core-dev" "dev-tools" "core-sdk" "opencl")
+        local components=("core" "core-dev" "dev-tools" "core-sdk" "hpc-sdk" "hiptensor" "rocalution" "opencl")
     fi
     echo "${components[@]}"
 }
@@ -2683,7 +2695,7 @@ install_rocm_multiarch() {
 
         if is_gfx_installed "$gfx"; then
             echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
-            echo -e "\e[33mRe-installing/upgrading GFX architecture: $gfx\e[0m"
+            echo -e "\e[36mRe-installing/upgrading GFX architecture: $gfx\e[0m"
             echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
         else
             echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
@@ -2720,6 +2732,11 @@ install_rocm_multiarch() {
             done
             COMPONENTS_GFX="${COMPONENTS_GFX#"${COMPONENTS_GFX%%[![:space:]]*}"}"
             COMPONENTS_GFX="${COMPONENTS_GFX%"${COMPONENTS_GFX##*[![:space:]]}"}"
+        fi
+
+        # Skip this GFX architecture if no components are available
+        if [[ -z "$COMPONENTS_GFX" ]]; then
+            continue
         fi
 
         # Install GFX-specific components
@@ -3201,15 +3218,26 @@ process_gfx_component() {
             fi
         done < "$gfx_meta_file"
     else
-        print_err "GFX meta config file not found: $gfx_meta_file"
-        echo "Available GFX architectures:"
-        for gfx_dir in "$EXTRACT_ROCM_DIR"/gfx*/; do
-            if [ -d "$gfx_dir" ]; then
-                gfx_name=$(basename "$gfx_dir")
-                echo "  - $gfx_name"
-            fi
-        done
-        exit 1
+        # Meta config file not found
+        # For multi-GFX installations (gfx=all), gracefully skip unsupported architectures
+        # For single-GFX installations, error out (user explicitly requested this arch)
+        if [[ ${#GFX_INSTALL_LIST[@]} -gt 1 ]]; then
+            # Extract component name from meta_base (e.g., amdrocm-hiptensor10.2 -> hiptensor)
+            local comp_name="${meta_base#amdrocm-}"
+            comp_name="${comp_name%%[0-9]*}"
+            echo -e "  \e[33mSkipping ${INSTALL_GFX}: ${comp_name} not available for this architecture\e[0m"
+            return 0
+        else
+            print_err "GFX meta config file not found: $gfx_meta_file"
+            echo "Available GFX architectures:"
+            for gfx_dir in "$EXTRACT_ROCM_DIR"/gfx*/; do
+                if [ -d "$gfx_dir" ]; then
+                    gfx_name=$(basename "$gfx_dir")
+                    echo "  - $gfx_name"
+                fi
+            done
+            exit 1
+        fi
     fi
 }
 
@@ -3275,6 +3303,15 @@ get_component_meta_base() {
         core-sdk)
             meta_base="amdrocm-core-sdk${ROCM_VER}"
             ;;
+        hpc-sdk)
+            meta_base="amdrocm-hpc-sdk${ROCM_VER}"
+            ;;
+        hiptensor)
+            meta_base="amdrocm-hiptensor${ROCM_VER}"
+            ;;
+        rocalution)
+            meta_base="amdrocm-rocalution${ROCM_VER}"
+            ;;
         opencl)
             meta_base="amdrocm-opencl${ROCM_VER}"
             ;;
@@ -3323,15 +3360,15 @@ configure_rocm_install() {
         if [[ "$meta_base" == "amdrocm-${compo_name}${ROCM_VER}" ]]; then
             # This means get_component_meta_base returned the default (unknown component)
             case "$compo_name" in
-                core|core-dev|dev-tools|core-sdk|opencl|test)
+                core|core-dev|dev-tools|core-sdk|hpc-sdk|hiptensor|rocalution|opencl|test)
                     # Known component, continue
                     ;;
                 *)
                     print_err "Unknown component: $compo_name"
                     if [[ "$INSTALLER_HAS_TESTS" == "yes" ]]; then
-                        echo "Valid components: core, core-dev, dev-tools, core-sdk, opencl, test"
+                        echo "Valid components: core, core-dev, dev-tools, core-sdk, hpc-sdk, hiptensor, rocalution, opencl, test"
                     else
-                        echo "Valid components: core, core-dev, dev-tools, core-sdk, opencl"
+                        echo "Valid components: core, core-dev, dev-tools, core-sdk, hpc-sdk, hiptensor, rocalution, opencl"
                     fi
                     exit 1
                     ;;
@@ -4611,6 +4648,12 @@ do
             echo "  opencl       OpenCL runtime"
             echo "  test         Test packages (architecture-specific)"
             echo ""
+            echo "Expansion components:"
+            echo ""
+            echo "  hpc-sdk      HPC SDK components (includes hiptensor + rocalution)"
+            echo "  hiptensor    hipTensor library"
+            echo "  rocalution   rocAlution library"
+            echo ""
             echo "Component categories can be combined with commas:"
             echo ""
             echo "Usage: $PROG compo=<category>[,<category>,...] gfx=<arch> rocm"
@@ -4619,6 +4662,8 @@ do
             echo "  $PROG compo=core gfx=gfx110x rocm"
             echo "  $PROG compo=core,dev-tools gfx=gfx110x rocm"
             echo "  $PROG compo=core-sdk gfx=gfx110x rocm"
+            echo "  $PROG compo=hpc-sdk gfx=gfx110x rocm"
+            echo "  $PROG compo=hiptensor gfx=gfx110x rocm"
             echo "  $PROG compo=core-sdk,test gfx=gfx110x rocm"
             echo "========================================="
             exit 0

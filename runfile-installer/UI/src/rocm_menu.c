@@ -1891,10 +1891,40 @@ void update_rocm_compo_selection_state()
 {
     MENU *pMenu = menuROCmCompo.pMenu;
     ITEM **items = menuROCmCompo.itemList[0].items;
-    int core_sdk_index = 4;  // core-sdk is now at index 4 (core, core-dev, dev-tools, opencl, core-sdk)
+
+    // Find indices dynamically by name to handle section headers and reordering
+    int core_sdk_idx = -1, hpc_sdk_idx = -1;
+    int core_idx = -1, core_dev_idx = -1, dev_tools_idx = -1, opencl_idx = -1;
+    int hiptensor_idx = -1, rocalution_idx = -1;
+
+    for (int i = 0; i < item_count(pMenu); i++)
+    {
+        const char *name = item_name(items[i]);
+
+        // Trim leading spaces from name for comparison
+        while (*name == ' ')
+            name++;
+
+        if (strcmp(name, "core-sdk") == 0)
+            core_sdk_idx = i;
+        else if (strcmp(name, "hpc-sdk") == 0)
+            hpc_sdk_idx = i;
+        else if (strcmp(name, "core") == 0)
+            core_idx = i;
+        else if (strcmp(name, "core-dev") == 0)
+            core_dev_idx = i;
+        else if (strcmp(name, "dev-tools") == 0)
+            dev_tools_idx = i;
+        else if (strcmp(name, "opencl") == 0)
+            opencl_idx = i;
+        else if (strcmp(name, "hiptensor") == 0)
+            hiptensor_idx = i;
+        else if (strcmp(name, "rocalution") == 0)
+            rocalution_idx = i;
+    }
 
     // Check if core-sdk is selected
-    bool core_sdk_selected = item_value(items[core_sdk_index]);
+    bool core_sdk_selected = (core_sdk_idx >= 0) && item_value(items[core_sdk_idx]);
 
     if (core_sdk_selected)
     {
@@ -1904,11 +1934,15 @@ void update_rocm_compo_selection_state()
             delete_menu_item_selection_mark(&menuROCmCompo, items[i]);
         }
 
-        // Disable and highlight other components to show they're included
-        for (int i = 0; i < core_sdk_index; i++)
+        // Disable and auto-select core-sdk children
+        int core_children[] = {core_idx, core_dev_idx, dev_tools_idx, opencl_idx};
+        for (int i = 0; i < 4; i++)
         {
-            item_opts_off(items[i], O_SELECTABLE);
-            set_item_value(items[i], TRUE);  // Auto-select them
+            if (core_children[i] >= 0)
+            {
+                item_opts_off(items[core_children[i]], O_SELECTABLE);
+                set_item_value(items[core_children[i]], TRUE);
+            }
         }
 
         // Set disabled items to WHITE_ON_BLUE (same as cursor)
@@ -1925,13 +1959,68 @@ void update_rocm_compo_selection_state()
     }
     else
     {
-        // Re-enable other components
-        for (int i = 0; i < core_sdk_index; i++)
+        // Re-enable core-sdk children
+        int core_children[] = {core_idx, core_dev_idx, dev_tools_idx, opencl_idx};
+        for (int i = 0; i < 4; i++)
         {
-            item_opts_on(items[i], O_SELECTABLE);
+            if (core_children[i] >= 0)
+            {
+                item_opts_on(items[core_children[i]], O_SELECTABLE);
+            }
         }
-        // Restore normal grey color for disabled items
-        set_menu_grey(pMenu, BLUE);
+    }
+
+    // HPC-SDK logic (same pattern as core-sdk)
+    bool hpc_sdk_selected = (hpc_sdk_idx >= 0) && item_value(items[hpc_sdk_idx]);
+
+    if (hpc_sdk_selected)
+    {
+        // Clear all X marks first
+        for (int i = 0; i < item_count(pMenu); i++)
+        {
+            delete_menu_item_selection_mark(&menuROCmCompo, items[i]);
+        }
+
+        // Disable and auto-select hpc-sdk children
+        int hpc_children[] = {hiptensor_idx, rocalution_idx};
+        for (int i = 0; i < 2; i++)
+        {
+            if (hpc_children[i] >= 0)
+            {
+                item_opts_off(items[hpc_children[i]], O_SELECTABLE);
+                set_item_value(items[hpc_children[i]], TRUE);
+            }
+        }
+
+        // Set disabled items to WHITE_ON_BLUE (same as cursor)
+        set_menu_grey(pMenu, WHITE_ON_BLUE);
+
+        // Redraw X marks for all selected items
+        for (int i = 0; i < item_count(pMenu); i++)
+        {
+            if (item_value(items[i]))
+            {
+                add_menu_item_selection_mark(&menuROCmCompo, items[i]);
+            }
+        }
+    }
+    else
+    {
+        // Re-enable hpc-sdk children
+        int hpc_children[] = {hiptensor_idx, rocalution_idx};
+        for (int i = 0; i < 2; i++)
+        {
+            if (hpc_children[i] >= 0)
+            {
+                item_opts_on(items[hpc_children[i]], O_SELECTABLE);
+            }
+        }
+
+        // Restore normal grey color for disabled items (only if core-sdk is also not selected)
+        if (!core_sdk_selected)
+        {
+            set_menu_grey(pMenu, BLUE);
+        }
     }
 }
 
@@ -1940,6 +2029,9 @@ void do_rocm_menu_compo()
     MENU *pMenu = menuROCmCompo.pMenu;
 
     rocm_menu_submenu_draw(&menuROCmCompo);
+
+    // Skip section headers on initial display
+    skip_menu_item_down_if_skippable(pMenu);
 
     // ROCm component menu loop
     menu_loop(&menuROCmCompo);
@@ -1996,8 +2088,14 @@ void update_rocm_components_name()
     {
         if(item_value(items[i]) == TRUE)
         {
+            const char *name = item_name(items[i]);
+
+            // Trim leading spaces from component name
+            while (*name == ' ')
+                name++;
+
             size_t remaining = buf_size - strlen(g_pRocmConfig->rocm_components) - 1;
-            strncat(g_pRocmConfig->rocm_components, item_name(items[i]), remaining);
+            strncat(g_pRocmConfig->rocm_components, name, remaining);
             remaining = buf_size - strlen(g_pRocmConfig->rocm_components) - 1;
             strncat(g_pRocmConfig->rocm_components, ",", remaining);
         }
