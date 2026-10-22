@@ -8,6 +8,8 @@ repos:
     -   id: check-yaml
     -   id: end-of-file-fixer # auto fixer
     -   id: trailing-whitespace # auto fixer
+        # rocm_compo_items* use intentional whitespace-only separator lines
+        exclude: ^runfile-installer/UI/rocm_menus/rocm_compo_items(_desc)?$
     -   id: check-merge-conflict # checks for merge conflict markers.
 
 # Python
