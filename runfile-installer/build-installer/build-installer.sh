@@ -191,6 +191,8 @@ initialize_gfx_family_map() {
             ["gfx1151"]="gfx115x"
             ["gfx1152"]="gfx115x"
             ["gfx1153"]="gfx115x"
+            ["gfx1170"]="gfx117x"
+            ["gfx1171"]="gfx117x"
             ["gfx1200"]="gfx120x"
             ["gfx1201"]="gfx120x"
             ["gfx1250"]="gfx1250"

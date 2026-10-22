@@ -27,6 +27,7 @@
 #   gfx1030-gfx1036 (RDNA2)
 #   gfx1100-gfx1103 (RDNA3)
 #   gfx1150-gfx1153 (RDNA3.5)
+#   gfx1170, gfx1171 (RDNA4)
 #   gfx1200, gfx1201 (RDNA4)
 #   gfx1250 (RDNA4+)
 #
@@ -285,6 +286,7 @@ map_gfx_to_package_group() {
             gfx1030|gfx1031|gfx1032|gfx1033|gfx1034|gfx1035|gfx1036|\
             gfx1100|gfx1101|gfx1102|gfx1103|\
             gfx1150|gfx1151|gfx1152|gfx1153|\
+            gfx1170|gfx1171|\
             gfx1200|gfx1201|gfx1250)
                 echo "$gfx_arch"
                 ;;
@@ -311,6 +313,7 @@ map_gfx_to_package_group() {
             gfx1153)               echo "gfx1153" ;;  # RDNA3.5
 
             # RDNA4
+            gfx1170|gfx1171)       echo "gfx117x" ;;  # RDNA4
             gfx1200|gfx1201)       echo "gfx120x" ;;  # RX 9070 series
             gfx1250)               echo "gfx1250" ;;  # RDNA4+
 
