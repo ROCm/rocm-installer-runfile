@@ -7,7 +7,9 @@ repos:
     hooks:
     -   id: check-yaml
     -   id: end-of-file-fixer # auto fixer
+        exclude: ^runfile-installer/UI/rocm_menus/
     -   id: trailing-whitespace # auto fixer
+        exclude: ^runfile-installer/UI/rocm_menus/
     -   id: check-merge-conflict # checks for merge conflict markers.
 
 # Python
