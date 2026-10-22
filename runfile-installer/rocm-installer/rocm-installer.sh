@@ -396,7 +396,7 @@ os_release() {
                 exit 1
             fi
 
-            if [[ $DISTRO_VER != 9* ]] && [[ "$DISTRO_NAME" = "centos" ]]; then
+            if [[ $DISTRO_VER != 9* ]] && [[ $DISTRO_VER != 10* ]] && [[ "$DISTRO_NAME" = "centos" ]]; then
                 echo "$DISTRO_NAME $DISTRO_VER is not a supported OS"
                 exit 1
             fi

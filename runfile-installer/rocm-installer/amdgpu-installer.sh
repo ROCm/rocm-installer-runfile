@@ -153,7 +153,7 @@ os_release() {
                 exit 1
             fi
 
-            if [[ $DISTRO_VER != 9* ]] && [[ "$DISTRO_NAME" = "centos" ]]; then
+            if [[ $DISTRO_VER != 9* ]] && [[ $DISTRO_VER != 10* ]] && [[ "$DISTRO_NAME" = "centos" ]]; then
                 echo "$DISTRO_NAME $DISTRO_VER is not a supported OS"
                 exit 1
             fi
@@ -405,7 +405,7 @@ get_amdgpu_distro_tag() {
             ;;
         rhel|centos|ol|rocky|almalinux|anolis)
             # RHEL-like distros: RHEL, CentOS Stream, Oracle Linux, Rocky, AlmaLinux, Anolis
-            # Map directly: 9 -> el9, 8 -> el8
+            # Map directly: 10 -> el10, 9 -> el9, 8 -> el8
             distro_tag="el${DISTRO_MAJOR_VER}"
             ;;
         tencentos|alinux)

@@ -235,7 +235,7 @@ get_amdgpu_distro_tag() {
             ;;
         rhel|centos|ol|rocky|almalinux|anolis)
             # RHEL-like distros: RHEL, CentOS Stream, Oracle Linux, Rocky, AlmaLinux, Anolis
-            # Map directly: 9 -> el9, 8 -> el8
+            # Map directly: 10 -> el10, 9 -> el9, 8 -> el8
             distro_tag="el${DISTRO_MAJOR_VER}"
             ;;
         tencentos|alinux)

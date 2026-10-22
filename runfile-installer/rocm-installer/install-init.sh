@@ -49,8 +49,8 @@ os_release() {
             DISTRO_VER=$(awk -F= '/^VERSION_ID=/{print $2}' /etc/os-release | tr -d '"')
             echo "Installer running on CentOS Stream $DISTRO_VER."
 
-            # CentOS Stream 9 support only
-            if [[ $DISTRO_VER != 9* ]]; then
+            # CentOS Stream 9 and 10 support
+            if [[ $DISTRO_VER != 9* ]] && [[ $DISTRO_VER != 10* ]]; then
                 echo "$DISTRO_NAME $DISTRO_VER is not a supported OS"
                 exit 1
             fi
