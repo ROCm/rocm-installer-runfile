@@ -1700,6 +1700,16 @@ build_UI() {
                 fi
             done
 
+            # Detect build type from config (nightly vs rc/stable)
+            local build_type="nightly"  # default
+            if [[ -n "$PULL_CONFIG_RELEASE_TYPE" ]]; then
+                if [[ "$PULL_CONFIG_RELEASE_TYPE" == "rc" ]] || \
+                   [[ "$PULL_CONFIG_RELEASE_TYPE" == "stable" ]] || \
+                   [[ "$PULL_CONFIG_RELEASE_TYPE" == "release" ]]; then
+                    build_type="stable"
+                fi
+            fi
+
             # UI now reads VERSION file at runtime - no version parameters needed
             # Build cmake command with flags
             local CMAKE_FLAGS=""
@@ -1710,6 +1720,15 @@ build_UI() {
             else
                 echo "Building UI for single-arch installer"
                 CMAKE_FLAGS="-DMULTI_ARCH_BUILD=OFF"
+            fi
+
+            # Add build type flag
+            if [[ "$build_type" == "stable" ]]; then
+                echo "Building UI for stable/rc release (reduced GPU list)"
+                CMAKE_FLAGS="$CMAKE_FLAGS -DSTABLE_BUILD=ON"
+            else
+                echo "Building UI for nightly release (full GPU list)"
+                CMAKE_FLAGS="$CMAKE_FLAGS -DSTABLE_BUILD=OFF"
             fi
 
             # Add test component flag if building with tests

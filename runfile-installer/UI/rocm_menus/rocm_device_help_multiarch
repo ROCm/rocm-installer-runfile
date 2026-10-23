@@ -81,54 +81,121 @@ for your GPU.
     Radeon VII           (gfx906)
     Vega Frontier/RX Vega (gfx900)
 
-[H2]Ryzen APUs (Integrated Graphics):
+[H2]Ryzen PRO APUs (Business Laptops - Integrated Graphics):
 
   RDNA 3.5 APUs:
-    AI Max+ 400 Series (gfx1151):
-      AI Max+ (PRO) 495/492/488 - Radeon 8060S
+    AI Max+ PRO 4xx Series (gfx1151):
+      AI Max+ PRO 495 - Radeon 8065S
 
-    AI Max 400 Series (gfx1151):
-      AI Max (PRO) 495/490/485 - Radeon 8050S
+    AI Max PRO 4xx Series (gfx1151):
+      AI Max PRO 490/485 - Radeon 8050S
 
-    AI Max+ 300 Series (gfx1151):
-      AI Max+ (PRO) 395/392/388 - Radeon 8060S
+    AI 9 HX PRO 4xx Series (gfx1150):
+      AI 9 HX PRO 475/470 - Radeon 890M
 
-    AI Max 300 Series (gfx1151):
-      AI Max (PRO) 390/385/380 - Radeon 8050S/8040S
+    AI 9 PRO (gfx1150):
+      AI 9 PRO 465 - Radeon 880M
 
-    AI 400 Series (gfx1150):
-      AI 9 HX (PRO)/PRO 475/470/465 - Radeon 890M/880M
+    AI 7 PRO 450 (gfx1152):
+      Radeon 860M
 
-    AI 400 Series (gfx1152):
-      AI 7 (PRO) 450, AI 5 PRO 440/435 - Radeon 860M/840M
+    AI 5 PRO (gfx1152):
+      AI 5 PRO 440 - Radeon 840M
 
-    AI 400 Series (gfx1153):
-      AI 7 445, AI 5 435/430 - Radeon 840M
+    AI 5 PRO (gfx1153):
+      AI 5 PRO 435 - Radeon 840M
 
-    AI 300 Series (gfx1150):
-      AI 9 HX (PRO)/9 375/370/365 - Radeon 890M/880M
+    AI Max+ PRO 3xx Series (gfx1151):
+      AI Max+ PRO 395 - Radeon 8060S
 
-    AI 300 Series (gfx1152):
-      AI 7 (PRO) 350/345, AI 5 (PRO) 340 - Radeon 860M/840M
+    AI Max PRO 3xx Series (gfx1151):
+      AI Max PRO 395/390/385/380 - Radeon 8050S/8040S
 
-    AI 300 Series (gfx1153):
-      AI 5 330 - Radeon 820M
+    AI 9 HX PRO 3xx Series (gfx1150):
+      AI 9 HX PRO 375/370 - Radeon 890M
+
+    AI 7 PRO 350 (gfx1152):
+      Radeon 860M
+
+    AI 5 PRO 340 (gfx1152):
+      Radeon 840M
 
   RDNA 3 APUs:
-    Ryzen PRO 7000 Series (gfx1103):
+    Ryzen PRO 7 2xx Series (gfx1103):
+      7 PRO 253/250/249 - Radeon 780M
+
+    Ryzen PRO 5 2xx Series (gfx1103):
+      5 PRO 230/225/224/220 - Radeon 760M
+
+    Ryzen PRO 2xx Series (gfx1103):
+      7/5/3 PRO 217/216/215/210/205 - Radeon 740M
+
+    Ryzen PRO 7xxx Series (gfx1103):
       7 PRO 7840U - Radeon 780M
 
-    Ryzen (PRO) 200 Series (gfx1103):
-      270/260/250/240/230/220/215/210 - Radeon 780M/760M/740M
+  GCN 5 APUs:
+    Ryzen PRO 4xxx Series (gfx90c):
+      7/5/3 PRO 4000G - Desktop APUs
+
+[H2]Ryzen APUs (Consumer Laptops - Integrated Graphics):
+
+  RDNA 3.5 APUs:
+    AI Max+ 3xx Series (gfx1151):
+      AI Max+ 395/392/388 - Radeon 8060S
+
+    AI Max 3xx Series (gfx1151):
+      AI Max 390/385 - Radeon 8050S
+
+    AI Halo (gfx1151):
+      Radeon 8050S
+
+    AI 9 HX 4xx Series (gfx1150):
+      AI 9 HX 475/470 - Radeon 890M
+
+    AI 9 465 (gfx1150):
+      Radeon 880M
+
+    AI 7 450 (gfx1152):
+      Radeon 860M
+
+    AI 7 445 (gfx1153):
+      Radeon 840M
+
+    AI 5 400 Series (gfx1153):
+      AI 5 435/430 - Radeon 840M
+
+    AI 9 HX 3xx Series (gfx1150):
+      AI 9 HX 375/370/365 - Radeon 890M/880M
+
+    AI 7 300 Series (gfx1152):
+      AI 7 350/345 - Radeon 860M/840M
+
+    AI 5 340 (gfx1152):
+      Radeon 840M
+
+    AI 5 330 (gfx1153):
+      Radeon 820M
+
+  RDNA 3 APUs:
+    Ryzen 9 2xx Series (gfx1103):
+      9 270 - Radeon 780M
+
+    Ryzen 7 2xx Series (gfx1103):
+      7 260/253/250/249 - Radeon 780M
+
+    Ryzen 5 2xx Series (gfx1103):
+      5 240/230/225/224/220 - Radeon 760M
+
+    Ryzen 2xx Series (gfx1103):
+      7/5/3 217/216/210/205 - Radeon 740M
+
+    Ryzen 1xx Series (gfx1103):
+      9 180, 7 165/155, 5 125 - Radeon 780M/760M/740M
 
   RDNA 2 APUs:
     Radeon 680M          (gfx1035)
     Raphael iGPU         (gfx1036)
     Van Gogh             (gfx1033)
-
-  GCN 5 APUs:
-    Ryzen PRO 4000 Series (gfx90c):
-      7/5/3 PRO 4000G - Desktop APUs
 
 [H1]How to Choose:
 
@@ -150,6 +217,9 @@ Examples:
   Ryzen AI Max+ 395: Select gfx1151
   RX 6700 XT: Select gfx1031
   Radeon VII: Select gfx906
+  Ryzen AI Max PRO 390: Select gfx1151
+  Ryzen 7 PRO 253: Select gfx1103
+  Ryzen 9 270: Select gfx1103
 
 If unsure about your GPU model, after installation run 'rocminfo' or
 'amd-smi' to verify your GPU's exact gfx architecture code.

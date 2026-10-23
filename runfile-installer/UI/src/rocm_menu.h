@@ -49,17 +49,33 @@
 #define ROCM_MENU_ITEM_COMPO_COL            ROCM_MENU_ITEM_DEVICE_COL
 
 // ROCm device menu setup
-// Select device files based on build type (multi-arch vs single-arch)
+// Select device files based on:
+//   1. Build type: STABLE_BUILD (rc/stable) vs nightly
+//   2. Installer type: MULTI_ARCH_BUILD vs single-arch
 #ifdef MULTI_ARCH_BUILD
-    #define ROCM_MENU_DEVICE_ITEMS_FILE         "./UI/rocm_menus/rocm_device_items_multiarch"
-    #define ROCM_MENU_DEVICE_ITEMDECS_FILE      "./UI/rocm_menus/rocm_device_items_desc_multiarch"
-    #define ROCM_MENU_DEVICE_HELP_TITLE         "ROCm Device Help"
-    #define ROCM_MENU_DEVICE_HELP_FILE          "./UI/rocm_menus/rocm_device_help_multiarch"
+    #ifdef STABLE_BUILD
+        #define ROCM_MENU_DEVICE_ITEMS_FILE         "./UI/rocm_menus/rocm_device_items_multiarch_stable"
+        #define ROCM_MENU_DEVICE_ITEMDECS_FILE      "./UI/rocm_menus/rocm_device_items_desc_multiarch_stable"
+        #define ROCM_MENU_DEVICE_HELP_TITLE         "ROCm Device Help"
+        #define ROCM_MENU_DEVICE_HELP_FILE          "./UI/rocm_menus/rocm_device_help_multiarch_stable"
+    #else
+        #define ROCM_MENU_DEVICE_ITEMS_FILE         "./UI/rocm_menus/rocm_device_items_multiarch"
+        #define ROCM_MENU_DEVICE_ITEMDECS_FILE      "./UI/rocm_menus/rocm_device_items_desc_multiarch"
+        #define ROCM_MENU_DEVICE_HELP_TITLE         "ROCm Device Help"
+        #define ROCM_MENU_DEVICE_HELP_FILE          "./UI/rocm_menus/rocm_device_help_multiarch"
+    #endif
 #else
-    #define ROCM_MENU_DEVICE_ITEMS_FILE         "./UI/rocm_menus/rocm_device_items"
-    #define ROCM_MENU_DEVICE_ITEMDECS_FILE      "./UI/rocm_menus/rocm_device_items_desc"
-    #define ROCM_MENU_DEVICE_HELP_TITLE         "ROCm Device Help"
-    #define ROCM_MENU_DEVICE_HELP_FILE          "./UI/rocm_menus/rocm_device_help"
+    #ifdef STABLE_BUILD
+        #define ROCM_MENU_DEVICE_ITEMS_FILE         "./UI/rocm_menus/rocm_device_items_stable"
+        #define ROCM_MENU_DEVICE_ITEMDECS_FILE      "./UI/rocm_menus/rocm_device_items_desc_stable"
+        #define ROCM_MENU_DEVICE_HELP_TITLE         "ROCm Device Help"
+        #define ROCM_MENU_DEVICE_HELP_FILE          "./UI/rocm_menus/rocm_device_help_stable"
+    #else
+        #define ROCM_MENU_DEVICE_ITEMS_FILE         "./UI/rocm_menus/rocm_device_items"
+        #define ROCM_MENU_DEVICE_ITEMDECS_FILE      "./UI/rocm_menus/rocm_device_items_desc"
+        #define ROCM_MENU_DEVICE_HELP_TITLE         "ROCm Device Help"
+        #define ROCM_MENU_DEVICE_HELP_FILE          "./UI/rocm_menus/rocm_device_help"
+    #endif
 #endif
 
 // ROCm component menu setup

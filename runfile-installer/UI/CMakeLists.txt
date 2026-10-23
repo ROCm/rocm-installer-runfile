@@ -97,6 +97,16 @@ if(MULTI_ARCH_BUILD)
     add_compile_definitions(MULTI_ARCH_BUILD)
 endif()
 
+# Stable/RC build flag - passed from build-installer.sh
+option(STABLE_BUILD "Build for stable/RC release with reduced GPU list" OFF)
+
+if(STABLE_BUILD)
+    message(STATUS "UI: Building for stable/RC release (reduced GPU list)")
+    add_compile_definitions(STABLE_BUILD)
+else()
+    message(STATUS "UI: Building for nightly release (full GPU list)")
+endif()
+
 # Test component inclusion flag - passed from build-installer.sh
 if(INCLUDE_TEST_COMPONENT)
     message(STATUS "UI: Building with test component support")

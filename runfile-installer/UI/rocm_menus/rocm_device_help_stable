@@ -1,0 +1,63 @@
+[H1]Overview:
+Select the GPU architecture group that matches your hardware. ROCm uses
+gfx architecture groups (e.g., gfx94x, gfx110x) to install components
+optimized for your GPU.
+
+[H1]GPU Families:
+
+[H2]Instinct (Data Center):
+  MI355X/MI350X/MI350P (gfx950) - CDNA 4 architecture
+  MI325X/MI300X/MI300A (gfx94x) - CDNA 3 architecture
+  MI250X/MI250/MI210   (gfx90a) - CDNA 2 architecture
+  MI100                (gfx908) - CDNA 1 architecture
+
+[H2]Radeon PRO (Professional Workstation):
+  AI PRO R9700/R9600D (gfx120x) - RDNA 4 AI accelerators
+  W7900/W7800/W7700   (gfx110x) - RDNA 3 workstation GPUs
+  V710                (gfx110x) - RDNA 3 virtualization GPU
+  W6800               (gfx103x) - RDNA 2 workstation GPU
+  V620                (gfx103x) - RDNA 2 virtualization GPU
+
+[H2]Radeon RX (Consumer Gaming):
+  RX 9070 XT/9070 GRE/9070     (gfx120x) - RDNA 4 high-end gaming
+  RX 9060 XT LP/9060 XT/9060   (gfx120x) - RDNA 4 mid-range gaming
+  RX 7900 XTX/7900 XT/7900 GRE (gfx110x) - RDNA 3 high-end gaming
+  RX 7800 XT                   (gfx110x) - RDNA 3 mid-range gaming
+  RX 7700 XT/7700 XE/7700      (gfx110x) - RDNA 3 mid-range gaming
+  RX 7600                      (gfx110x) - RDNA 3 entry-level gaming
+
+[H2]Ryzen APUs (Integrated Graphics):
+
+  RDNA 3.5 Architecture (gfx115x):
+    AI Max PRO 300 Series (gfx1151) - Ryzen AI Max+ PRO 395, Max PRO 390/385/380
+    AI Max 300 Series     (gfx1151) - Ryzen AI Max+ 395/392/388, Max 390/385
+    AI PRO 400 Series     (gfx1150) - Ryzen AI 9 HX PRO 475/470, 9 PRO 465
+    AI PRO 400 Series     (gfx1152) - Ryzen AI 7 PRO 450
+    AI 400 Series         (gfx1150) - Ryzen AI 9 HX 475/470/465
+    AI 400 Series         (gfx1152) - Ryzen AI 7 450/445
+    AI PRO 300 Series     (gfx1152) - Ryzen AI 9 HX PRO 370, 7 PRO 360/350,
+                                       5 PRO 340
+    AI 300 Series         (gfx1150) - Ryzen AI 9 HX 375/370
+    AI 300 Series         (gfx1152) - Ryzen AI 9 365, 7 350/345, 5 340/330
+
+  RDNA 3 Architecture (gfx1103):
+    200 Series            (gfx1103) - Ryzen 9 270, 7 260/250, 5 240/230/220, 3 210
+
+[H1]About GFX Groups:
+The 'x' in gfx codes (e.g., gfx94x, gfx110x) is a wildcard that covers
+multiple specific architectures. For example:
+  - gfx94x covers gfx940, gfx941, gfx942
+  - gfx110x covers gfx1100, gfx1101, gfx1102
+
+This ensures compatible components are installed for your GPU variant.
+
+[H1]Usage:
+Use Up/Down arrows to navigate. Family headers (Instinct:, Radeon PRO:, etc.)
+are automatically skipped during navigation.
+
+Press Space or Enter to select your GPU architecture group.
+Press <DONE> when finished to return to the ROCm Options menu.
+
+[H1]Finding Your GPU:
+Run 'rocminfo' or 'amd-smi' after installation to see your GPU's exact
+gfx architecture code.

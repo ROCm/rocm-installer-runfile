@@ -1,0 +1,197 @@
+[H1]Overview:
+Select the GPU architecture that matches your hardware. Each entry corresponds
+to a specific GPU model. This allows you to install ROCm optimized for your
+exact GPU model, reducing installation size compared to installing all models.
+You can also choose to install all supported GPU architectures if preferred.
+
+The installer supports fine-grained GPU architectures for precise matching.
+For example, RDNA 3 GPUs have separate entries: gfx1100 (Navi 31), gfx1101
+(Navi 32), and gfx1102 (Navi 33), allowing you to select the exact architecture
+for your GPU.
+
+[H1]GPU Families:
+
+[H2]Instinct (Data Center):
+  MI355X/MI350X/MI350P (gfx950) - CDNA 4 architecture
+  MI325X/MI300X/MI300A (gfx942) - CDNA 3 architecture
+  MI250X/MI250/MI210   (gfx90a) - CDNA 2 architecture
+  MI100                (gfx908) - CDNA 1 architecture
+
+[H2]Radeon PRO V (Cloud Graphics):
+
+  RDNA 3 GPUs:
+    V710                 (gfx1101) - Navi 32
+
+  RDNA 2 GPUs:
+    V620                 (gfx1030)
+
+[H2]Radeon PRO (Professional Workstation):
+
+  RDNA 4 GPUs:
+    AI PRO R9700/R9600D  (gfx1201) - Navi 48
+
+  RDNA 3 GPUs:
+    W7900/W7800          (gfx1100) - Navi 31
+    W7700                (gfx1101) - Navi 32
+    W7600/W7500/W7400    (gfx1102) - Navi 33
+
+  RDNA 2 GPUs:
+    W6800                (gfx1030)
+
+[H2]Radeon RX (Consumer Gaming):
+
+  RDNA 4 GPUs:
+    RX 9070 series       (gfx1201) - Navi 48 high-end
+    RX 9060 series       (gfx1200) - Navi 44 mid-range
+    RX 9050 series       (gfx1200) - Navi 44 mainstream
+
+  RDNA 3 GPUs:
+    RX 7900 series       (gfx1100) - Navi 31 high-end
+    RX 7800 XT           (gfx1101) - Navi 32 high-end
+    RX 7700 series       (gfx1101) - Navi 32 mid-range
+    RX 7600 series       (gfx1102) - Navi 33 mainstream
+
+  RDNA 2 GPUs:
+    RX 6950/6900/6800    (gfx1030) - high-end
+
+[H2]Ryzen PRO APUs (Business Laptops - Integrated Graphics):
+
+  RDNA 3.5 APUs:
+    AI Max+ PRO 4xx Series (gfx1151):
+      AI Max+ PRO 495 - Radeon 8065S
+
+    AI Max PRO 4xx Series (gfx1151):
+      AI Max PRO 490/485 - Radeon 8050S
+
+    AI 9 HX PRO 4xx Series (gfx1150):
+      AI 9 HX PRO 475/470 - Radeon 890M
+
+    AI 9 PRO (gfx1150):
+      AI 9 PRO 465 - Radeon 880M
+
+    AI 7 PRO 450 (gfx1152):
+      Radeon 860M
+
+    AI 5 PRO (gfx1152):
+      AI 5 PRO 440 - Radeon 840M
+
+    AI 5 PRO (gfx1153):
+      AI 5 PRO 435 - Radeon 840M
+
+    AI Max+ PRO 3xx Series (gfx1151):
+      AI Max+ PRO 395 - Radeon 8060S
+
+    AI Max PRO 3xx Series (gfx1151):
+      AI Max PRO 395/390/385/380 - Radeon 8050S/8040S
+
+    AI 9 HX PRO 3xx Series (gfx1150):
+      AI 9 HX PRO 375/370 - Radeon 890M
+
+    AI 7 PRO 350 (gfx1152):
+      Radeon 860M
+
+    AI 5 PRO 340 (gfx1152):
+      Radeon 840M
+
+  RDNA 3 APUs:
+    Ryzen PRO 7 2xx Series (gfx1103):
+      7 PRO 253/250/249 - Radeon 780M
+
+    Ryzen PRO 5 2xx Series (gfx1103):
+      5 PRO 230/225/224/220 - Radeon 760M
+
+    Ryzen PRO 2xx Series (gfx1103):
+      7/5/3 PRO 217/216/215/210/205 - Radeon 740M
+
+    Ryzen PRO 7xxx Series (gfx1103):
+      7 PRO 7840U - Radeon 780M
+
+[H2]Ryzen APUs (Consumer Laptops - Integrated Graphics):
+
+  RDNA 3.5 APUs:
+    AI Max+ 3xx Series (gfx1151):
+      AI Max+ 395/392/388 - Radeon 8060S
+
+    AI Max 3xx Series (gfx1151):
+      AI Max 390/385 - Radeon 8050S
+
+    AI Halo (gfx1151):
+      Radeon 8050S
+
+    AI 9 HX 4xx Series (gfx1150):
+      AI 9 HX 475/470 - Radeon 890M
+
+    AI 9 465 (gfx1150):
+      Radeon 880M
+
+    AI 7 450 (gfx1152):
+      Radeon 860M
+
+    AI 7 445 (gfx1153):
+      Radeon 840M
+
+    AI 5 400 Series (gfx1153):
+      AI 5 435/430 - Radeon 840M
+
+    AI 9 HX 3xx Series (gfx1150):
+      AI 9 HX 375/370/365 - Radeon 890M/880M
+
+    AI 7 300 Series (gfx1152):
+      AI 7 350/345 - Radeon 860M/840M
+
+    AI 5 340 (gfx1152):
+      Radeon 840M
+
+    AI 5 330 (gfx1153):
+      Radeon 820M
+
+  RDNA 3 APUs:
+    Ryzen 9 2xx Series (gfx1103):
+      9 270 - Radeon 780M
+
+    Ryzen 7 2xx Series (gfx1103):
+      7 260/253/250/249 - Radeon 780M
+
+    Ryzen 5 2xx Series (gfx1103):
+      5 240/230/225/224/220 - Radeon 760M
+
+    Ryzen 2xx Series (gfx1103):
+      7/5/3 217/216/210/205 - Radeon 740M
+
+    Ryzen 1xx Series (gfx1103):
+      9 180, 7 165/155, 5 125 - Radeon 780M/760M/740M
+
+[H1]How to Choose:
+
+[H2]Option 1: Install All Architectures
+Select the "All Architectures" option at the top of the menu to install
+ROCm components for all available GPU architectures. This is the largest
+installation but ensures compatibility with any GPU in the system.
+
+[H2]Option 2: Install Specific Architecture
+If you know your GPU model, find it in the list above and select the
+corresponding gfx architecture for a smaller, optimized installation.
+
+Examples:
+  RX 7900 XTX: Select gfx1100
+  MI300X: Select gfx942
+  Ryzen AI 9 HX 370: Select gfx1150
+  Radeon PRO V710: Select gfx1101
+  Ryzen AI Max+ 395: Select gfx1151
+  Ryzen AI Max PRO 390: Select gfx1151
+  Ryzen 7 PRO 253: Select gfx1103
+  Ryzen 9 270: Select gfx1103
+
+If unsure about your GPU model, after installation run 'rocminfo' or
+'amd-smi' to verify your GPU's exact gfx architecture code.
+
+[H1]Usage:
+Use Up/Down arrows to navigate. Family headers (Instinct:, Radeon PRO:, etc.)
+are automatically skipped during navigation.
+
+Press Space or Enter to select your GPU architecture.
+Press DONE when finished to return to the ROCm Options menu.
+
+[H1]Auto-Detection:
+If you don't select a GPU architecture manually, the installer will attempt
+to auto-detect your GPU and install the correct components automatically.
