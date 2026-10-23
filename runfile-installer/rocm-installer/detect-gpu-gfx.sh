@@ -259,8 +259,8 @@ detect_installer_type() {
         fi
     fi
 
-    # Default to single-arch
-    echo "single"
+    # Default to multi-arch
+    echo "multi"
     return 0
 }
 
@@ -521,6 +521,32 @@ map_device_id_with_revision_to_gfx() {
         1900/f1) echo "gfx1100" ;;
         1900/f2) echo "gfx1100" ;;
 
+        # Device 0x1900 - RDNA3 APU variants (gfx1103)
+        # Ryzen 200/100 Series with Radeon 780M/760M/740M
+        # Note: These fall through to fallback mapping anyway, but documenting
+        # explicit revisions for clarity and potential future differentiation
+        1900/09) echo "gfx1103" ;;  # Ryzen 9 180 (Radeon 780M)
+        1900/0a) echo "gfx1103" ;;  # Ryzen 7 165 (Radeon 760M)
+        1900/0b) echo "gfx1103" ;;  # Ryzen 7 253 (Radeon 780M)
+        1900/0c) echo "gfx1103" ;;  # Ryzen 5 225 (Radeon 760M)
+        1900/0d) echo "gfx1103" ;;  # Ryzen 7 249 (Radeon 780M)
+        1900/0e) echo "gfx1103" ;;  # Ryzen 5 224 (Radeon 760M)
+        1900/e0) echo "gfx1103" ;;  # Ryzen 7 PRO 253 (Radeon 780M)
+        1900/e1) echo "gfx1103" ;;  # Ryzen 5 PRO 225 (Radeon 760M)
+        1900/e2) echo "gfx1103" ;;  # Ryzen 7 PRO 249 (Radeon 780M)
+        1900/e3) echo "gfx1103" ;;  # Ryzen 5 PRO 224 (Radeon 760M)
+
+        # Device 0x1901 - RDNA3 APU variants (gfx1103)
+        # Ryzen 200/100 Series with Radeon 740M/760M
+        1901/01) echo "gfx1103" ;;  # Ryzen 5 216 (Radeon 740M)
+        1901/02) echo "gfx1103" ;;  # Ryzen 3 205 (Radeon 740M)
+        1901/cd) echo "gfx1103" ;;  # Ryzen 7 155 (Radeon 760M)
+        1901/ce) echo "gfx1103" ;;  # Ryzen 5 125 (Radeon 740M)
+        1901/cf) echo "gfx1103" ;;  # Ryzen 7 217 (Radeon 740M)
+        1901/da) echo "gfx1103" ;;  # Ryzen 7 PRO 217 (Radeon 740M)
+        1901/db) echo "gfx1103" ;;  # Ryzen 5 PRO 216 (Radeon 740M)
+        1901/dc) echo "gfx1103" ;;  # Ryzen 3 PRO 205 (Radeon 740M)
+
         # RDNA4 - RX 9000 series (Navi48 -> gfx1201)
         7550/c0) echo "gfx1201" ;;  # AMD Radeon RX 9070 XT
         7550/c2) echo "gfx1201" ;;  # AMD Radeon 9070 GRE
@@ -600,8 +626,8 @@ map_device_id_to_gfx() {
 
         # RDNA3 - RX 7900 XTX/XT
         7448|744c|7449|744a|744b) echo "gfx1100" ;;
-        # RDNA3 - RX 7800/7700
-        7478|747e|746f|748f) echo "gfx1101" ;;
+        # RDNA3 - RX 7800/7700/W7700
+        7470|7478|747e|746f|748f) echo "gfx1101" ;;
         # RDNA3 - RX 7600
         7480|7483|7487|7460|7461|7489|7499) echo "gfx1102" ;;
 
@@ -1064,12 +1090,15 @@ collect_from_sysfs() {
             rev_id="00"
         fi
 
-        # Pass revision ID to enable revision-aware mapping
-        if [[ -n "$rev_id" && "$rev_id" != "00" ]]; then
-            gfx_arch=$(map_device_id_to_gfx "$device_id" "$rev_id" 2>/dev/null || echo "unknown")
+        # Pass revision ID to enable revision-aware mapping (always pass if available, even "00")
+        if [[ -n "$rev_id" ]]; then
+            gfx_arch=$(map_device_id_to_gfx "$device_id" "$rev_id")
         else
-            gfx_arch=$(map_device_id_to_gfx "$device_id" 2>/dev/null || echo "unknown")
+            gfx_arch=$(map_device_id_to_gfx "$device_id")
         fi
+
+        # If mapping failed, set to unknown
+        [[ -z "$gfx_arch" ]] && gfx_arch="unknown"
 
         name="AMD GPU"
         if [[ -f "$card/product_name" ]]; then
@@ -1103,12 +1132,15 @@ collect_from_lspci() {
         rev_id=$(echo "$pci_verbose" | grep -oP '\(rev \K[0-9a-f]{2}(?=\))' | tr '[:lower:]' '[:upper:]')
         [[ -z "$rev_id" ]] && rev_id="00"
 
-        # Pass revision ID to enable revision-aware mapping
-        if [[ -n "$rev_id" && "$rev_id" != "00" ]]; then
-            gfx_arch=$(map_device_id_to_gfx "$device_id" "$rev_id" 2>/dev/null || echo "unknown")
+        # Pass revision ID to enable revision-aware mapping (always pass if available, even "00")
+        if [[ -n "$rev_id" ]]; then
+            gfx_arch=$(map_device_id_to_gfx "$device_id" "$rev_id")
         else
-            gfx_arch=$(map_device_id_to_gfx "$device_id" 2>/dev/null || echo "unknown")
+            gfx_arch=$(map_device_id_to_gfx "$device_id")
         fi
+
+        # If mapping failed, set to unknown
+        [[ -z "$gfx_arch" ]] && gfx_arch="unknown"
 
         name=$(lspci -s "$pci_addr" 2>/dev/null | head -1 | sed -E 's/^[0-9a-f:.]+\s+[^:]+:\s+//')
         [[ -z "$name" ]] && name=$(echo "$pci_line" | sed -E 's/^[0-9a-f:.]+\s+[^:]+:\s+//' | sed 's/\s*\[.*$//')
