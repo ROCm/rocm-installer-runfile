@@ -2734,15 +2734,13 @@ install_rocm_multiarch() {
             COMPONENTS_GFX="${COMPONENTS_GFX%"${COMPONENTS_GFX##*[![:space:]]}"}"
         fi
 
-        # Skip this GFX architecture if no components are available
-        if [[ -z "$COMPONENTS_GFX" ]]; then
-            continue
+        # Install GFX-specific components (if any exist)
+        if [[ -n "$COMPONENTS_GFX" ]]; then
+            install_gfx_components
         fi
 
-        # Install GFX-specific components
-        install_gfx_components
-
-        # Mark as installed
+        # Mark GFX as installed (even if no GFX-specific components)
+        # This is required for multiarch uninstall to work correctly
         mark_gfx_installed "$gfx"
     done
 
