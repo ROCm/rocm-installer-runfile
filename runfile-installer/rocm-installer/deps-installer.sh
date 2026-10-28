@@ -750,7 +750,14 @@ apply_sles_translation() {
         local unique_trans=""
         for trans_pkg in "${trans_pkgs[@]}"; do
             # Check if we've already processed this exact translated package
-            if [[ ! " ${SLES_SEEN_PKGS[*]} " =~ " ${trans_pkg} " ]]; then
+            local seen=0
+            for seen_pkg in "${SLES_SEEN_PKGS[@]}"; do
+                if [[ "$seen_pkg" == "$trans_pkg" ]]; then
+                    seen=1
+                    break
+                fi
+            done
+            if [[ $seen -eq 0 ]]; then
                 SLES_SEEN_PKGS+=("$trans_pkg")
                 if [[ -n "$unique_trans" ]]; then
                     unique_trans="$unique_trans|$trans_pkg"
@@ -766,7 +773,14 @@ apply_sles_translation() {
         translated="$unique_trans"
     else
         # Single package - check if we've seen it
-        if [[ " ${SLES_SEEN_PKGS[*]} " =~ " ${translated} " ]]; then
+        local seen=0
+        for seen_pkg in "${SLES_SEEN_PKGS[@]}"; do
+            if [[ "$seen_pkg" == "$translated" ]]; then
+                seen=1
+                break
+            fi
+        done
+        if [[ $seen -eq 1 ]]; then
             return 1  # Skip duplicate
         fi
         SLES_SEEN_PKGS+=("$translated")
