@@ -743,6 +743,49 @@ apply_sles_translation() {
         print_str "Translating package name for SLES: $pkg -> $translated" 1
     fi
 
+    # Handle multi-package translations and track seen packages for deduplication
+    # (e.g., both fftw-libs-double and fftw-libs-single -> "libfftw3-3|libfftw3_threads3")
+    if [[ "$translated" == *'|'* ]]; then
+        IFS='|' read -ra trans_pkgs <<< "$translated"
+        local unique_trans=""
+        for trans_pkg in "${trans_pkgs[@]}"; do
+            # Check if we've already processed this exact translated package
+            local seen=0
+            for seen_pkg in "${SLES_SEEN_PKGS[@]}"; do
+                if [[ "$seen_pkg" == "$trans_pkg" ]]; then
+                    seen=1
+                    break
+                fi
+            done
+            if [[ $seen -eq 0 ]]; then
+                SLES_SEEN_PKGS+=("$trans_pkg")
+                if [[ -n "$unique_trans" ]]; then
+                    unique_trans="$unique_trans|$trans_pkg"
+                else
+                    unique_trans="$trans_pkg"
+                fi
+            fi
+        done
+        # If all packages were duplicates, skip this dependency
+        if [[ -z "$unique_trans" ]]; then
+            return 1
+        fi
+        translated="$unique_trans"
+    else
+        # Single package - check if we've seen it
+        local seen=0
+        for seen_pkg in "${SLES_SEEN_PKGS[@]}"; do
+            if [[ "$seen_pkg" == "$translated" ]]; then
+                seen=1
+                break
+            fi
+        done
+        if [[ $seen -eq 1 ]]; then
+            return 1  # Skip duplicate
+        fi
+        SLES_SEEN_PKGS+=("$translated")
+    fi
+
     PKG_TRANSLATED="$translated"
     return 0
 }
@@ -838,6 +881,15 @@ translate_package_name_sles() {
             ;;
         ocl-icd-devel)
             translated="ocl-icd-devel"
+            ;;
+
+        # FFTW libraries (RHEL bundles base+threads, SLES splits them)
+        # Use | delimiter to separate multiple packages (not space, which breaks version constraints)
+        fftw-libs-double)
+            translated="libfftw3-3|libfftw3_threads3"
+            ;;
+        fftw-libs-single)
+            translated="libfftw3-3|libfftw3_threads3"
             ;;
 
         # Common utilities (same name on both distros)
@@ -1290,43 +1342,48 @@ check_installed_dep_packages() {
             fi
         fi
 
-        # Apply SLES translation if needed
+        # Apply SLES translation if needed (returns 1 if duplicate to skip)
         if ! apply_sles_translation "$pkg"; then
             continue
         fi
-        pkg="$PKG_TRANSLATED"
 
-        print_str "+++++++++++++++++++++++++++++++++++++++++++++++++++++++"
-        print_str "$pkg : ..." 1
+        # Handle multi-package translations (pipe-separated to avoid breaking version constraints)
+        # e.g., fftw-libs-double -> "libfftw3-3|libfftw3_threads3"
+        IFS='|' read -ra translated_pkgs <<< "$PKG_TRANSLATED"
+        for translated_pkg in "${translated_pkgs[@]}"; do
+            print_str "+++++++++++++++++++++++++++++++++++++++++++++++++++++++"
+            print_str "$translated_pkg : ..." 1
 
-        DEPS_COUNT=$((DEPS_COUNT+1))
-        DEPS+="$pkg "
+            DEPS_COUNT=$((DEPS_COUNT+1))
+            DEPS+="$translated_pkg "
+            pkg="$translated_pkg"  # Set for the checks below
 
-        if [[ "$pkg" == *'|'* ]]; then
-            status=1
-            IFS='|' read -ra deps <<< "$pkg"
-            for dep in "${deps[@]}"; do
-                dep_trimmed=$(echo "$dep" | sed 's/^ *//;s/ *$//')
-                if check_dep_version_installed "$dep_trimmed"; then
-                    status=0
-                    break
-                fi
-            done
+            if [[ "$pkg" == *'|'* ]]; then
+                status=1
+                IFS='|' read -ra deps <<< "$pkg"
+                for dep in "${deps[@]}"; do
+                    dep_trimmed=$(echo "$dep" | sed 's/^ *//;s/ *$//')
+                    if check_dep_version_installed "$dep_trimmed"; then
+                        status=0
+                        break
+                    fi
+                done
 
-        else
-            # check a single dep
-            check_dep_version_installed "$pkg"
-            status=$?
-        fi
+            else
+                # check a single dep
+                check_dep_version_installed "$pkg"
+                status=$?
+            fi
 
-        # Check the dep install status and add any missing deps not installed on the system to the "missing" list
-        if [ $status -eq 0 ]; then
-            echo -e "$pkg : \e[32mINSTALLED\e[0m"
-        else
-            echo -e "$pkg : \e[31mNOT INSTALLED\e[0m"
-            MISSING_DEPS+="$pkg, "
-            MISSING_DEPS_COUNT=$((MISSING_DEPS_COUNT+1))
-        fi
+            # Check the dep install status and add any missing deps not installed on the system to the "missing" list
+            if [ $status -eq 0 ]; then
+                echo -e "$pkg : \e[32mINSTALLED\e[0m"
+            else
+                echo -e "$pkg : \e[31mNOT INSTALLED\e[0m"
+                MISSING_DEPS+="$pkg, "
+                MISSING_DEPS_COUNT=$((MISSING_DEPS_COUNT+1))
+            fi
+        done
     done < "$DEPS_FILE"
 }
 
@@ -1976,6 +2033,9 @@ read_deps() {
         exit 1
     fi
 
+    # Initialize SLES deduplication tracking array
+    SLES_SEEN_PKGS=()
+
     while IFS= read -r dep; do
         # Skip ocl-icd packages for Alibaba Cloud Linux 4 (not available in repos)
         if [[ "$DISTRO_NAME" = "alinux" && "$DISTRO_MAJOR_VER" = "4" ]]; then
@@ -1985,13 +2045,18 @@ read_deps() {
             fi
         fi
 
-        # Apply SLES translation if needed
+        # Apply SLES translation if needed (returns 1 if duplicate to skip)
         if ! apply_sles_translation "$dep"; then
             continue
         fi
-        dep="$PKG_TRANSLATED"
-        MISSING_DEPS="$MISSING_DEPS $dep,"
-        DEPS_COUNT=$((DEPS_COUNT+1))
+
+        # Handle multi-package translations (pipe-separated to avoid breaking version constraints)
+        # e.g., fftw-libs-double -> "libfftw3-3|libfftw3_threads3"
+        IFS='|' read -ra translated_pkgs <<< "$PKG_TRANSLATED"
+        for translated_pkg in "${translated_pkgs[@]}"; do
+            MISSING_DEPS="$MISSING_DEPS $translated_pkg,"
+            DEPS_COUNT=$((DEPS_COUNT+1))
+        done
     done < "$DEPS_FILE"
 
     # add any kernel packages to the deps list
@@ -2177,6 +2242,9 @@ build_dependencies_list_for_compo() {
     local compo_type=$1
     echo "------------------------------------"
     print_str "Building Dependency List for: $compo_type"
+
+    # Initialize SLES deduplication tracking array
+    SLES_SEEN_PKGS=()
 
     # Set the dependency file based on component type
     if [[ "$compo_type" == "rocm" ]]; then
