@@ -3768,7 +3768,8 @@ uninstall_rocm_target() {
 
     # set the version directory
     local rocm_ver_dir="${inst%/}"
-    local rocm_rm_dir="${inst%/rocm*}"
+    # Strip /rocm/core-* suffix to get parent directory (not just /rocm* which fails with /home/rocm)
+    local rocm_rm_dir="${inst%/rocm/core-*}"
 
     # Set manifest file path for uninstall (use detected install path)
     INSTALL_MANIFEST_FILE="$rocm_ver_dir/.info/$INSTALL_MANIFEST_NAME"
@@ -4025,8 +4026,9 @@ uninstall_rocm() {
     if find_rocm_with_progress "$TARGET_DIR"; then
 
         # Update the target for scriptlet handling
-        if [[ "$TARGET_DIR" == *"rocm"* ]]; then
-            TARGET_DIR="${TARGET_ROCM_DIR%/rocm*}"
+        # Strip /rocm/core-* suffix if present (not just /rocm* which fails with /home/rocm)
+        if [[ "$TARGET_DIR" == *"/rocm/core-"* ]]; then
+            TARGET_DIR="${TARGET_ROCM_DIR%/rocm/core-*}"
             echo "TARGET_DIR : $TARGET_DIR"
         fi
 
