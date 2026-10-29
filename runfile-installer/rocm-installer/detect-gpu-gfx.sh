@@ -98,6 +98,11 @@ output_results() {
     local -a output_lines=()
 
     for ((i=0; i<${#GPU_NAMES[@]}; i++)); do
+        # Filter out unknown GPUs from output
+        if [[ "${GPU_GFX[$i]}" == "unknown" ]]; then
+            continue
+        fi
+
         case "$format" in
             name)
                 output_lines+=("${GPU_NAMES[$i]}")
@@ -175,7 +180,14 @@ OPTIONS:
 
     -u, --unique                Deduplicate output (show each unique value once)
 
-    --simulate                  Simulate 4 unique GPUs (no hardware needed)
+    --simulate <scenario>       Simulate GPU detection for testing (no hardware needed)
+                                Scenarios:
+                                  default      - 4 unique GPUs (gfx942, gfx90a, gfx1100, gfx1201)
+                                  multi-same   - 8 identical MI300X GPUs (tests --unique dedup)
+                                  multi-diff   - MI300X + MI250X (tests multi-arch detection)
+                                  mixed        - Unknown GPU + MI300X (tests unknown filtering)
+                                  all-unknown  - 2 unknown GPUs (tests exit code 2)
+                                  single       - Single MI300X GPU (tests exit code 0)
 
 EXIT CODES:
     0 - Successfully detected GFX architecture
@@ -211,8 +223,12 @@ EXAMPLES:
     # Force PCI-based detection
     $0 --method pci
 
-    # Simulate 4 unique GPUs
-    $0 --simulate --output all
+    # Simulate different GPU scenarios
+    $0 --simulate default --output all              # 4 unique GPUs
+    $0 --simulate multi-same --output all --unique  # 8 identical GPUs
+    $0 --simulate multi-diff --output all --unique  # Multi-arch (MI300X + MI250X)
+    $0 --simulate mixed --output all --unique       # Mixed known + unknown
+    $0 --simulate all-unknown --output all          # All unknown GPUs
 
 EOF
 }
@@ -1029,7 +1045,14 @@ while [[ $# -gt 0 ]]; do
             ;;
         --simulate)
             SIMULATE=1
-            shift
+            # Check if a scenario argument is provided
+            if [[ -n "${2:-}" && ! "$2" =~ ^- ]]; then
+                SIMULATE_SCENARIO="$2"
+                shift 2
+            else
+                SIMULATE_SCENARIO="default"
+                shift
+            fi
             ;;
         *)
             print_error "Unknown option: $1"
@@ -1160,19 +1183,59 @@ collect_gpu_data() {
     return 1
 }
 
-# Simulate GPU data for testing (4 unique GPUs)
+# Simulate GPU data for testing
 simulate_gpu_data() {
-    # GPU 1: MI300X (CDNA3)
-    add_gpu "AMD Instinct MI300X" "74a0" "00" "gfx942"
+    local scenario="${SIMULATE_SCENARIO:-default}"
 
-    # GPU 2: MI250X (CDNA2)
-    add_gpu "AMD Instinct MI250X" "740f" "00" "gfx90a"
+    case "$scenario" in
+        default)
+            # 4 unique GPUs with different architectures
+            add_gpu "AMD Instinct MI300X" "74a0" "00" "gfx942"
+            add_gpu "AMD Instinct MI250X" "740f" "00" "gfx90a"
+            add_gpu "AMD Radeon RX 7900 XTX" "7448" "00" "gfx1100"
+            add_gpu "AMD Radeon RX 9070 XT" "7550" "01" "gfx1201"
+            ;;
 
-    # GPU 3: RX 7900 XTX (RDNA3)
-    add_gpu "AMD Radeon RX 7900 XTX" "7448" "00" "gfx1100"
+        multi-same)
+            # 8 identical MI300X GPUs (tests --unique deduplication)
+            for i in {1..8}; do
+                add_gpu "AMD Instinct MI300X" "74a0" "00" "gfx942"
+            done
+            ;;
 
-    # GPU 4: RX 9070 XT (RDNA4)
-    add_gpu "AMD Radeon RX 9070 XT" "7550" "01" "gfx1201"
+        multi-diff)
+            # 2 different architectures (tests multi-arch auto-install: exit code 3)
+            add_gpu "AMD Instinct MI300X" "74a0" "00" "gfx942"
+            add_gpu "AMD Instinct MI300X" "74a0" "00" "gfx942"
+            add_gpu "AMD Instinct MI250X" "740f" "00" "gfx90a"
+            add_gpu "AMD Instinct MI250X" "740f" "00" "gfx90a"
+            ;;
+
+        mixed)
+            # Mixed known + unknown GPUs (tests unknown filtering)
+            add_gpu "Unknown AMD GPU" "9999" "00" "unknown"
+            add_gpu "AMD Instinct MI300X" "74a0" "00" "gfx942"
+            add_gpu "Unknown AMD GPU" "8888" "00" "unknown"
+            add_gpu "AMD Radeon RX 7900 XTX" "7448" "00" "gfx1100"
+            ;;
+
+        all-unknown)
+            # All unknown GPUs (tests exit code 2 after filtering)
+            add_gpu "Unknown AMD GPU 1" "9999" "00" "unknown"
+            add_gpu "Unknown AMD GPU 2" "8888" "00" "unknown"
+            ;;
+
+        single)
+            # Single GPU (tests exit code 0)
+            add_gpu "AMD Instinct MI300X" "74a0" "00" "gfx942"
+            ;;
+
+        *)
+            print_error "Unknown simulation scenario: $scenario"
+            print_error "Valid scenarios: default, multi-same, multi-diff, mixed, all-unknown, single"
+            return 1
+            ;;
+    esac
 
     return 0
 }
@@ -1184,8 +1247,13 @@ fi
 
 # Handle --output modes
 if [[ -n "$OUTPUT_FORMAT" ]]; then
-    # Use simulated data if requested, otherwise collect real data
-    if [[ $SIMULATE == 1 ]]; then
+    # Use simulated data if requested (via --simulate flag or ROCM_DETECT_SIM env var)
+    # Environment variable allows rocm-installer.sh to trigger simulation for testing
+    if [[ $SIMULATE == 1 ]] || [[ -n "${ROCM_DETECT_SIM:-}" ]]; then
+        # Use env var scenario if set and --simulate wasn't used
+        if [[ $SIMULATE == 0 && -n "${ROCM_DETECT_SIM:-}" ]]; then
+            SIMULATE_SCENARIO="${ROCM_DETECT_SIM}"
+        fi
         simulate_gpu_data
     else
         if ! collect_gpu_data; then
@@ -1199,14 +1267,18 @@ if [[ -n "$OUTPUT_FORMAT" ]]; then
             output_results "$OUTPUT_FORMAT"
 
             # Determine correct exit code based on unique GFX architectures
+            # Filter out unknown GPUs and build list of known architectures
             unique_gfx=()
+            unknown_count=0
+
             for gfx in "${GPU_GFX[@]}"; do
-                # Check for unknown/unsupported architectures
+                # Track unknown architectures but don't abort immediately
                 if [[ "$gfx" == "unknown" ]]; then
-                    exit 2  # AMD GPU detected but architecture unknown
+                    unknown_count=$((unknown_count + 1))
+                    continue  # Skip unknown, process known GPUs
                 fi
 
-                # Build unique GFX list
+                # Build unique GFX list (only known architectures)
                 if [[ $DEDUPLICATE == 1 ]]; then
                     # With --unique, we already deduplicated in output, so check the actual unique count
                     pattern=" $gfx "
@@ -1219,9 +1291,23 @@ if [[ -n "$OUTPUT_FORMAT" ]]; then
                 fi
             done
 
-            # Determine exit code
+            # Warn about unknown GPUs (to stderr, won't affect output parsing)
+            if [[ $unknown_count -gt 0 ]]; then
+                if [[ $unknown_count -eq 1 ]]; then
+                    print_warn "1 unknown/unsupported GPU detected and filtered out"
+                else
+                    print_warn "$unknown_count unknown/unsupported GPUs detected and filtered out"
+                fi
+            fi
+
+            # Determine exit code based on known architectures
             if [[ ${#unique_gfx[@]} -eq 0 ]]; then
-                exit 1  # No GPU detected
+                # All GPUs are unknown (no known archs found)
+                if [[ $unknown_count -gt 0 ]]; then
+                    exit 2  # AMD GPU detected but all architectures unknown
+                else
+                    exit 1  # No GPU detected
+                fi
             elif [[ $DEDUPLICATE == 1 && ${#unique_gfx[@]} -gt 1 ]]; then
                 exit 3  # Multiple different architectures (after deduplication)
             else

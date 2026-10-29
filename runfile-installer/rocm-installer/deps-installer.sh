@@ -744,9 +744,8 @@ apply_sles_translation() {
     fi
 
     # Handle multi-package translations and track seen packages for deduplication
-    # (e.g., both fftw-libs-double and fftw-libs-single -> "libfftw3-3|libfftw3_threads3")
-    if [[ "$translated" == *'|'* ]]; then
-        IFS='|' read -ra trans_pkgs <<< "$translated"
+    if [[ "$translated" == *','* ]]; then
+        IFS=',' read -ra trans_pkgs <<< "$translated"
         local unique_trans=""
         for trans_pkg in "${trans_pkgs[@]}"; do
             # Check if we've already processed this exact translated package
@@ -760,7 +759,7 @@ apply_sles_translation() {
             if [[ $seen -eq 0 ]]; then
                 SLES_SEEN_PKGS+=("$trans_pkg")
                 if [[ -n "$unique_trans" ]]; then
-                    unique_trans="$unique_trans|$trans_pkg"
+                    unique_trans="$unique_trans,$trans_pkg"
                 else
                     unique_trans="$trans_pkg"
                 fi
@@ -884,12 +883,12 @@ translate_package_name_sles() {
             ;;
 
         # FFTW libraries (RHEL bundles base+threads, SLES splits them)
-        # Use | delimiter to separate multiple packages (not space, which breaks version constraints)
+        # Use comma delimiter to separate multiple packages (avoids conflict with Debian OR syntax)
         fftw-libs-double)
-            translated="libfftw3-3|libfftw3_threads3"
+            translated="libfftw3-3,libfftw3_threads3"
             ;;
         fftw-libs-single)
-            translated="libfftw3-3|libfftw3_threads3"
+            translated="libfftw3-3,libfftw3_threads3"
             ;;
 
         # Common utilities (same name on both distros)
@@ -1347,9 +1346,8 @@ check_installed_dep_packages() {
             continue
         fi
 
-        # Handle multi-package translations (pipe-separated to avoid breaking version constraints)
-        # e.g., fftw-libs-double -> "libfftw3-3|libfftw3_threads3"
-        IFS='|' read -ra translated_pkgs <<< "$PKG_TRANSLATED"
+        # Handle multi-package translations (comma-separated for SLES)
+        IFS=',' read -ra translated_pkgs <<< "$PKG_TRANSLATED"
         for translated_pkg in "${translated_pkgs[@]}"; do
             print_str "+++++++++++++++++++++++++++++++++++++++++++++++++++++++"
             print_str "$translated_pkg : ..." 1
@@ -2050,9 +2048,8 @@ read_deps() {
             continue
         fi
 
-        # Handle multi-package translations (pipe-separated to avoid breaking version constraints)
-        # e.g., fftw-libs-double -> "libfftw3-3|libfftw3_threads3"
-        IFS='|' read -ra translated_pkgs <<< "$PKG_TRANSLATED"
+        # Handle multi-package translations (comma-separated for SLES)
+        IFS=',' read -ra translated_pkgs <<< "$PKG_TRANSLATED"
         for translated_pkg in "${translated_pkgs[@]}"; do
             MISSING_DEPS="$MISSING_DEPS $translated_pkg,"
             DEPS_COUNT=$((DEPS_COUNT+1))
