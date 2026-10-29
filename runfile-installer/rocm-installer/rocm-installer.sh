@@ -1471,8 +1471,13 @@ detect_hardware_gfx() {
     # Use --output all --unique to get all fields in one call (tab-separated: name, device-id, revision, gfx)
     # The --unique flag deduplicates identical GPUs (e.g., 8x MI300 gfx94x → 1 entry)
     # The script now returns proper exit codes: 0=single arch, 1=no GPU, 2=unknown arch, 3=multiple archs
+    # Note: Warnings (unknown GPUs filtered) go to stderr and are displayed to user
+
+    # Support simulation via ROCM_DETECT_SIM environment variable for testing
+    # Valid scenarios: default, multi-same, multi-diff, mixed, all-unknown, single
+    # The detect-gpu-gfx.sh script will automatically use simulation if ROCM_DETECT_SIM is set
     local all_output
-    all_output=$("$detect_script" --output all --unique 2>/dev/null)
+    all_output=$("$detect_script" --output all --unique)
     local exit_code=$?
 
     # Parse the tab-separated output and populate arrays (even on exit code 3)
@@ -1587,15 +1592,83 @@ auto_detect_gfx() {
     elif [[ $detect_exit_code -eq 3 ]]; then
         # Multiple different architectures detected
         echo ""
-        print_err "Multiple different GPU architectures detected: $detected_gfx"
+        echo "Multiple different GPU architectures detected"
         echo ""
-        echo "This installer only supports installing for a single GPU architecture."
-        echo "Please specify which architecture to install using the gfx= argument."
-        echo ""
-        echo "Detected architectures: $detected_gfx"
-        echo ""
-        echo "Example: $PROG gfx=${detected_gfx%%,*} rocm"
-        exit 1
+
+        # Check if this is a multi-arch installer
+        if [[ "${INSTALLER_BUILD_TYPE:-}" == "multi-arch" ]]; then
+            # Multi-arch installer: auto-install all detected architectures
+            echo "Detected GPU architectures:"
+            local arch_count=0
+            for i in "${!DETECTED_DEVICE_IDS[@]}"; do
+                local dev_name="${DETECTED_DEVICE_NAMES[$i]:-Unknown}"
+                local dev_id="${DETECTED_DEVICE_IDS[$i]}"
+                local gfx="${DETECTED_GFX_ARCHS[$i]}"
+                arch_count=$((arch_count + 1))
+                if [[ -n "$dev_name" && "$dev_name" != "Unknown AMD GPU" && "$dev_name" != "N/A" ]]; then
+                    echo "  [$arch_count] $dev_name (Device: 0x$dev_id, GFX: $gfx)"
+                else
+                    echo "  [$arch_count] AMD GPU Device 0x$dev_id (GFX: $gfx)"
+                fi
+            done
+            echo ""
+
+            # Build unique architecture list for auto-installation
+            local -a unique_archs=()
+            for gfx_arch in "${DETECTED_GFX_ARCHS[@]}"; do
+                # Check if already in list
+                local found=0
+                for unique_arch in "${unique_archs[@]}"; do
+                    if [[ "$gfx_arch" == "$unique_arch" ]]; then
+                        found=1
+                        break
+                    fi
+                done
+                if [[ $found -eq 0 ]]; then
+                    unique_archs+=("$gfx_arch")
+                fi
+            done
+
+            # Populate GFX_INSTALL_LIST with all detected unique architectures
+            GFX_INSTALL_LIST=("${unique_archs[@]}")
+            USER_SPECIFIED_GFX=0  # Mark as auto-detected
+
+            echo "Auto-installing for ${#unique_archs[@]} detected architectures: ${unique_archs[*]}"
+            echo "=============================================================="
+            echo ""
+
+            # Prompt user to confirm (if prompts enabled)
+            if [[ $PROMPT_USER == 1 ]]; then
+                prompt_user "Continue with multi-arch installation for all detected GPUs? (y/n): "
+                if [[ "$option" == "N" || "$option" == "n" ]]; then
+                    echo ""
+                    echo "To install for specific architecture(s), use:"
+                    echo "  $PROG gfx=<arch> rocm"
+                    echo ""
+                    echo "Examples:"
+                    for arch in "${unique_archs[@]}"; do
+                        echo "  $PROG gfx=$arch rocm"
+                    done
+                    echo "  $PROG gfx=${unique_archs[0]},${unique_archs[1]} rocm  # Multiple"
+                    exit 1
+                fi
+                echo ""
+            fi
+
+            # Clear INSTALL_GFX for multi-arch mode (use GFX_INSTALL_LIST instead)
+            INSTALL_GFX=""
+        else
+            # Single-arch installer: cannot auto-install multiple architectures
+            print_err "Multiple different GPU architectures detected"
+            echo ""
+            echo "This is a single-arch installer that only supports one GPU architecture."
+            echo "Please specify which architecture to install using the gfx= argument."
+            echo ""
+            echo "Detected architectures: $detected_gfx"
+            echo ""
+            echo "Example: $PROG gfx=${detected_gfx%%,*} rocm"
+            exit 1
+        fi
     fi
 }
 
