@@ -11,7 +11,6 @@ on:
       - release/therock-*
 
 permissions:
-  id-token: write
   contents: read
 
 concurrency:
@@ -46,6 +45,7 @@ jobs:
     name: Basic Runfile Installer Build
     needs: setup
     permissions:
+      id-token: write
       contents: read
     uses: ./.github/workflows/build_linux_runfile_installer.yaml
     with:
