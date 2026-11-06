@@ -25,6 +25,7 @@ jobs:
     outputs:
       rocm_version: ${{ steps.params.outputs.rocm_version }}  # Set by script setup_runfile_installer_ci.py
       pull_amdgpu: ${{ steps.params.outputs.pull_amdgpu }}
+      pull_run_id: ${{ steps.params.outputs.pull_run_id }}
 
     steps:
      - name: Checkout repository
@@ -55,4 +56,5 @@ jobs:
       pull_pkg: amdrocm-core-sdk
       gfx_archs: gfx1100
       pull_amdgpu: ${{ needs.setup.outputs.pull_amdgpu }}
+      pull_run_id: ${{ needs.setup.outputs.pull_run_id }}
       upload_to_s3: false

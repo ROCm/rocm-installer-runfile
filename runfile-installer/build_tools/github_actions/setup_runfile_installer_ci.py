@@ -91,6 +91,20 @@ def get_amdgpu_driver_version() -> str:
     return f"release,{version}"
 
 
+def derive_pull_run_id(rocm_version):
+    """
+    Parse only MAJOR and MINOR version from rocm_version.
+    rocm_version expected to be in the format MAJOR.MINOR.PATCH
+    """
+    rocm_version_split = rocm_version.split(".")
+    if len(rocm_version_split) >= 2:
+        pull_run_id = f"{rocm_version_split[0]}.{rocm_version_split[1]}"
+        return pull_run_id
+
+    print(f"ERROR: Unable to derive pull_run_id from rocm_version '{rocm_version}'")
+    sys.exit(1)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Setup parameters for Linux runfile installer CI workflow"
@@ -110,6 +124,9 @@ def main():
     rocm_version = fetch_latest_rocm_version()
     sources["rocm_version"] = "auto-detected"
 
+    pull_run_id = derive_pull_run_id(rocm_version)
+    sources["pull_run_id"] = "auto-detected from rocm_version"
+
     if pull_amdgpu == "latest":
         pull_amdgpu = get_amdgpu_driver_version()
         sources["pull_amdgpu"] = "auto-detected"
@@ -120,6 +137,7 @@ def main():
     outputs = {
         "rocm_version": rocm_version,
         "pull_amdgpu": pull_amdgpu,
+        "pull_run_id": pull_run_id,
     }
 
     gha_set_output(outputs)
@@ -132,6 +150,7 @@ def main():
 | Parameter | Value | Source |
 |-----------|-------|--------|
 | ROCM_VERSION | `{rocm_version}` | {sources["rocm_version"]} |
+| PULL_RUN_ID | `{pull_run_id}` | {sources["pull_run_id"]} |
 | PULL_AMDGPU | `{pull_amdgpu}` | {sources["pull_amdgpu"]} |
 
 </details>
