@@ -427,6 +427,10 @@ os_release() {
             UNINSTALL_SCRIPTLET_ARG="0"
             PKG_INSTALLED_CMD="rpm -qa"
             PACKAGE_TYPE="rpm"
+
+            # update-alternatives is required by the ROCm postinst scriptlets to create the
+            # /opt/rocm and /usr/bin symlinks, and is not guaranteed on SLES (e.g. 16.1).
+            INSTALLER_DEPS+=(update-alternatives)
             ;;
         *)
             echo "$ID is not a supported OS"
