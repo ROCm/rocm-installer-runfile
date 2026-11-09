@@ -58,6 +58,12 @@ GCC_TOOLSET_PACKAGES_OL=(gcc-toolset-11-gcc gcc-toolset-11-gcc-c++ gcc-toolset-1
 declare -A SLES_PKG_CACHE
 declare -A CAPABILITY_MAP_CACHE  # Maps RHEL package names to capabilities for SLES resolution
 
+# Installer prerequisites required by the ROCm install that are not part of the extracted required deps.
+INSTALLER_DEPS=(rsync)
+
+# SLES-only packages required by ROCm that are not part of the extracted required deps.
+INSTALLER_DEPS_SLES=
+
 # Debian kernel package URLs from snapshot.debian.org (package -> URL)
 declare -A DEBIAN_KERNEL_PKG_INFO
 
@@ -136,6 +142,13 @@ os_release() {
 
     DISTRO_VER=$(awk -F= '/^VERSION_ID=/{print $2}' /etc/os-release | tr -d '"')
     DISTRO_MAJOR_VER=${DISTRO_VER%.*}
+
+    # Packages not guaranteed to be installed on SLES (e.g. minimal 16.1 images):
+    #   update-alternatives : used by the ROCm postinst scriptlets to create the /opt/rocm and /usr/bin symlinks
+    #   findutils           : required by the installer
+    if [[ "$DISTRO_PACKAGE_MGR" == "zypper" ]]; then
+        INSTALLER_DEPS_SLES="update-alternatives findutils"
+    fi
 }
 
 get_os_codename() {
@@ -1303,6 +1316,47 @@ check_installed_kernel_packages() {
     echo Checking Kernel Packages...Complete.
 }
 
+process_installer_deps() {
+    # Add the installer prerequisites (INSTALLER_DEPS) and the SLES-only extra packages
+    # (INSTALLER_DEPS_SLES) to the deps list.
+    # In list-only mode they are added to the list; otherwise they are checked and
+    # added to the missing list if not installed.
+    local pkg
+    local -a installer_pkgs
+
+    # Sort the package names (and remove duplicates)
+    mapfile -t installer_pkgs < <(printf '%s\n' "${INSTALLER_DEPS[@]}" $INSTALLER_DEPS_SLES | awk 'NF' | sort -u)
+
+    if [[ $DEPS_LIST_ONLY == 0 ]]; then
+        echo "------------------------------------"
+        echo Checking Installer Dependencies...
+    fi
+
+    for pkg in "${installer_pkgs[@]}"; do
+        # Skip if the package is already in the list
+        if [[ ",${MISSING_DEPS// /}," == *",$pkg,"* ]]; then
+            continue
+        fi
+
+        DEPS_COUNT=$((DEPS_COUNT+1))
+
+        if [[ $DEPS_LIST_ONLY == 1 ]]; then
+            MISSING_DEPS="$MISSING_DEPS $pkg,"
+            MISSING_DEPS_COUNT=$((MISSING_DEPS_COUNT+1))
+        elif check_dep_version_installed "$pkg"; then
+            echo -e "$pkg : \e[32mINSTALLED\e[0m"
+        else
+            echo -e "$pkg : \e[31mNOT INSTALLED\e[0m"
+            MISSING_DEPS+="$pkg, "
+            MISSING_DEPS_COUNT=$((MISSING_DEPS_COUNT+1))
+        fi
+    done
+
+    if [[ $DEPS_LIST_ONLY == 0 ]]; then
+        echo Checking Installer Dependencies...Complete.
+    fi
+}
+
 check_installed_graphics_packages() {
     local graphics_deps_file="$1"
 
@@ -2337,6 +2391,11 @@ build_dependencies_list_for_compo() {
         fi
     fi
 
+    # Add the installer prerequisites and SLES-only extra packages for the ROCm component
+    if [[ "$compo_type" == "rocm" ]]; then
+        process_installer_deps
+    fi
+
     # Check kernel packages only for AMDGPU component (not ROCm)
     if [[ $DEPS_LIST_ONLY == 0 && "$compo_type" == "amdgpu" ]]; then
         check_installed_kernel_packages
@@ -2539,7 +2598,7 @@ install_repos_sle() {
             echo "Activating required SLES modules for version ${DISTRO_VER}..."
 
             # Register PackageHub for SLES 16.x
-            register_suse_module "PackageHub" "16.0"
+            register_suse_module "PackageHub" "${DISTRO_VER}"
 
             echo "Module activation complete."
         fi
