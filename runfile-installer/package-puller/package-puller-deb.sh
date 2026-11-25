@@ -242,8 +242,11 @@ setup_apt() {
     if [[ $ROCM_REPO =~ amdrocm\.gpg ]] || [[ $ROCM_REPO =~ rocm\.gpg ]]; then
         sudo mkdir --parents --mode=0755 /etc/apt/keyrings
 
-        # Determine GPG key URL based on repo type (release vs prerelease)
-        if [[ $ROCM_REPO =~ rocm\.prereleases\.amd\.com ]]; then
+        # Determine GPG key URL based on repo type (nightly, prerelease or release)
+        if [[ $ROCM_REPO =~ nightly\.repo\.amd\.com ]]; then
+            GPG_KEY_URL="https://nightly.repo.amd.com/rocm/core/gpg/nightly.gpg"
+            echo "Using nightly GPG key: $GPG_KEY_URL"
+        elif [[ $ROCM_REPO =~ rocm\.prereleases\.amd\.com ]]; then
             GPG_KEY_URL="https://rocm.prereleases.amd.com/packages/gpg/rocm.gpg"
             echo "Using prerelease GPG key: $GPG_KEY_URL"
         else

@@ -42,6 +42,10 @@ PULL_ROCM_PKG_VERSION=""               # Explicit package version (e.g., 7.11.0-
 PULL_CONFIG_AMDGPU=""                   # release / config (must be set via config file or command-line args)
 PULL_CONFIG_AMDGPU_BUILDNUM=""          # For release: 3x.xx.xx / .3x.xx.xx | For config: build number (e.g., 2232928, 2296104)
 
+# Nightly builds with a pull tag (YYYYMMDD date) on or after this date use the signed nightly repo
+# templates (GPG key). Earlier nightly tags use the unsigned templates.
+NIGHTLY_GPG_MIN_TAG=20261101
+
 # Package configs (relative to package-puller directory)
 # These will be dynamically generated from templates by setup_puller_config_rocm()
 PULLER_CONFIG_DEB=""
@@ -800,8 +804,19 @@ setup_puller_config_rocm() {
     TEMPLATE_DIR="../package-puller/config/therock/rocm/${PULL_CONFIG_RELEASE_TYPE}"
 
     # Template files
-    TEMPLATE_DEB="${TEMPLATE_DIR}/rocm-${PULL_CONFIG_RELEASE_TYPE}-deb.config"
-    TEMPLATE_RPM="${TEMPLATE_DIR}/rocm-${PULL_CONFIG_RELEASE_TYPE}-rpm.config"
+    # Nightly builds from NIGHTLY_GPG_MIN_TAG use the signed templates (gpgcheck/signed-by + nightly GPG key)
+    local template_type="${PULL_CONFIG_RELEASE_TYPE}"
+    if [[ "${PULL_CONFIG_RELEASE_TYPE}" == "nightly" ]]; then
+        if [[ "${PULL_CONFIG_TAG}" =~ ^[0-9]{8}$ ]] && (( 10#${PULL_CONFIG_TAG} >= NIGHTLY_GPG_MIN_TAG )); then
+            template_type="nightly-signed"
+            echo "Using signed nightly repo (tag ${PULL_CONFIG_TAG} >= ${NIGHTLY_GPG_MIN_TAG})"
+        else
+            echo "Using unsigned nightly repo (tag ${PULL_CONFIG_TAG} < ${NIGHTLY_GPG_MIN_TAG} or not a date)"
+        fi
+    fi
+
+    TEMPLATE_DEB="${TEMPLATE_DIR}/rocm-${template_type}-deb.config"
+    TEMPLATE_RPM="${TEMPLATE_DIR}/rocm-${template_type}-rpm.config"
 
     # Build version string from tag and runid
     local version_string=""
