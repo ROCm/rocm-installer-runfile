@@ -168,6 +168,43 @@ format_duration() {
 
 ###### NO-DPKG HELPER FUNCTIONS ################################################
 
+# Make sure the zstd tool is available (install it with the system package manager if missing)
+ensure_zstd() {
+    command -v zstd > /dev/null 2>&1 && return 0
+
+    echo "zstd not found. Installing..." >&2
+    if command -v dnf > /dev/null 2>&1; then
+        $SUDO dnf install -y zstd >&2
+    elif command -v yum > /dev/null 2>&1; then
+        $SUDO yum install -y zstd >&2
+    elif command -v apt-get > /dev/null 2>&1; then
+        $SUDO apt-get install -y zstd >&2
+    elif command -v zypper > /dev/null 2>&1; then
+        $SUDO zypper --non-interactive install zstd >&2
+    fi
+
+    command -v zstd > /dev/null 2>&1
+}
+
+# Extract a tar member archive from a DEB (control/data). tar older than 1.31 (EL8, Ubuntu 20.04)
+# cannot auto-detect zstd, which newer ROCm DEBs use, so .zst archives are decompressed with zstd.
+# Usage: untar_deb_member <archive> [tar extract args...]
+untar_deb_member() {
+    local archive="$1"
+    shift
+
+    if [[ "$archive" == *.zst ]]; then
+        if ! ensure_zstd; then
+            echo "ERROR: zstd is required to extract $archive but is not installed." >&2
+            return 1
+        fi
+        zstd -dcq -- "$archive" | tar -x "$@"
+        [[ ${PIPESTATUS[0]} -eq 0 && ${PIPESTATUS[1]} -eq 0 ]]
+    else
+        tar -xf "$archive" "$@"
+    fi
+}
+
 # Global variable to cache the control file content
 CONTROL_FILE_CONTENT=""
 CONTROL_FILE_EXTRACTED=0
@@ -192,7 +229,7 @@ extract_control_file() {
     elif [ -f "$temp_dir/control.tar.xz" ]; then
         tar -xJf "$temp_dir/control.tar.xz" -C "$temp_dir" ./control 2>/dev/null
     elif [ -f "$temp_dir/control.tar.zst" ]; then
-        tar -xf "$temp_dir/control.tar.zst" -C "$temp_dir" ./control 2>/dev/null
+        untar_deb_member "$temp_dir/control.tar.zst" -C "$temp_dir" ./control 2>/dev/null
     fi
 
     # Read the control file into memory
@@ -206,7 +243,8 @@ extract_control_file() {
 
     if [ $CONTROL_FILE_EXTRACTED -eq 0 ]; then
         echo "ERROR: Failed to extract control file from $deb_package"
-        return 1
+        echo "ERROR: Package extraction failed: stopping the build."
+        exit 1
     fi
 
     return 0
@@ -416,7 +454,11 @@ extract_data() {
 
     echo Extracting Data = "$data"
 
-    tar -xf "$data" -C "$package_dir_content"
+    if ! untar_deb_member "$data" -C "$package_dir_content"; then
+        echo "ERROR: Failed to extract package content: $data"
+        echo "ERROR: Package extraction failed: stopping the build."
+        exit 1
+    fi
 
     rm "$data"
 
@@ -573,7 +615,11 @@ extract_scriptlets() {
 
     echo "Extracting control: $control"
 
-    tar -xf "$control" -C "$package_dir_scriptlet"
+    if ! untar_deb_member "$control" -C "$package_dir_scriptlet"; then
+        echo "ERROR: Failed to extract package control data: $control"
+        echo "ERROR: Package extraction failed: stopping the build."
+        exit 1
+    fi
 
     rm "$control"
     rm "$package_dir_scriptlet/control"
@@ -644,7 +690,11 @@ extract_package() {
 
     # Unpack the .deb file
     echo "Unpack '$PACKAGE'"
-    ar xv --output "$PACKAGE_DIR" "$PACKAGE"
+    if ! ar xv --output "$PACKAGE_DIR" "$PACKAGE"; then
+        echo "ERROR: Failed to unpack package (ar): $PACKAGE"
+        echo "ERROR: Package extraction failed: stopping the build."
+        exit 1
+    fi
 
     # Extract the content from data
     if [[ $EXTRACT_CONTENT == 1 ]]; then
